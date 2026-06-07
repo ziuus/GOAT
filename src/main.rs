@@ -3,6 +3,7 @@ mod mcp;
 mod brain;
 mod llm;
 mod config;
+mod swarm;
 mod ui;
 
 use app::{App, InputMode};
@@ -128,6 +129,10 @@ async fn run_app(
                         KeyCode::Char('l') => {
                             info!("learn about me indexing requested");
                             app.learn_about_me();
+                        }
+                        KeyCode::Char('r') => {
+                            info!(input_length = app.input.len(), "swarm route requested");
+                            app.route_current_input();
                         }
                         _ => {}
                     },

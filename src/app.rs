@@ -1,5 +1,6 @@
 use crate::brain::Brain;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
+use crate::swarm::{RouteDecision, SwarmRouter};
 use crate::config::Config;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -20,6 +21,8 @@ pub struct App {
     pub mcp_client: Option<crate::mcp::McpClient>,
     pub history: Vec<Message>,
     pub config: Config,
+    pub swarm_router: SwarmRouter,
+    pub active_route: Option<RouteDecision>,
 }
 
 impl App {
@@ -49,6 +52,8 @@ impl App {
             mcp_client: None,
             history: Vec::new(),
             config,
+            swarm_router: SwarmRouter::default(),
+            active_route: None,
         }
     }
     
@@ -83,6 +88,25 @@ impl App {
                 self.logs.push(format!("[BRAIN ERROR] Learn About Me failed: {}", err));
             }
         }
+    }
+
+    pub fn route_current_input(&mut self) {
+        let candidate = if self.input.trim().is_empty() {
+            self.current_task.as_str()
+        } else {
+            self.input.as_str()
+        };
+
+        let decision = self.swarm_router.route(candidate);
+        self.logs.push(format!(
+            "[SWARM] Routed to {} ({:?}) confidence {}%: {}",
+            decision.profile.name,
+            decision.profile.kind,
+            decision.confidence,
+            decision.reason
+        ));
+        self.current_task = format!("{} agent selected", decision.profile.name);
+        self.active_route = Some(decision);
     }
 
     pub async fn handle_user_input(&mut self, msg: String) {
@@ -125,7 +149,19 @@ impl App {
                 }
             }
 
-            match self.llm_router.completion("openai", "gpt-4o-mini", self.history.clone(), tools).await {
+            let route = self.swarm_router.route(self.history.last().and_then(|message| message.content.as_deref()).unwrap_or_default());
+            self.active_route = Some(route.clone());
+            self.current_task = format!("{} agent working", route.profile.name);
+
+            let mut routed_history = vec![Message {
+                role: "system".to_string(),
+                content: Some(route.profile.system_prompt.to_string()),
+                tool_calls: None,
+                tool_call_id: None,
+            }];
+            routed_history.extend(self.history.clone());
+
+            match self.llm_router.completion(route.profile.provider, route.profile.model, routed_history, tools).await {
                 Ok(response) => {
                     self.history.push(Message {
                         role: "assistant".to_string(),
