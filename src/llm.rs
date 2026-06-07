@@ -1,23 +1,24 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::time::Duration;
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct ToolCall {
     pub id: String,
-    pub r#type: String, // typically "function"
+    pub r#type: String,
     pub function: FunctionCall,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct FunctionCall {
     pub name: String,
-    pub arguments: String, // JSON string of arguments
+    pub arguments: String,
 }
 
 #[derive(Serialize, Clone)]
 pub struct Tool {
-    pub r#type: String, // typically "function"
+    pub r#type: String,
     pub function: FunctionDeclaration,
 }
 
@@ -36,7 +37,7 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>, // used when role is "tool"
+    pub tool_call_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -73,8 +74,13 @@ pub struct LlmRouter {
 
 impl LlmRouter {
     pub fn new(openai_key: Option<String>, groq_key: Option<String>) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
         Self {
-            client: Client::new(),
+            client,
             openai_key: openai_key.or_else(|| std::env::var("OPENAI_API_KEY").ok()),
             groq_key: groq_key.or_else(|| std::env::var("GROQ_API_KEY").ok()),
         }

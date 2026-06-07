@@ -1,11 +1,17 @@
 use std::collections::HashMap;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::time::timeout;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::config::McpServerConfig;
+
+const MCP_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(30);
+const MCP_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const MCP_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcRequest {
@@ -99,7 +105,7 @@ impl McpClient {
         self.stdin.flush().await?;
 
         let mut line = String::new();
-        self.stdout.read_line(&mut line).await?;
+        timeout(MCP_INITIALIZE_TIMEOUT, self.stdout.read_line(&mut line)).await??;
 
         let resp: JsonRpcResponse = serde_json::from_str(&line)?;
         Ok(resp)
@@ -119,7 +125,7 @@ impl McpClient {
         self.stdin.flush().await?;
 
         let mut line = String::new();
-        self.stdout.read_line(&mut line).await?;
+        timeout(MCP_REQUEST_TIMEOUT, self.stdout.read_line(&mut line)).await??;
 
         let resp: JsonRpcResponse = serde_json::from_str(&line)?;
         Ok(resp)
@@ -211,9 +217,10 @@ impl McpManager {
         let mut logs = Vec::new();
 
         for (name, server) in &mut self.servers {
-            match server.client.shutdown().await {
-                Ok(()) => logs.push(format!("[MCP] Server '{name}' stopped.")),
-                Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+            match timeout(MCP_SHUTDOWN_TIMEOUT, server.client.shutdown()).await {
+                Ok(Ok(())) => logs.push(format!("[MCP] Server '{name}' stopped.")),
+                Ok(Err(err)) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+                Err(_) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown timed out.")),
             }
         }
 
@@ -234,6 +241,6 @@ impl McpManager {
             .get_mut(&server_name)
             .ok_or_else(|| format!("MCP server '{server_name}' is not running"))?;
 
-        server.client.call_tool(name, arguments).await
+        timeout(MCP_REQUEST_TIMEOUT, server.client.call_tool(name, arguments)).await?
     }
 }
