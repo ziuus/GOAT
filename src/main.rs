@@ -87,6 +87,7 @@ async fn run_app(
                         }
                         KeyCode::Char('q') => {
                             info!("quit requested");
+                            app.shutdown_mcp_servers().await;
                             app.quit();
                         }
                         KeyCode::Char('c') => {
@@ -103,6 +104,10 @@ async fn run_app(
                         KeyCode::Char('r') => {
                             info!(input_length = app.input.len(), "swarm route requested");
                             app.route_current_input();
+                        }
+                        KeyCode::Char('m') => {
+                            info!("MCP status requested");
+                            app.show_mcp_status();
                         }
                         _ => {}
                     },

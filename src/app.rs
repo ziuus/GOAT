@@ -66,6 +66,20 @@ impl App {
         self.logs.extend(logs);
     }
 
+    pub fn show_mcp_status(&mut self) {
+        let running = self.mcp_manager.running_servers();
+        if running.is_empty() {
+            self.logs.push("[MCP] No MCP servers are running.".to_string());
+        } else {
+            self.logs.push(format!("[MCP] Running servers: {}", running.join(", ")));
+        }
+    }
+
+    pub async fn shutdown_mcp_servers(&mut self) {
+        let logs = self.mcp_manager.shutdown_all().await;
+        self.logs.extend(logs);
+    }
+
     pub fn learn_about_me(&mut self) {
         let Some(brain) = &self.brain else {
             self.logs.push("[BRAIN ERROR] Brain is not connected.".to_string());

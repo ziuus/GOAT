@@ -44,9 +44,18 @@ pub struct McpManager {
 }
 
 impl McpClient {
-    pub async fn spawn(command: &str, args: &[&str]) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut child = Command::new(command)
-            .args(args)
+    pub async fn spawn_with_env(
+        command: &str,
+        args: &[&str],
+        env: &HashMap<String, String>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut child_command = Command::new(command);
+        child_command.args(args);
+        for (key, value) in env {
+            child_command.env(key, value);
+        }
+
+        let mut child = child_command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -56,6 +65,17 @@ impl McpClient {
         let stdout = BufReader::new(child.stdout.take().ok_or("Failed to open stdout")?);
 
         Ok(Self { child, stdin, stdout })
+    }
+
+    pub fn is_running(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.is_running() {
+            self.child.kill().await?;
+        }
+        Ok(())
     }
 
     pub async fn initialize(&mut self) -> Result<JsonRpcResponse, Box<dyn std::error::Error>> {
@@ -136,7 +156,7 @@ impl McpManager {
                 continue;
             }
 
-            match McpClient::spawn(&config.command, &config.args.iter().map(String::as_str).collect::<Vec<_>>()).await {
+            match McpClient::spawn_with_env(&config.command, &config.args.iter().map(String::as_str).collect::<Vec<_>>(), &config.env).await {
                 Ok(mut client) => match client.initialize().await {
                     Ok(_) => match client.list_tools().await {
                         Ok(tool_payload) => {
@@ -178,6 +198,28 @@ impl McpManager {
             .values()
             .flat_map(|server| server.tools.iter().cloned())
             .collect()
+    }
+
+    pub fn running_servers(&mut self) -> Vec<String> {
+        self.servers
+            .iter_mut()
+            .filter_map(|(name, server)| server.client.is_running().then(|| name.clone()))
+            .collect()
+    }
+
+    pub async fn shutdown_all(&mut self) -> Vec<String> {
+        let mut logs = Vec::new();
+
+        for (name, server) in &mut self.servers {
+            match server.client.shutdown().await {
+                Ok(()) => logs.push(format!("[MCP] Server '{name}' stopped.")),
+                Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+            }
+        }
+
+        self.servers.clear();
+        self.tool_index.clear();
+        logs
     }
 
     pub async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, Box<dyn std::error::Error>> {

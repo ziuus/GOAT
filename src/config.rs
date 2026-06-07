@@ -35,10 +35,8 @@ impl Config {
             let config: Config = toml::from_str(&content)?;
             Ok(config)
         } else {
-            // Default config if not found
             let default_config = Config::default();
             
-            // Optionally, create the default config file structure
             if let Some(parent) = config_path.parent() {
                 let _ = fs::create_dir_all(parent);
             }
