@@ -15,7 +15,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{error::Error, io};
 use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
 
 fn init_logging() -> WorkerGuard {
@@ -90,41 +90,11 @@ async fn run_app(
                             app.quit();
                         }
                         KeyCode::Char('c') => {
-                            app.logs.push("[MCP] Spawning 'uvx mcp-server-sqlite --db goat_brain.db'...".to_string());
-                            info!("spawning sqlite MCP server");
+                            app.logs.push("[MCP] Starting configured MCP servers...".to_string());
+                            info!("starting configured MCP servers");
                             terminal.draw(|f| ui::render(f, app))?;
-                            
-                            match crate::mcp::McpClient::spawn("uvx", &["mcp-server-sqlite", "--db", "goat_brain.db"]).await {
-                                Ok(mut client) => {
-                                    match client.initialize().await {
-                                        Ok(init_res) => {
-                                            info!(response = ?init_res, "MCP server initialized");
-                                            app.logs.push(format!("[MCP] Initialized: {:?}", init_res));
-                                            
-                                            match client.list_tools().await {
-                                                Ok(tools) => {
-                                                    info!(tools = ?tools, "MCP tools listed");
-                                                    app.logs.push(format!("[MCP] Tools: {:?}", tools));
-                                                }
-                                                Err(e) => {
-                                                    warn!(error = %e, "failed to list MCP tools");
-                                                    app.logs.push(format!("[MCP ERROR] List tools failed: {}", e));
-                                                }
-                                            }
-                                            
-                                            app.mcp_client = Some(client);
-                                        }
-                                        Err(e) => {
-                                            error!(error = %e, "failed to initialize MCP server");
-                                            app.logs.push(format!("[MCP ERROR] Initialize failed: {}", e));
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    error!(error = %e, "failed to spawn MCP server");
-                                    app.logs.push(format!("[MCP ERROR] Spawn failed: {}", e));
-                                }
-                            }
+                            app.start_configured_mcp_servers().await;
+                            info!("configured MCP startup finished");
                         }
                         KeyCode::Char('l') => {
                             info!("learn about me indexing requested");

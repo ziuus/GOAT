@@ -18,7 +18,7 @@ pub struct App {
     pub input_mode: InputMode,
     pub brain: Option<Brain>,
     pub llm_router: LlmRouter,
-    pub mcp_client: Option<crate::mcp::McpClient>,
+    pub mcp_manager: crate::mcp::McpManager,
     pub history: Vec<Message>,
     pub config: Config,
     pub swarm_router: SwarmRouter,
@@ -49,7 +49,7 @@ impl App {
             input_mode: InputMode::Normal,
             brain,
             llm_router,
-            mcp_client: None,
+            mcp_manager: crate::mcp::McpManager::new(),
             history: Vec::new(),
             config,
             swarm_router: SwarmRouter::default(),
@@ -59,6 +59,11 @@ impl App {
     
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub async fn start_configured_mcp_servers(&mut self) {
+        let logs = self.mcp_manager.start_configured(&self.config.mcp_servers).await;
+        self.logs.extend(logs);
     }
 
     pub fn learn_about_me(&mut self) {
@@ -121,31 +126,28 @@ impl App {
 
         for _iteration in 0..10 {
             let mut tools: Option<Vec<Tool>> = None;
-            
-            if let Some(ref mut client) = self.mcp_client {
-                if let Ok(mcp_tools) = client.list_tools().await {
-                    if let Some(tools_array) = mcp_tools.get("tools").and_then(|t| t.as_array()) {
-                        let mut mapped_tools = Vec::new();
-                        for t in tools_array {
-                            if let (Some(name), Some(desc), Some(schema)) = (
-                                t.get("name").and_then(|v| v.as_str()),
-                                t.get("description").and_then(|v| v.as_str()),
-                                t.get("inputSchema")
-                            ) {
-                                mapped_tools.push(Tool {
-                                    r#type: "function".to_string(),
-                                    function: FunctionDeclaration {
-                                        name: name.to_string(),
-                                        description: desc.to_string(),
-                                        parameters: schema.clone(),
-                                    }
-                                });
-                            }
-                        }
-                        if !mapped_tools.is_empty() {
-                            tools = Some(mapped_tools);
-                        }
+
+            let mcp_tools = self.mcp_manager.all_tools();
+            if !mcp_tools.is_empty() {
+                let mut mapped_tools = Vec::new();
+                for tool in mcp_tools {
+                    if let (Some(name), Some(desc), Some(schema)) = (
+                        tool.get("name").and_then(|value| value.as_str()),
+                        tool.get("description").and_then(|value| value.as_str()),
+                        tool.get("inputSchema"),
+                    ) {
+                        mapped_tools.push(Tool {
+                            r#type: "function".to_string(),
+                            function: FunctionDeclaration {
+                                name: name.to_string(),
+                                description: desc.to_string(),
+                                parameters: schema.clone(),
+                            },
+                        });
                     }
+                }
+                if !mapped_tools.is_empty() {
+                    tools = Some(mapped_tools);
                 }
             }
 
@@ -181,14 +183,12 @@ impl App {
                         for tc in tool_calls {
                             self.logs.push(format!("[AGENT] Executing tool: {}", tc.function.name));
 
-                            let tool_result = if let Some(ref mut client) = self.mcp_client {
+                            let tool_result = {
                                 let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::json!({}));
-                                match client.call_tool(&tc.function.name, args).await {
+                                match self.mcp_manager.call_tool(&tc.function.name, args).await {
                                     Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
                                     Err(e) => format!("Error calling tool: {}", e),
                                 }
-                            } else {
-                                "Error: MCP Client not connected.".to_string()
                             };
 
                             self.logs.push(format!("[TOOL] Result: {}", tool_result));

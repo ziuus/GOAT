@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::config::McpServerConfig;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcRequest {
@@ -27,6 +30,17 @@ pub struct McpClient {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+}
+
+pub struct ManagedMcpServer {
+    pub client: McpClient,
+    pub tools: Vec<Value>,
+}
+
+#[derive(Default)]
+pub struct McpManager {
+    servers: HashMap<String, ManagedMcpServer>,
+    tool_index: HashMap<String, String>,
 }
 
 impl McpClient {
@@ -102,5 +116,82 @@ impl McpClient {
             "arguments": arguments
         }))).await?;
         Ok(resp.result.unwrap_or(json!({})))
+    }
+}
+
+impl McpManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub async fn start_configured(
+        &mut self,
+        configs: &HashMap<String, McpServerConfig>,
+    ) -> Vec<String> {
+        let mut logs = Vec::new();
+
+        for (name, config) in configs {
+            if self.servers.contains_key(name) {
+                logs.push(format!("[MCP] Server '{name}' already running."));
+                continue;
+            }
+
+            match McpClient::spawn(&config.command, &config.args.iter().map(String::as_str).collect::<Vec<_>>()).await {
+                Ok(mut client) => match client.initialize().await {
+                    Ok(_) => match client.list_tools().await {
+                        Ok(tool_payload) => {
+                            let tools = tool_payload
+                                .get("tools")
+                                .and_then(Value::as_array)
+                                .cloned()
+                                .unwrap_or_default();
+
+                            for tool in &tools {
+                                if let Some(tool_name) = tool.get("name").and_then(Value::as_str) {
+                                    self.tool_index.insert(tool_name.to_string(), name.to_string());
+                                }
+                            }
+
+                            self.servers.insert(
+                                name.to_string(),
+                                ManagedMcpServer { client, tools },
+                            );
+                            logs.push(format!("[MCP] Server '{name}' started."));
+                        }
+                        Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' tool listing failed: {err}")),
+                    },
+                    Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' initialize failed: {err}")),
+                },
+                Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' spawn failed: {err}")),
+            }
+        }
+
+        if configs.is_empty() {
+            logs.push("[MCP] No configured MCP servers found.".to_string());
+        }
+
+        logs
+    }
+
+    pub fn all_tools(&self) -> Vec<Value> {
+        self.servers
+            .values()
+            .flat_map(|server| server.tools.iter().cloned())
+            .collect()
+    }
+
+    pub async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, Box<dyn std::error::Error>> {
+        let server_name = self
+            .tool_index
+            .get(name)
+            .ok_or_else(|| format!("No MCP server registered tool '{name}'"))?
+            .clone();
+
+        let server = self
+            .servers
+            .get_mut(&server_name)
+            .ok_or_else(|| format!("MCP server '{server_name}' is not running"))?;
+
+        server.client.call_tool(name, arguments).await
     }
 }
