@@ -125,6 +125,10 @@ async fn run_app(
                                 }
                             }
                         }
+                        KeyCode::Char('l') => {
+                            info!("learn about me indexing requested");
+                            app.learn_about_me();
+                        }
                         _ => {}
                     },
                     InputMode::Editing => match key.code {

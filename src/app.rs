@@ -1,7 +1,8 @@
 use crate::brain::Brain;
-use crate::llm::{LlmRouter, Message, Tool, FunctionDeclaration, ToolCall};
+use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::config::Config;
 use serde_json::Value;
+use std::path::PathBuf;
 
 pub enum InputMode {
     Normal,
@@ -55,6 +56,35 @@ impl App {
         self.running = false;
     }
 
+    pub fn learn_about_me(&mut self) {
+        let Some(brain) = &self.brain else {
+            self.logs.push("[BRAIN ERROR] Brain is not connected.".to_string());
+            return;
+        };
+
+        let paths = default_index_paths();
+        if paths.is_empty() {
+            self.logs.push("[BRAIN] No default paths found to index.".to_string());
+            return;
+        }
+
+        self.logs.push(format!("[BRAIN] Indexing {} local knowledge roots...", paths.len()));
+        match brain.index_paths(&paths) {
+            Ok(summary) => {
+                self.logs.push(format!(
+                    "[BRAIN] Indexed {} files (scanned {}, skipped {}, failed {}).",
+                    summary.indexed_files,
+                    summary.scanned_files,
+                    summary.skipped_files,
+                    summary.failed_files
+                ));
+            }
+            Err(err) => {
+                self.logs.push(format!("[BRAIN ERROR] Learn About Me failed: {}", err));
+            }
+        }
+    }
+
     pub async fn handle_user_input(&mut self, msg: String) {
         self.logs.push(format!("[USER] {}", msg));
         
@@ -65,11 +95,9 @@ impl App {
             tool_call_id: None,
         });
 
-        // Agentic loop max iterations
         for _iteration in 0..10 {
             let mut tools: Option<Vec<Tool>> = None;
             
-            // 1. Fetch tools from MCP if client exists
             if let Some(ref mut client) = self.mcp_client {
                 if let Ok(mcp_tools) = client.list_tools().await {
                     if let Some(tools_array) = mcp_tools.get("tools").and_then(|t| t.as_array()) {
@@ -97,10 +125,8 @@ impl App {
                 }
             }
 
-            // 2. Call LLM
             match self.llm_router.completion("openai", "gpt-4o-mini", self.history.clone(), tools).await {
                 Ok(response) => {
-                    // Record assistant message
                     self.history.push(Message {
                         role: "assistant".to_string(),
                         content: response.content.clone(),
@@ -108,7 +134,6 @@ impl App {
                         tool_call_id: None,
                     });
 
-                    // Log text content
                     if let Some(content) = &response.content {
                         self.logs.push(format!("[LLM] {}", content));
                         if let Some(ref brain) = self.brain {
@@ -116,30 +141,22 @@ impl App {
                         }
                     }
 
-                    // 3. Handle Tool Calls
                     if let Some(tool_calls) = response.tool_calls {
                         for tc in tool_calls {
                             self.logs.push(format!("[AGENT] Executing tool: {}", tc.function.name));
-                            
-                            let mut tool_result = String::new();
-                            
-                            if let Some(ref mut client) = self.mcp_client {
+
+                            let tool_result = if let Some(ref mut client) = self.mcp_client {
                                 let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::json!({}));
                                 match client.call_tool(&tc.function.name, args).await {
-                                    Ok(res) => {
-                                        tool_result = serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string());
-                                    }
-                                    Err(e) => {
-                                        tool_result = format!("Error calling tool: {}", e);
-                                    }
+                                    Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
+                                    Err(e) => format!("Error calling tool: {}", e),
                                 }
                             } else {
-                                tool_result = "Error: MCP Client not connected.".to_string();
-                            }
+                                "Error: MCP Client not connected.".to_string()
+                            };
 
                             self.logs.push(format!("[TOOL] Result: {}", tool_result));
                             
-                            // Append tool result to history
                             self.history.push(Message {
                                 role: "tool".to_string(),
                                 content: Some(tool_result),
@@ -148,7 +165,6 @@ impl App {
                             });
                         }
                     } else {
-                        // No tool calls, interaction complete
                         break;
                     }
                 }
@@ -159,4 +175,19 @@ impl App {
             }
         }
     }
+}
+
+fn default_index_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    if let Some(home) = dirs::home_dir() {
+        for relative in ["Projects", "PAI", "Documents", ".config/goat"] {
+            let path = home.join(relative);
+            if path.exists() {
+                paths.push(path);
+            }
+        }
+    }
+
+    paths
 }
