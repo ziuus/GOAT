@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 const MAX_LOG_LINES: usize = 500;
+const MAX_HISTORY_MESSAGES: usize = 80;
 
 pub enum InputMode {
     Normal,
@@ -77,6 +78,13 @@ impl App {
         let extra = self.logs.len().saturating_sub(MAX_LOG_LINES);
         if extra > 0 {
             self.logs.drain(0..extra);
+        }
+    }
+
+    fn trim_history(&mut self) {
+        let extra = self.history.len().saturating_sub(MAX_HISTORY_MESSAGES);
+        if extra > 0 {
+            self.history.drain(0..extra);
         }
     }
 
@@ -153,6 +161,7 @@ impl App {
             tool_calls: None,
             tool_call_id: None,
         });
+        self.trim_history();
 
         for _iteration in 0..10 {
             let mut tools: Option<Vec<Tool>> = None;
@@ -201,6 +210,7 @@ impl App {
                         tool_calls: response.tool_calls.clone(),
                         tool_call_id: None,
                     });
+                    self.trim_history();
 
                     if let Some(content) = &response.content {
                         self.push_log(format!("[LLM] {}", content));
@@ -229,6 +239,7 @@ impl App {
                                 tool_calls: None,
                                 tool_call_id: Some(tc.id),
                             });
+                            self.trim_history();
                         }
                     } else {
                         break;

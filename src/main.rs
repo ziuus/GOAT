@@ -91,7 +91,7 @@ async fn run_app(
                             app.quit();
                         }
                         KeyCode::Char('c') => {
-                            app.logs.push("[MCP] Starting configured MCP servers...".to_string());
+                            app.push_log("[MCP] Starting configured MCP servers...");
                             info!("starting configured MCP servers");
                             terminal.draw(|f| ui::render(f, app))?;
                             app.start_configured_mcp_servers().await;
@@ -117,7 +117,7 @@ async fn run_app(
                             if !msg.is_empty() {
                                 app.input.clear();
                                 info!(length = msg.len(), "submitting user input");
-                                
+
                                 terminal.draw(|f| ui::render(f, app))?;
 
                                 app.handle_user_input(msg).await;
