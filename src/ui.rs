@@ -6,6 +6,8 @@ use ratatui::{
 };
 use crate::app::{App, InputMode};
 
+const VISIBLE_LOG_LINES: usize = 200;
+
 pub fn render(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -22,10 +24,10 @@ pub fn render(f: &mut Frame, app: &App) {
     f.render_widget(task_block, chunks[0]);
 
     let input_title = match app.input_mode {
-        InputMode::Normal => " Input (Press 'i' to edit) ",
+        InputMode::Normal => " Input (i edit | c MCP | l learn | r route | m status | q quit) ",
         InputMode::Editing => " Input (Press 'Esc' to stop, 'Enter' to send) ",
     };
-    
+
     let input_style = match app.input_mode {
         InputMode::Normal => Style::default(),
         InputMode::Editing => Style::default().fg(Color::Yellow),
@@ -47,7 +49,8 @@ pub fn render(f: &mut Frame, app: &App) {
         }
     }
 
-    let logs_text = app.logs.join("\n");
+    let log_start = app.logs.len().saturating_sub(VISIBLE_LOG_LINES);
+    let logs_text = app.logs[log_start..].join("\n");
     let logs_block = Paragraph::new(logs_text)
         .block(Block::default().title(" Execution Logs ").borders(Borders::ALL));
     f.render_widget(logs_block, chunks[2]);

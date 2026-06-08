@@ -5,6 +5,8 @@ use crate::config::Config;
 use serde_json::Value;
 use std::path::PathBuf;
 
+const MAX_LOG_LINES: usize = 500;
+
 pub enum InputMode {
     Normal,
     Editing,
@@ -61,52 +63,66 @@ impl App {
         self.running = false;
     }
 
+    pub fn push_log(&mut self, log: impl Into<String>) {
+        self.logs.push(log.into());
+        self.trim_logs();
+    }
+
+    pub fn extend_logs(&mut self, logs: impl IntoIterator<Item = String>) {
+        self.logs.extend(logs);
+        self.trim_logs();
+    }
+
+    fn trim_logs(&mut self) {
+        let extra = self.logs.len().saturating_sub(MAX_LOG_LINES);
+        if extra > 0 {
+            self.logs.drain(0..extra);
+        }
+    }
+
     pub async fn start_configured_mcp_servers(&mut self) {
         let logs = self.mcp_manager.start_configured(&self.config.mcp_servers).await;
-        self.logs.extend(logs);
+        self.extend_logs(logs);
     }
 
     pub fn show_mcp_status(&mut self) {
         let running = self.mcp_manager.running_servers();
         if running.is_empty() {
-            self.logs.push("[MCP] No MCP servers are running.".to_string());
+            self.push_log("[MCP] No MCP servers are running.");
         } else {
-            self.logs.push(format!("[MCP] Running servers: {}", running.join(", ")));
+            self.push_log(format!("[MCP] Running servers: {}", running.join(", ")));
         }
     }
 
     pub async fn shutdown_mcp_servers(&mut self) {
         let logs = self.mcp_manager.shutdown_all().await;
-        self.logs.extend(logs);
+        self.extend_logs(logs);
     }
 
     pub fn learn_about_me(&mut self) {
+        let paths = default_index_paths();
+        if paths.is_empty() {
+            self.push_log("[BRAIN] No default paths found to index.");
+            return;
+        }
+
+        self.push_log(format!("[BRAIN] Indexing {} local knowledge roots...", paths.len()));
         let Some(brain) = &self.brain else {
-            self.logs.push("[BRAIN ERROR] Brain is not connected.".to_string());
+            self.push_log("[BRAIN ERROR] Brain is not connected.");
             return;
         };
 
-        let paths = default_index_paths();
-        if paths.is_empty() {
-            self.logs.push("[BRAIN] No default paths found to index.".to_string());
-            return;
-        }
-
-        self.logs.push(format!("[BRAIN] Indexing {} local knowledge roots...", paths.len()));
-        match brain.index_paths(&paths) {
-            Ok(summary) => {
-                self.logs.push(format!(
-                    "[BRAIN] Indexed {} files (scanned {}, skipped {}, failed {}).",
-                    summary.indexed_files,
-                    summary.scanned_files,
-                    summary.skipped_files,
-                    summary.failed_files
-                ));
-            }
-            Err(err) => {
-                self.logs.push(format!("[BRAIN ERROR] Learn About Me failed: {}", err));
-            }
-        }
+        let result_log = match brain.index_paths(&paths) {
+            Ok(summary) => format!(
+                "[BRAIN] Indexed {} files (scanned {}, skipped {}, failed {}).",
+                summary.indexed_files,
+                summary.scanned_files,
+                summary.skipped_files,
+                summary.failed_files
+            ),
+            Err(err) => format!("[BRAIN ERROR] Learn About Me failed: {}", err),
+        };
+        self.push_log(result_log);
     }
 
     pub fn route_current_input(&mut self) {
@@ -117,7 +133,7 @@ impl App {
         };
 
         let decision = self.swarm_router.route(candidate);
-        self.logs.push(format!(
+        self.push_log(format!(
             "[SWARM] Routed to {} ({:?}) confidence {}%: {}",
             decision.profile.name,
             decision.profile.kind,
@@ -129,7 +145,7 @@ impl App {
     }
 
     pub async fn handle_user_input(&mut self, msg: String) {
-        self.logs.push(format!("[USER] {}", msg));
+        self.push_log(format!("[USER] {}", msg));
         
         self.history.push(Message {
             role: "user".to_string(),
@@ -187,7 +203,7 @@ impl App {
                     });
 
                     if let Some(content) = &response.content {
-                        self.logs.push(format!("[LLM] {}", content));
+                        self.push_log(format!("[LLM] {}", content));
                         if let Some(ref brain) = self.brain {
                             let _ = brain.log_interaction("assistant", content);
                         }
@@ -195,7 +211,7 @@ impl App {
 
                     if let Some(tool_calls) = response.tool_calls {
                         for tc in tool_calls {
-                            self.logs.push(format!("[AGENT] Executing tool: {}", tc.function.name));
+                            self.push_log(format!("[AGENT] Executing tool: {}", tc.function.name));
 
                             let tool_result = {
                                 let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::json!({}));
@@ -205,8 +221,8 @@ impl App {
                                 }
                             };
 
-                            self.logs.push(format!("[TOOL] Result: {}", tool_result));
-                            
+                            self.push_log(format!("[TOOL] Result: {}", tool_result));
+
                             self.history.push(Message {
                                 role: "tool".to_string(),
                                 content: Some(tool_result),
@@ -219,7 +235,7 @@ impl App {
                     }
                 }
                 Err(e) => {
-                    self.logs.push(format!("[ERROR] LLM Failed: {}", e));
+                    self.push_log(format!("[ERROR] LLM Failed: {}", e));
                     break;
                 }
             }

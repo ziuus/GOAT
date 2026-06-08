@@ -6,6 +6,7 @@ use std::path::PathBuf;
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Config {
     pub keys: Keys,
+    #[serde(default)]
     pub mcp_servers: HashMap<String, McpServerConfig>,
 }
 
@@ -36,14 +37,14 @@ impl Config {
             Ok(config)
         } else {
             let default_config = Config::default();
-            
+
             if let Some(parent) = config_path.parent() {
                 let _ = fs::create_dir_all(parent);
             }
             if let Ok(content) = toml::to_string_pretty(&default_config) {
                 let _ = fs::write(config_path, content);
             }
-            
+
             Ok(default_config)
         }
     }
