@@ -58,6 +58,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added safety-invariant doc comment: `execute()` is post-approval only
 - Improved descriptions noting approval requirement
 
+### Added — Phase 1.2A: Agent Feature Research (2026-06-08)
+
+**New file: `docs/GOAT_AGENT_FEATURE_RESEARCH.md`**
+- Researched 19 reference agents/tools for features, UX patterns, and architecture
+- Tools covered: OpenCode, Claude Code, Gemini CLI / Antigravity, OpenAI Codex CLI/Cloud, GitHub Copilot, Aider, Cline, Continue, Devin, Jules, Cursor, Windsurf, Hermes, JCode, Little Bird AI, Pi, OpenClaw, GitHub Copilot CLI
+- License compatibility table for all researched tools
+- Master feature blueprint with priority order for GOAT roadmap
+- Planned slash command catalog (/help /status /mcp /learn /route /clear /tools /sessions /plan /review etc.)
+- Architecture principles informed by research (harness design, GOAT.md, Plan/Act, git-native, repo map, etc.)
+
+### Added — Phase 1.2B: TUI/UX Overhaul (2026-06-08)
+
+**Complete interaction model change:**
+- **Removed modal `InputMode`** — no more "press i to type" Vim-style mode switching
+- GOAT now works like a normal chat app: type immediately, Enter sends, Ctrl+C quits
+
+**Modified: `src/app.rs`**
+- Removed `InputMode::Normal/Editing` enum entirely
+- Added `AppStatus` enum: `Ready`, `Thinking`, `ToolRunning(tool)`, `WaitingApproval(tool)`, `Error(msg)`
+- Added `log_scroll: usize` field for user-controllable log scrolling
+- Added `provider_label: String` for status bar display
+- Added `mcp_server_count: usize` for status bar
+- Added `scroll_up()`, `scroll_down()`, `scroll_to_bottom()` methods
+- Added `handle_slash_command()` — slash command dispatcher
+  - `/help` — full help text with all commands and key bindings
+  - `/status` — show provider/session/brain/history status
+  - `/mcp` — start MCP servers
+  - `/learn` — trigger project indexing
+  - `/route` — show swarm route
+  - `/clear` — clear log display
+  - `/tools` — list native + MCP tools
+  - `/sessions` — show session history from brain
+- `handle_user_input()` dispatches slash commands before sending to LLM
+- User messages now shown as `[YOU]` instead of `[USER]` (more chat-like)
+- Agent responses shown as `[GOAT]` instead of `[LLM]`
+- Friendly startup splash instead of debug-like system messages
+- Auto-scrolls to bottom after responses and after approval resolution
+
+**Modified: `src/main.rs`**
+- Removed all `InputMode` references — no more modal switching
+- `run_app()` now: Enter sends, Char pushes, Backspace pops (always active)
+- Added `Ctrl+C` for clean exit (safe, works anywhere)
+- Added `Up/Down` arrow keys for log scrolling (1 line)
+- Added `PageUp/PageDown` for fast scroll (10 lines)
+- Added `Home/End` for jump to top/bottom of log
+- `Esc` clears input if non-empty; scrolls to bottom if input already empty
+- Approval mode: only `y/n/a/d` and `Esc` (= deny) intercepted; all other keys ignored
+- Removed `q` quit (was only in Normal mode; replaced by universal Ctrl+C)
+
+**Modified: `src/ui.rs`**
+- **New 3-panel layout:**
+  - Row 0: Header bar (1 line, always visible)
+  - Row 1: Chat + log panel (fills available height, scrollable)
+  - Row 2: Input composer (3 lines, always visible at bottom)
+- **Header bar:** `GOAT v0.1 │ provider:model │ Session:ID │ [MCP:N] │ STATUS`
+  - Status shows: `● READY` / `◌ THINKING…` / `⚙ RUNNING` / `⚠ APPROVAL` / `✕ ERROR`
+  - Status color changes by state (green/amber/blue/orange/red)
+- **Input composer:**
+  - Placeholder text: `Ask GOAT anything… (Enter to send · Ctrl+C to quit · /help for commands)`
+  - During approval: replaced with `⚠ Approval required — [y] approve [n] deny [a] always allow [d] always deny [Esc] deny`
+  - Cursor always visible in correct position
+- **Log panel:**
+  - Rich RGB colour-coding by message prefix
+  - `[YOU]` = soft blue + bold (user messages stand out)
+  - `[GOAT]` = soft green (assistant responses)
+  - `[TOOL]` = purple
+  - `[AGENT]` = lighter blue
+  - `[APPROVAL] ✓` = green, `[APPROVAL] ✗` = red, `[APPROVAL]` = amber
+  - `[ERROR]` = bright red + bold
+  - `[SYSTEM]` = dim grey
+  - `[HELP]` / `[STATUS]` = teal / yellow
+  - Scroll indicator: `[↑↓ scroll | End = bottom | N lines above]` when scrolled up
+- **Approval overlay:** centred modal with proper key hints, amber/red colour scheme
+
+**cargo check:** 0 errors, 8 dead_code warnings (public API)  
+**cargo test:** 16/16 pass  
+**cargo fmt:** clean
+
 ### Planned (remaining Phase 1 tasks)
 - Restore `src/ui.rs` to fix compilation blocker (already done in Phase 0 recovery)
 - Move brain DB to XDG data directory

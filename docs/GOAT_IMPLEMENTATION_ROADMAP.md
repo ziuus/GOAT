@@ -43,15 +43,14 @@
 
 ### Tasks:
 
-#### 1.1 Restore TUI (Unblocks Compilation)
-- [ ] Create `src/ui.rs` with `pub fn render(f: &mut Frame, app: &App)`
-- [ ] Log panel: renders `app.logs` with wrapping
-- [ ] Input panel: renders `app.input` with cursor indicator
-- [ ] Status bar: shows current agent, model, session ID
-- [ ] Normal/Editing mode visual indicator
-- [ ] MCP server count in status bar
-- [ ] Confirm `cargo check` passes
-- [ ] Confirm `cargo run` launches and is interactive
+#### 1.1 Restore TUI (Unblocks Compilation) ✅ COMPLETE
+- [x] Create `src/ui.rs` with `pub fn render(f: &mut Frame, app: &App)`
+- [x] Log panel: renders `app.logs` with wrapping and RGB colour-coding
+- [x] Input panel: renders `app.input` with cursor indicator and placeholder text
+- [x] Status bar (header): shows provider/model, session ID, MCP count, AppStatus
+- [x] Approval overlay panel rendered when approval is pending
+- [x] `cargo check` passes
+- [x] `cargo run` launches and is interactive
 
 #### 1.2 Security — Approval Gate for Dangerous Tools ✅ COMPLETE
 - [x] Create `src/approval.rs` with `ApprovalGate`, `ApprovalRequest`, `ApprovalDecision`, `RiskLevel`, `SessionPolicy`
@@ -71,7 +70,37 @@
 - [x] `cargo check` passes
 - [x] `cargo test` 16/16 pass
 
-#### 1.3 Config and Data Path Fix
+#### 1.2A Agent Feature Research ✅ COMPLETE
+- [x] Research 19 reference agent platforms
+- [x] Document features, UX patterns, architecture ideas, license status for each
+- [x] Create `docs/GOAT_AGENT_FEATURE_RESEARCH.md` (master blueprint)
+- [x] License compatibility table
+- [x] Master feature priority blueprint for GOAT roadmap
+- [x] Slash command catalog planned
+- [x] Architecture principles documented (GOAT.md, Plan/Act, repo map, git-native, etc.)
+
+#### 1.2B TUI/UX Overhaul ✅ COMPLETE
+- [x] Remove modal `InputMode` (no more "press i to type")
+- [x] Always-active input composer at bottom
+- [x] Placeholder text: "Ask GOAT anything..."
+- [x] Ctrl+C for clean exit
+- [x] Arrow key / PageUp / PageDown log scrolling
+- [x] Home/End to jump to top/bottom of log
+- [x] Esc clears input (or scrolls to bottom if input empty)
+- [x] Slash command dispatcher (`/help`, `/status`, `/mcp`, `/learn`, `/route`, `/clear`, `/tools`, `/sessions`)
+- [x] Unknown slash command shows helpful error
+- [x] Header bar: provider/model, session, MCP count, status with color
+- [x] AppStatus enum: Ready, Thinking, ToolRunning, WaitingApproval, Error
+- [x] Rich RGB colour palette for all message types
+- [x] Scroll indicator shows "N lines above" when scrolled up
+- [x] Input composer approval override during pending approval
+- [x] Approval overlay improved with key hints and colour
+- [x] Auto-scroll to bottom after LLM response
+- [x] User messages shown as `[YOU]` (more chat-like)
+- [x] Agent responses shown as `[GOAT]`
+- [x] `cargo check` 0 errors
+- [x] `cargo test` 16/16 pass
+
 - [ ] Move `goat_brain.db` to `~/.local/share/goat/goat_brain.db` (XDG data dir)
 - [ ] Update `brain.rs` path to use XDG via `dirs::data_dir()`
 - [ ] Add migration: if old `goat_brain.db` exists in project root, warn and optionally migrate

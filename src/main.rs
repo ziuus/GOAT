@@ -8,9 +8,9 @@ mod swarm;
 mod tools;
 mod ui;
 
-use app::{App, InputMode};
+use app::App;
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if let Err(err) = res {
         error!(error = ?err, "application loop exited with an error");
-        println!("{:?}", err);
+        eprintln!("Error: {:?}", err);
     }
 
     Ok(())
@@ -82,74 +82,91 @@ async fn run_app(
 
         if crossterm::event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
-                // ── Approval mode: intercept all keys when a prompt is pending ──
+                // ── Global exits — always active ───────────────────────────────
+                // Ctrl+C: safe exit regardless of any other mode.
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                    info!("Ctrl+C received — shutting down");
+                    app.push_log("[GOAT] Shutting down… goodbye!");
+                    terminal.draw(|f| ui::render(f, app))?;
+                    app.shutdown_mcp_servers().await;
+                    app.quit();
+                    break;
+                }
+
+                // ── Approval mode: intercept y/n/a/d when prompt is pending ───
                 if app.has_pending_approval() {
-                    if let KeyCode::Char(c) = key.code {
-                        terminal.draw(|f| ui::render(f, app))?;
-                        app.resolve_approval(c).await;
+                    match key.code {
+                        KeyCode::Char(c) if matches!(c, 'y' | 'n' | 'a' | 'd') => {
+                            terminal.draw(|f| ui::render(f, app))?;
+                            app.resolve_approval(c).await;
+                        }
+                        KeyCode::Esc => {
+                            // Esc during approval = deny (safe default).
+                            terminal.draw(|f| ui::render(f, app))?;
+                            app.resolve_approval('n').await;
+                        }
+                        // Any other key ignored during approval — user must respond.
+                        _ => {}
                     }
-                    // Any other key is silently ignored while approval is pending.
-                    // This is the safe default: no execution without explicit y/n/a/d.
                 } else {
-                    // ── Normal input handling ──────────────────────────────────
-                    match app.input_mode {
-                        InputMode::Normal => match key.code {
-                            KeyCode::Char('i') => {
-                                app.input_mode = InputMode::Editing;
-                            }
-                            KeyCode::Char('q') => {
-                                info!("quit requested");
-                                app.shutdown_mcp_servers().await;
-                                app.quit();
-                            }
-                            KeyCode::Char('c') => {
-                                app.push_log("[MCP] Starting configured MCP servers...");
-                                info!("starting configured MCP servers");
+                    // ── Normal input handling — always-active composer ─────────
+                    match key.code {
+                        // ── Send message ────────────────────────────────────
+                        KeyCode::Enter => {
+                            let msg = app.input.trim().to_string();
+                            if !msg.is_empty() {
+                                app.input.clear();
+                                app.scroll_to_bottom();
+                                info!(length = msg.len(), "submitting user input");
                                 terminal.draw(|f| ui::render(f, app))?;
-                                app.start_configured_mcp_servers().await;
-                                info!("configured MCP startup finished");
+                                app.handle_user_input(msg).await;
                             }
-                            KeyCode::Char('l') => {
-                                info!("learn about me indexing requested");
-                                app.learn_about_me();
-                            }
-                            KeyCode::Char('r') => {
-                                info!(input_length = app.input.len(), "swarm route requested");
-                                app.route_current_input();
-                            }
-                            KeyCode::Char('m') => {
-                                info!("MCP status requested");
-                                app.show_mcp_status();
-                            }
-                            _ => {}
-                        },
-                        InputMode::Editing => match key.code {
-                            KeyCode::Enter => {
-                                let msg = app.input.clone();
-                                if !msg.is_empty() {
-                                    app.input.clear();
-                                    info!(length = msg.len(), "submitting user input");
+                        }
 
-                                    terminal.draw(|f| ui::render(f, app))?;
+                        // ── Typing ──────────────────────────────────────────
+                        KeyCode::Char(c) => {
+                            app.input.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            app.input.pop();
+                        }
 
-                                    app.handle_user_input(msg).await;
-                                }
+                        // ── Cancel / clear input ────────────────────────────
+                        KeyCode::Esc => {
+                            if !app.input.is_empty() {
+                                app.input.clear();
+                            } else {
+                                app.scroll_to_bottom();
                             }
-                            KeyCode::Char(c) => {
-                                app.input.push(c);
-                            }
-                            KeyCode::Backspace => {
-                                app.input.pop();
-                            }
-                            KeyCode::Esc => {
-                                app.input_mode = InputMode::Normal;
-                            }
-                            _ => {}
-                        },
+                        }
+
+                        // ── Log scrolling ────────────────────────────────────
+                        KeyCode::Up => {
+                            app.scroll_up(1);
+                        }
+                        KeyCode::Down => {
+                            app.scroll_down(1);
+                        }
+                        KeyCode::PageUp => {
+                            app.scroll_up(10);
+                        }
+                        KeyCode::PageDown => {
+                            app.scroll_down(10);
+                        }
+                        KeyCode::Home => {
+                            // Jump to oldest message.
+                            app.scroll_up(usize::MAX);
+                        }
+                        KeyCode::End => {
+                            app.scroll_to_bottom();
+                        }
+
+                        _ => {}
                     }
                 }
             }
         }
+
         if !app.running {
             break;
         }

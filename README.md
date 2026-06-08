@@ -2,9 +2,11 @@
 
 **GOAT** (General Omniscient Agentic Tool) is a Rust-first, terminal-first AI agent platform that combines the best features from leading AI agent systems into a single, modular, secure CLI/TUI experience.
 
-> ⚠️ **Status: Pre-Alpha (Phase 0 — Audit Complete, Phase 1 In Development)**  
-> GOAT currently does **not compile** due to a missing `src/ui.rs` module. This is the first task in Phase 1.  
-> Do not use in production. Features listed as planned are not yet implemented.
+**Version:** 0.2 — Phase 1.2 complete (TUI/UX Overhaul + Agent Feature Research)  
+**Status:** Pre-Alpha — compiles, runs, ApprovalGate + modern TUI active  
+**Last Updated:** 2026-06-08
+
+> Do not use in production. This is pre-alpha software. Features listed as `planned` are not yet implemented.
 
 ---
 
