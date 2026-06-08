@@ -68,8 +68,9 @@ pub struct MessageContent {
 
 pub struct LlmRouter {
     client: Client,
-    openai_key: Option<String>,
-    groq_key: Option<String>,
+    pub openai_key: Option<String>,
+    pub openai_base_url: Option<String>,
+    pub groq_key: Option<String>,
 }
 
 impl LlmRouter {
@@ -79,9 +80,20 @@ impl LlmRouter {
             .build()
             .unwrap_or_else(|_| Client::new());
 
+        let mut final_openai_key = openai_key.or_else(|| std::env::var("OPENAI_API_KEY").ok());
+        let mut final_base_url = None;
+
+        if final_openai_key.is_none() {
+            if let Some((key, url)) = crate::config::Config::get_fallback_api_key() {
+                final_openai_key = Some(key);
+                final_base_url = Some(url);
+            }
+        }
+
         Self {
             client,
-            openai_key: openai_key.or_else(|| std::env::var("OPENAI_API_KEY").ok()),
+            openai_key: final_openai_key,
+            openai_base_url: final_base_url,
             groq_key: groq_key.or_else(|| std::env::var("GROQ_API_KEY").ok()),
         }
     }
@@ -107,7 +119,9 @@ impl LlmRouter {
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, Box<dyn Error>> {
         let key = self.openai_key.as_ref().ok_or("OPENAI_API_KEY not set")?;
-        self.call_openai_compatible("https://api.openai.com/v1/chat/completions", key, model, messages, tools).await
+        let base_url = self.openai_base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+        self.call_openai_compatible(&url, key, model, messages, tools).await
     }
 
     async fn groq_completion(

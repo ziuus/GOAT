@@ -25,6 +25,35 @@ pub struct McpServerConfig {
 }
 
 impl Config {
+    pub fn get_fallback_api_key() -> Option<(String, String)> {
+        let mut path = dirs::home_dir()?;
+        path.push(".config");
+        path.push("opencode");
+        path.push("opencode.json");
+
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(key) = json.pointer("/provider/freellmapi/options/apiKey").and_then(|v| v.as_str()) {
+                    if !key.is_empty() && !key.starts_with("{env:") {
+                        let url = json.pointer("/provider/freellmapi/options/baseURL")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("http://localhost:5999/v1");
+                        return Some((key.to_string(), url.to_string()));
+                    }
+                }
+                if let Some(key) = json.pointer("/provider/omnichat/options/apiKey").and_then(|v| v.as_str()) {
+                    if !key.is_empty() && key != "***" && !key.starts_with("{env:") {
+                        let url = json.pointer("/provider/omnichat/options/baseURL")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("https://api.openai.com/v1");
+                        return Some((key.to_string(), url.to_string()));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
         let mut config_path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
         config_path.push(".config");
