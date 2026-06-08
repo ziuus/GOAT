@@ -119,9 +119,13 @@ impl LlmRouter {
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, Box<dyn Error>> {
         let key = self.openai_key.as_ref().ok_or("OPENAI_API_KEY not set")?;
-        let base_url = self.openai_base_url.as_deref().unwrap_or("https://api.openai.com/v1");
+        let base_url = self
+            .openai_base_url
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1");
         let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-        self.call_openai_compatible(&url, key, model, messages, tools).await
+        self.call_openai_compatible(&url, key, model, messages, tools)
+            .await
     }
 
     async fn groq_completion(
@@ -131,7 +135,14 @@ impl LlmRouter {
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, Box<dyn Error>> {
         let key = self.groq_key.as_ref().ok_or("GROQ_API_KEY not set")?;
-        self.call_openai_compatible("https://api.groq.com/openai/v1/chat/completions", key, model, messages, tools).await
+        self.call_openai_compatible(
+            "https://api.groq.com/openai/v1/chat/completions",
+            key,
+            model,
+            messages,
+            tools,
+        )
+        .await
     }
 
     async fn call_openai_compatible(

@@ -167,14 +167,26 @@ Rolling daily log files are written to `./logs/goat.log.YYYY-MM-DD`.
 ## Security
 
 GOAT is designed with security-first principles:
-- Approval prompts before any shell command, file write, or subagent spawn (Phase 1)
-- Persistent audit log of all tool executions (Phase 2)
-- Secret redaction from logs (Phase 2)
+- **Approval gates implemented** (Phase 1.1) — bash, write_file, and call_subagent all require interactive confirmation before executing
+- Risk levels: `CRITICAL` / `HIGH` / `MEDIUM` assessed per-command with pattern matching
+- Session policies: `a` (always allow) / `d` (always deny) per tool for the session lifetime
+- Denial forwarded to LLM so it can adapt its plan without crashing the loop
+- Secret redaction before displaying command arguments
+- Persistent audit log (Phase 2)
+- Secret redaction from trace logs (Phase 2)
 - Sandbox mode (Phase 6)
 
-See [`docs/GOAT_SECURITY_MODEL.md`](docs/GOAT_SECURITY_MODEL.md) for the full security model.
+**Key bindings when approval is pending:**
 
-> ⚠️ **Phase 0 Warning:** The current codebase has NO approval gates on bash/write tools. Do not connect live API keys until Phase 1 security is complete.
+| Key | Action |
+|-----|--------|
+| `y` | Approve once |
+| `n` | Deny once |
+| `a` | Approve + always allow this tool for the session |
+| `d` | Deny + always deny this tool for the session |
+| *any other key* | **Denied** (safe default) |
+
+See [`docs/GOAT_SECURITY_MODEL.md`](docs/GOAT_SECURITY_MODEL.md) for the full security model.
 
 ---
 

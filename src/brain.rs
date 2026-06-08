@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
@@ -75,7 +75,13 @@ impl Brain {
         Ok(Brain { conn })
     }
 
-    pub fn insert_memory(&self, label: &str, description: &str, value: &str, scope: &str) -> Result<()> {
+    pub fn insert_memory(
+        &self,
+        label: &str,
+        description: &str,
+        value: &str,
+        scope: &str,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO memory_blocks (label, description, value, scope) VALUES (?1, ?2, ?3, ?4)",
             (label, description, value, scope),
@@ -84,13 +90,14 @@ impl Brain {
     }
 
     pub fn get_all_memories(&self) -> Result<Vec<(String, String)>> {
-        let mut stmt = self.conn.prepare("SELECT label, value FROM memory_blocks")?;
-        let memories = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?
-        .filter_map(Result::ok)
-        .collect();
-        
+        let mut stmt = self
+            .conn
+            .prepare("SELECT label, value FROM memory_blocks")?;
+        let memories = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(Result::ok)
+            .collect();
+
         Ok(memories)
     }
 
@@ -103,16 +110,22 @@ impl Brain {
     }
 
     pub fn get_sessions(&self) -> Result<Vec<(String, String)>> {
-        let mut stmt = self.conn.prepare("SELECT id, title FROM sessions ORDER BY created_at DESC")?;
-        let sessions = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, title FROM sessions ORDER BY created_at DESC")?;
+        let sessions = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(Result::ok)
             .collect();
         Ok(sessions)
     }
 
     pub fn load_session_history(&self, session_id: &str) -> Result<Vec<(String, String)>> {
-        let mut stmt = self.conn.prepare("SELECT role, content FROM interactions WHERE session_id = ?1 ORDER BY id ASC")?;
-        let history = stmt.query_map([session_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+        let mut stmt = self.conn.prepare(
+            "SELECT role, content FROM interactions WHERE session_id = ?1 ORDER BY id ASC",
+        )?;
+        let history = stmt
+            .query_map([session_id], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(Result::ok)
             .collect();
         Ok(history)
@@ -194,7 +207,10 @@ impl Brain {
         };
 
         let digest = Sha256::digest(&bytes);
-        let hash = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let hash = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
         let modified_unix = metadata
             .modified()
             .ok()
@@ -249,12 +265,39 @@ fn is_ignored_entry(entry: &DirEntry) -> bool {
 
 fn is_allowed_extension(path: &Path) -> bool {
     let allowed = [
-        "rs", "toml", "md", "txt", "json", "yaml", "yml", "js", "jsx", "ts", "tsx", "py",
-        "go", "java", "kt", "c", "h", "cpp", "hpp", "css", "html", "sh", "zsh", "fish", "sql",
-        "env.example", "gitignore",
+        "rs",
+        "toml",
+        "md",
+        "txt",
+        "json",
+        "yaml",
+        "yml",
+        "js",
+        "jsx",
+        "ts",
+        "tsx",
+        "py",
+        "go",
+        "java",
+        "kt",
+        "c",
+        "h",
+        "cpp",
+        "hpp",
+        "css",
+        "html",
+        "sh",
+        "zsh",
+        "fish",
+        "sql",
+        "env.example",
+        "gitignore",
     ];
 
-    let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
     if allowed.contains(&file_name) {
         return true;
     }

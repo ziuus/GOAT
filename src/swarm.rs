@@ -29,7 +29,20 @@ impl SwarmRouter {
     pub fn route(&self, input: &str) -> RouteDecision {
         let normalized = input.to_lowercase();
 
-        if contains_any(&normalized, &["browser", "website", "webpage", "click", "screenshot", "scrape", "login", "navigate", "research online"]) {
+        if contains_any(
+            &normalized,
+            &[
+                "browser",
+                "website",
+                "webpage",
+                "click",
+                "screenshot",
+                "scrape",
+                "login",
+                "navigate",
+                "research online",
+            ],
+        ) {
             return RouteDecision {
                 profile: browser_profile(),
                 confidence: 88,
@@ -37,7 +50,24 @@ impl SwarmRouter {
             };
         }
 
-        if contains_any(&normalized, &["code", "fix", "bug", "compile", "test", "refactor", "cargo", "typescript", "rust", "python", "repo", "commit", "pull request"]) {
+        if contains_any(
+            &normalized,
+            &[
+                "code",
+                "fix",
+                "bug",
+                "compile",
+                "test",
+                "refactor",
+                "cargo",
+                "typescript",
+                "rust",
+                "python",
+                "repo",
+                "commit",
+                "pull request",
+            ],
+        ) {
             return RouteDecision {
                 profile: coder_profile(),
                 confidence: 86,
@@ -45,7 +75,20 @@ impl SwarmRouter {
             };
         }
 
-        if contains_any(&normalized, &["research", "compare", "find", "source", "paper", "latest", "market", "audit", "analyze options"]) {
+        if contains_any(
+            &normalized,
+            &[
+                "research",
+                "compare",
+                "find",
+                "source",
+                "paper",
+                "latest",
+                "market",
+                "audit",
+                "analyze options",
+            ],
+        ) {
             return RouteDecision {
                 profile: researcher_profile(),
                 confidence: 80,

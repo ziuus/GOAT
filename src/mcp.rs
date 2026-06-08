@@ -1,11 +1,11 @@
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::time::timeout;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
 use crate::config::McpServerConfig;
 
@@ -70,7 +70,11 @@ impl McpClient {
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = BufReader::new(child.stdout.take().ok_or("Failed to open stdout")?);
 
-        Ok(Self { child, stdin, stdout })
+        Ok(Self {
+            child,
+            stdin,
+            stdout,
+        })
     }
 
     pub fn is_running(&mut self) -> bool {
@@ -111,7 +115,11 @@ impl McpClient {
         Ok(resp)
     }
 
-    pub async fn send_request(&mut self, method: &str, params: Option<Value>) -> Result<JsonRpcResponse, Box<dyn std::error::Error>> {
+    pub async fn send_request(
+        &mut self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<JsonRpcResponse, Box<dyn std::error::Error>> {
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: rand::random::<u64>(),
@@ -136,11 +144,20 @@ impl McpClient {
         Ok(resp.result.unwrap_or(json!({})))
     }
 
-    pub async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, Box<dyn std::error::Error>> {
-        let resp = self.send_request("tools/call", Some(json!({
-            "name": name,
-            "arguments": arguments
-        }))).await?;
+    pub async fn call_tool(
+        &mut self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
+        let resp = self
+            .send_request(
+                "tools/call",
+                Some(json!({
+                    "name": name,
+                    "arguments": arguments
+                })),
+            )
+            .await?;
         Ok(resp.result.unwrap_or(json!({})))
     }
 }
@@ -162,7 +179,13 @@ impl McpManager {
                 continue;
             }
 
-            match McpClient::spawn_with_env(&config.command, &config.args.iter().map(String::as_str).collect::<Vec<_>>(), &config.env).await {
+            match McpClient::spawn_with_env(
+                &config.command,
+                &config.args.iter().map(String::as_str).collect::<Vec<_>>(),
+                &config.env,
+            )
+            .await
+            {
                 Ok(mut client) => match client.initialize().await {
                     Ok(_) => match client.list_tools().await {
                         Ok(tool_payload) => {
@@ -174,19 +197,22 @@ impl McpManager {
 
                             for tool in &tools {
                                 if let Some(tool_name) = tool.get("name").and_then(Value::as_str) {
-                                    self.tool_index.insert(tool_name.to_string(), name.to_string());
+                                    self.tool_index
+                                        .insert(tool_name.to_string(), name.to_string());
                                 }
                             }
 
-                            self.servers.insert(
-                                name.to_string(),
-                                ManagedMcpServer { client, tools },
-                            );
+                            self.servers
+                                .insert(name.to_string(), ManagedMcpServer { client, tools });
                             logs.push(format!("[MCP] Server '{name}' started."));
                         }
-                        Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' tool listing failed: {err}")),
+                        Err(err) => logs.push(format!(
+                            "[MCP ERROR] Server '{name}' tool listing failed: {err}"
+                        )),
                     },
-                    Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' initialize failed: {err}")),
+                    Err(err) => logs.push(format!(
+                        "[MCP ERROR] Server '{name}' initialize failed: {err}"
+                    )),
                 },
                 Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' spawn failed: {err}")),
             }
@@ -219,7 +245,9 @@ impl McpManager {
         for (name, server) in &mut self.servers {
             match timeout(MCP_SHUTDOWN_TIMEOUT, server.client.shutdown()).await {
                 Ok(Ok(())) => logs.push(format!("[MCP] Server '{name}' stopped.")),
-                Ok(Err(err)) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+                Ok(Err(err)) => logs.push(format!(
+                    "[MCP ERROR] Server '{name}' shutdown failed: {err}"
+                )),
                 Err(_) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown timed out.")),
             }
         }
@@ -229,7 +257,11 @@ impl McpManager {
         logs
     }
 
-    pub async fn call_tool(&mut self, name: &str, arguments: Value) -> Result<Value, Box<dyn std::error::Error>> {
+    pub async fn call_tool(
+        &mut self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
         let server_name = self
             .tool_index
             .get(name)
@@ -241,6 +273,10 @@ impl McpManager {
             .get_mut(&server_name)
             .ok_or_else(|| format!("MCP server '{server_name}' is not running"))?;
 
-        timeout(MCP_REQUEST_TIMEOUT, server.client.call_tool(name, arguments)).await?
+        timeout(
+            MCP_REQUEST_TIMEOUT,
+            server.client.call_tool(name, arguments),
+        )
+        .await?
     }
 }

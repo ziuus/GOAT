@@ -211,16 +211,18 @@ Status legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Approval gate for bash | `planned` | Phase 1 priority |
-| Approval gate for write_file | `planned` | Phase 1 priority |
-| Approval gate for call_subagent | `planned` | Phase 5 |
+| Approval gate for bash | `working` | Phase 1.1 — `src/approval.rs` |
+| Approval gate for write_file | `working` | Phase 1.1 — `src/approval.rs` |
+| Approval gate for call_subagent | `working` | Phase 1.1 — `src/approval.rs` |
 | Command allowlist/blocklist | `planned` | Phase 2 |
 | Path allowlist/blocklist | `planned` | Phase 2 |
 | Persistent audit log | `planned` | Phase 2 |
-| Secret redaction from logs | `planned` | Phase 2 |
+| Secret redaction from logs | `partial` | Basic secret redaction in approval.rs display |
 | Sandbox mode | `planned` | Phase 6 |
 | Dry-run mode | `planned` | Phase 2 |
 | API key encryption | `planned` | Phase 3 |
+| Risk level assessment (Critical/High/Medium) | `working` | Phase 1.1 — assess_bash_risk, assess_write_risk |
+| Session policy (always allow/deny per tool) | `working` | Phase 1.1 — SessionPolicy in ApprovalGate |
 
 ---
 

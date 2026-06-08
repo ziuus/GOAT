@@ -53,13 +53,23 @@
 - [ ] Confirm `cargo check` passes
 - [ ] Confirm `cargo run` launches and is interactive
 
-#### 1.2 Security — Approval Gate for Dangerous Tools
-- [ ] Add `ApprovalState` enum to app: `Pending`, `Approved`, `Rejected`
-- [ ] Add approval prompt rendering to `ui.rs`
-- [ ] `bash` tool: surface approval prompt before executing any command
-- [ ] `write_file` tool: surface approval prompt before writing
-- [ ] `call_subagent` tool: surface approval prompt before spawning
-- [ ] Log approval decisions to tracing log
+#### 1.2 Security — Approval Gate for Dangerous Tools ✅ COMPLETE
+- [x] Create `src/approval.rs` with `ApprovalGate`, `ApprovalRequest`, `ApprovalDecision`, `RiskLevel`, `SessionPolicy`
+- [x] Risk assessment for bash commands (`assess_bash_risk`): Critical/High/Medium levels
+- [x] Risk assessment for write paths (`assess_write_risk`): Critical/High/Medium levels
+- [x] `bash` tool: approval gate checked before executing any command
+- [x] `write_file` tool: approval gate checked before writing
+- [x] `call_subagent` tool: approval gate checked before spawning
+- [x] Session policy: `a` = always allow, `d` = always deny, for lifetime of session
+- [x] Deny-by-default: any unrecognised input character → Denied
+- [x] Denial message forwarded to LLM in tool-result role so it can adapt
+- [x] TUI approval overlay rendered by `src/ui.rs` when approval is pending
+- [x] Input box overridden with approval hint during pending state
+- [x] Log approval decisions to tracing log
+- [x] Secret redaction in command display before showing to user
+- [x] 16 unit tests for all approval scenarios — all passing
+- [x] `cargo check` passes
+- [x] `cargo test` 16/16 pass
 
 #### 1.3 Config and Data Path Fix
 - [ ] Move `goat_brain.db` to `~/.local/share/goat/goat_brain.db` (XDG data dir)

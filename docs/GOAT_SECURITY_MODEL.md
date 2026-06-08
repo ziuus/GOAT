@@ -1,8 +1,8 @@
 # GOAT — Security Model
 
-**Version:** 0.1 (Phase 0 Draft)  
+**Version:** 0.2 (Phase 1.1 — ApprovalGate implemented)  
 **Last Updated:** 2026-06-08  
-**Current Security Status:** INSUFFICIENT — critical gaps identified in Phase 0 audit
+**Current Security Status:** IMPROVED — approval gates implemented for bash, write_file, call_subagent
 
 > This document describes the intended security model. Items marked MISSING are not yet implemented.
 
@@ -43,28 +43,37 @@ Every tool call must declare its operation category:
 | `MemoryWrite` | brain inserts | Auto-approved |
 | `MemoryScan` | index_paths | Require approval per directory |
 
-### 2.2 Approval Gate (MISSING — Phase 1 Priority)
+### 2.2 Approval Gate (✅ IMPLEMENTED — Phase 1.1)
 
-Before any `Shell`, `WriteFile`, or `SubagentSpawn` operation, GOAT must:
+Before any `Shell`, `WriteFile`, or `SubagentSpawn` operation, GOAT:
 
-1. Surface an approval prompt in the TUI showing:
-   - Operation type
-   - Tool name
-   - Exact arguments (command, path, agent name)
-   - Risk assessment
-2. Wait for user input: `y` (approve), `n` (reject), `a` (approve all similar in this session)
-3. Log the decision to the audit trail
-4. If rejected, return an error message to the LLM so it can adapt
+1. Checks the [`ApprovalGate`] session policy (is this tool always-allowed/always-denied?).
+2. If no policy, surfaces an approval prompt — both in the TUI log panel and as a centred overlay box.
+3. Suspends the agent loop and intercepts the next keypress from the TUI event loop.
+4. Resolves via user input (see below) and logs the decision via `tracing`.
+5. If denied, pushes a tool-result message back to the LLM so it can adapt its plan.
+
+**Implementation:** `src/approval.rs` — `ApprovalGate`, `ApprovalRequest`, `ApprovalDecision`, `SessionPolicy`
+
+**Key inputs:**
+
+| Key | Outcome |
+|-----|---------|
+| `y` | Approve once |
+| `n` | Deny once |
+| `a` | Approve + set session policy to always-allow for this tool |
+| `d` | Deny + set session policy to always-deny for this tool |
+| any other key | Denied (safe default) |
 
 ```
-┌─────────────────────── Approval Required ───────────────────────┐
-│                                                                  │
-│  Tool: bash                                                      │
-│  Command: rm -rf /tmp/test_dir                                   │
-│  Risk: SHELL — modifies filesystem                               │
-│                                                                  │
-│  [y] Approve   [n] Reject   [a] Approve all bash this session    │
-└──────────────────────────────────────────────────────────────────┘
+╔══════════════ APPROVAL REQUIRED ══════════════╗
+  Tool   : bash
+  Action : rm -rf /tmp/test_dir
+  Risk   : HIGH
+  Note   : This command matches patterns associated with destructive operations.
+  Cwd    : /home/user/project
+  [y] Approve once  [n] Deny  [a] Always allow (session)  [d] Always deny (session)
+╚════════════════════════════════════════════════╝
 ```
 
 ### 2.3 Allowlist and Blocklist (MISSING — Phase 2)
@@ -271,9 +280,9 @@ No input validation on tool arguments.
 ## 11. Security Checklist by Phase
 
 ### Phase 1 (Must-have before calling Phase 1 complete):
-- [ ] Approval gate for bash tool
-- [ ] Approval gate for write_file tool
-- [ ] Approval gate for call_subagent tool
+- [x] Approval gate for bash tool ✅
+- [x] Approval gate for write_file tool ✅
+- [x] Approval gate for call_subagent tool ✅
 - [ ] Warn if config file is world-readable
 - [ ] Confirm scanning before learn_about_me
 

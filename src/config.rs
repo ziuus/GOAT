@@ -33,17 +33,25 @@ impl Config {
 
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(key) = json.pointer("/provider/freellmapi/options/apiKey").and_then(|v| v.as_str()) {
+                if let Some(key) = json
+                    .pointer("/provider/freellmapi/options/apiKey")
+                    .and_then(|v| v.as_str())
+                {
                     if !key.is_empty() && !key.starts_with("{env:") {
-                        let url = json.pointer("/provider/freellmapi/options/baseURL")
+                        let url = json
+                            .pointer("/provider/freellmapi/options/baseURL")
                             .and_then(|v| v.as_str())
                             .unwrap_or("http://localhost:5999/v1");
                         return Some((key.to_string(), url.to_string()));
                     }
                 }
-                if let Some(key) = json.pointer("/provider/omnichat/options/apiKey").and_then(|v| v.as_str()) {
+                if let Some(key) = json
+                    .pointer("/provider/omnichat/options/apiKey")
+                    .and_then(|v| v.as_str())
+                {
                     if !key.is_empty() && key != "***" && !key.starts_with("{env:") {
-                        let url = json.pointer("/provider/omnichat/options/baseURL")
+                        let url = json
+                            .pointer("/provider/omnichat/options/baseURL")
                             .and_then(|v| v.as_str())
                             .unwrap_or("https://api.openai.com/v1");
                         return Some((key.to_string(), url.to_string()));

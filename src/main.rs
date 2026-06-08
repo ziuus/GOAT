@@ -1,21 +1,22 @@
 mod app;
-mod mcp;
+mod approval;
 mod brain;
-mod llm;
 mod config;
+mod llm;
+mod mcp;
 mod swarm;
-mod ui;
 mod tools;
+mod ui;
 
 use app::{App, InputMode};
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{error::Error, io};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::time::Duration;
+use std::{error::Error, io};
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
 
@@ -81,60 +82,71 @@ async fn run_app(
 
         if crossterm::event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
-                match app.input_mode {
-                    InputMode::Normal => match key.code {
-                        KeyCode::Char('i') => {
-                            app.input_mode = InputMode::Editing;
-                        }
-                        KeyCode::Char('q') => {
-                            info!("quit requested");
-                            app.shutdown_mcp_servers().await;
-                            app.quit();
-                        }
-                        KeyCode::Char('c') => {
-                            app.push_log("[MCP] Starting configured MCP servers...");
-                            info!("starting configured MCP servers");
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.start_configured_mcp_servers().await;
-                            info!("configured MCP startup finished");
-                        }
-                        KeyCode::Char('l') => {
-                            info!("learn about me indexing requested");
-                            app.learn_about_me();
-                        }
-                        KeyCode::Char('r') => {
-                            info!(input_length = app.input.len(), "swarm route requested");
-                            app.route_current_input();
-                        }
-                        KeyCode::Char('m') => {
-                            info!("MCP status requested");
-                            app.show_mcp_status();
-                        }
-                        _ => {}
-                    },
-                    InputMode::Editing => match key.code {
-                        KeyCode::Enter => {
-                            let msg = app.input.clone();
-                            if !msg.is_empty() {
-                                app.input.clear();
-                                info!(length = msg.len(), "submitting user input");
-
-                                terminal.draw(|f| ui::render(f, app))?;
-
-                                app.handle_user_input(msg).await;
+                // ── Approval mode: intercept all keys when a prompt is pending ──
+                if app.has_pending_approval() {
+                    if let KeyCode::Char(c) = key.code {
+                        terminal.draw(|f| ui::render(f, app))?;
+                        app.resolve_approval(c).await;
+                    }
+                    // Any other key is silently ignored while approval is pending.
+                    // This is the safe default: no execution without explicit y/n/a/d.
+                } else {
+                    // ── Normal input handling ──────────────────────────────────
+                    match app.input_mode {
+                        InputMode::Normal => match key.code {
+                            KeyCode::Char('i') => {
+                                app.input_mode = InputMode::Editing;
                             }
-                        }
-                        KeyCode::Char(c) => {
-                            app.input.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            app.input.pop();
-                        }
-                        KeyCode::Esc => {
-                            app.input_mode = InputMode::Normal;
-                        }
-                        _ => {}
-                    },
+                            KeyCode::Char('q') => {
+                                info!("quit requested");
+                                app.shutdown_mcp_servers().await;
+                                app.quit();
+                            }
+                            KeyCode::Char('c') => {
+                                app.push_log("[MCP] Starting configured MCP servers...");
+                                info!("starting configured MCP servers");
+                                terminal.draw(|f| ui::render(f, app))?;
+                                app.start_configured_mcp_servers().await;
+                                info!("configured MCP startup finished");
+                            }
+                            KeyCode::Char('l') => {
+                                info!("learn about me indexing requested");
+                                app.learn_about_me();
+                            }
+                            KeyCode::Char('r') => {
+                                info!(input_length = app.input.len(), "swarm route requested");
+                                app.route_current_input();
+                            }
+                            KeyCode::Char('m') => {
+                                info!("MCP status requested");
+                                app.show_mcp_status();
+                            }
+                            _ => {}
+                        },
+                        InputMode::Editing => match key.code {
+                            KeyCode::Enter => {
+                                let msg = app.input.clone();
+                                if !msg.is_empty() {
+                                    app.input.clear();
+                                    info!(length = msg.len(), "submitting user input");
+
+                                    terminal.draw(|f| ui::render(f, app))?;
+
+                                    app.handle_user_input(msg).await;
+                                }
+                            }
+                            KeyCode::Char(c) => {
+                                app.input.push(c);
+                            }
+                            KeyCode::Backspace => {
+                                app.input.pop();
+                            }
+                            KeyCode::Esc => {
+                                app.input_mode = InputMode::Normal;
+                            }
+                            _ => {}
+                        },
+                    }
                 }
             }
         }
