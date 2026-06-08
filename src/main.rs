@@ -4,15 +4,16 @@ mod brain;
 mod cli;
 mod config;
 mod error;
+mod headless;
 mod llm;
 mod mcp;
 mod paths;
+mod runtime;
 mod swarm;
 mod tools;
 mod ui;
 
 use anyhow::{Context, Result};
-use app::App;
 use clap::Parser;
 use cli::Cli;
 use crossterm::{
@@ -26,10 +27,12 @@ use std::time::Duration;
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
 
-/// Initialise file-based logging.
+// ── Logging ───────────────────────────────────────────────────────────────────
+
+/// Initialise file-based rolling daily logs.
 ///
-/// Log files are written to the GOAT data directory (`<data_dir>/logs/`).
-/// Falls back to `./logs` if the data directory is not yet available.
+/// Logs go to `<data_dir>/logs/` (XDG).  Falls back to `./logs` if the XDG
+/// directory could not be created.
 fn init_logging(log_dir: &std::path::Path) -> WorkerGuard {
     let file_appender = tracing_appender::rolling::daily(log_dir, "goat.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
@@ -43,9 +46,11 @@ fn init_logging(log_dir: &std::path::Path) -> WorkerGuard {
     guard
 }
 
+// ── Entry point ───────────────────────────────────────────────────────────────
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    // ── 1. Parse CLI arguments ────────────────────────────────────────────────
+    // ── 1. Parse CLI arguments ─────────────────────────────────────────────────
     let cli = Cli::parse();
 
     // ── 2. Resolve paths (XDG + CLI overrides) ────────────────────────────────
@@ -60,7 +65,6 @@ async fn main() -> Result<()> {
     }
 
     // Ensure data and log directories exist before we try to write logs.
-    // These are non-fatal — we fall back to ./logs if needed.
     if goat_paths.ensure_data_dir().is_err() {
         eprintln!(
             "[WARN] Could not create data directory: {} — falling back to ./logs",
@@ -69,7 +73,7 @@ async fn main() -> Result<()> {
     }
     let _ = goat_paths.ensure_log_dir();
 
-    // ── 3. Initialise logging ─────────────────────────────────────────────────
+    // ── 3. Initialise logging ──────────────────────────────────────────────────
     let log_dir = if goat_paths.log_dir.exists() {
         goat_paths.log_dir.clone()
     } else {
@@ -81,10 +85,11 @@ async fn main() -> Result<()> {
         config = %goat_paths.config_file.display(),
         data_dir = %goat_paths.data_dir.display(),
         db = %goat_paths.db_file.display(),
+        headless = cli.headless,
         "resolved paths"
     );
 
-    // ── 4. Load configuration ─────────────────────────────────────────────────
+    // ── 4. Load configuration ──────────────────────────────────────────────────
     let config_result = config::Config::load_from(&goat_paths.config_file).with_context(|| {
         format!(
             "failed to load config from {}",
@@ -95,8 +100,8 @@ async fn main() -> Result<()> {
     let config_warnings = config_result.warnings;
     info!("configuration loaded");
 
-    // ── 5. Handle non-TUI subcommands ─────────────────────────────────────────
-    // These run before the terminal enters raw mode so they print cleanly.
+    // ── 5. Handle non-TUI/non-headless subcommands ────────────────────────────
+    // These run before raw mode and print cleanly to stdout.
     if cli::handle_subcommand(&cli, &goat_paths, &goat_config)
         .await
         .context("subcommand failed")?
@@ -104,18 +109,38 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // ── 6. Detect legacy DB and warn before entering TUI ──────────────────────
-    // This is printed to stderr (before raw mode) so it is visible even if
-    // the TUI fails to start.
+    // ── 6. Detect legacy DB and warn before entering UI ───────────────────────
+    // Printed to stderr so it is visible even if the TUI/headless fails to start.
     if let Some(legacy) = paths::GoatPaths::detect_legacy_db() {
         eprintln!(
-            "[WARN] Legacy database detected: {}\n  New database location: {}\n  To migrate: cargo run -- migrate-db",
+            "[WARN] Legacy database detected: {}\n  New location: {}\n  Migrate: goat migrate-db",
             legacy.display(),
             goat_paths.db_file.display()
         );
     }
 
-    // ── 7. Launch TUI ─────────────────────────────────────────────────────────
+    // ── 7. Bootstrap shared runtime ───────────────────────────────────────────
+    // Shared between TUI and headless: brain, LLM, session, approval gate.
+    let (runtime, boot_log) =
+        runtime::GoatRuntime::bootstrap(goat_config, goat_paths, config_warnings);
+
+    // ── 8. Route to TUI or headless ───────────────────────────────────────────
+    if cli.headless {
+        info!("launching headless mode");
+        headless::run(runtime)
+            .await
+            .context("headless mode failed")?;
+    } else {
+        info!("launching TUI");
+        run_tui(runtime, boot_log).await.context("TUI failed")?;
+    }
+
+    Ok(())
+}
+
+// ── TUI runner ────────────────────────────────────────────────────────────────
+
+async fn run_tui(runtime: runtime::GoatRuntime, boot_log: Vec<String>) -> Result<()> {
     enable_raw_mode().context("failed to enable raw mode")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -123,18 +148,17 @@ async fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend).context("failed to create terminal")?;
     info!("terminal initialized");
 
-    let mut app = App::new(goat_config, goat_paths, config_warnings);
+    let mut app = app::App::from_runtime(runtime, boot_log);
 
     let res = run_app(&mut terminal, &mut app).await;
 
-    // ── 8. Restore terminal ───────────────────────────────────────────────────
     disable_raw_mode().ok();
     execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
     terminal.show_cursor().ok();
     info!("terminal restored");
 
     if let Err(ref err) = res {
-        error!(error = ?err, "application loop exited with an error");
+        error!(error = ?err, "TUI loop exited with an error");
         eprintln!("Error: {err:?}");
     }
 
@@ -142,9 +166,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+// ── TUI event loop ────────────────────────────────────────────────────────────
+
 async fn run_app(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    app: &mut App,
+    app: &mut app::App,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui::render(f, app))?;

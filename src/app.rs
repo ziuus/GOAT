@@ -7,6 +7,7 @@ use crate::config::Config;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::mcp::McpManager;
 use crate::paths::GoatPaths;
+use crate::runtime::GoatRuntime;
 use crate::swarm::{RouteDecision, SwarmRouter};
 use crate::tools::NativeTools;
 use serde_json::Value;
@@ -76,17 +77,15 @@ pub struct App {
 }
 
 impl App {
-    /// Create a new `App`.
+    /// Create `App` from a pre-bootstrapped `GoatRuntime`.
     ///
-    /// - `config`: loaded GOAT configuration.
-    /// - `paths`: resolved XDG data/config paths for this session.
-    /// - `startup_warnings`: non-fatal warnings from config loading (e.g.
-    ///   insecure permissions) shown in the TUI log at startup.
-    pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
-        let brain = Brain::new(&paths.db_file).ok();
+    /// This is the preferred constructor used in production.
+    /// `boot_log` contains messages from the bootstrap phase (brain connection,
+    /// session resume, security notices) to display in the TUI at startup.
+    pub fn from_runtime(rt: GoatRuntime, boot_log: Vec<String>) -> Self {
         let mut logs: Vec<String> = Vec::new();
 
-        // Startup splash
+        // TUI splash header.
         logs.push(
             "[GOAT] v0.2 — Universal AI Agent Platform | Type your message and press Enter"
                 .to_string(),
@@ -94,64 +93,19 @@ impl App {
         logs.push("[GOAT] Slash commands: /help /status /mcp /learn /route /clear".to_string());
         logs.push("[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel".to_string());
 
-        // Show any config-load warnings (e.g. insecure permissions) at the top.
-        for warning in &startup_warnings {
+        // Show startup_warnings (config permission issues, etc.).
+        for warning in &rt.startup_warnings {
             logs.push(warning.clone());
         }
 
-        // ── Session management ────────────────────────────────────────────────
-        // New sessions get a UUID. Old sessions retain their existing IDs.
-        let mut session_id = Uuid::new_v4().to_string();
-        let mut history = Vec::new();
-
-        if let Some(ref b) = brain {
-            logs.push(format!(
-                "[SYSTEM] Brain connected: {}",
-                paths.db_file.display()
-            ));
-            if let Ok(sessions) = b.get_sessions() {
-                if let Some((latest_id, _)) = sessions.first() {
-                    // Existing session — resume it (UUID or legacy ID).
-                    session_id = latest_id.clone();
-                    logs.push(format!("[SYSTEM] Resumed session: {}", session_id));
-                    if let Ok(loaded_history) = b.load_session_history(&session_id) {
-                        for (role, content) in loaded_history {
-                            history.push(Message {
-                                role,
-                                content: Some(content),
-                                tool_calls: None,
-                                tool_call_id: None,
-                            });
-                        }
-                    }
-                } else {
-                    // No sessions yet — create a fresh UUID session.
-                    let _ = b.create_session(&session_id, "New Session");
-                    logs.push(format!("[SYSTEM] Created session: {}", session_id));
-                }
-            }
-        } else {
-            logs.push("[WARN] Brain (SQLite) unavailable — running without memory.".to_string());
+        // Show runtime boot log (brain connection, session, security notice).
+        for msg in &boot_log {
+            logs.push(msg.clone());
         }
 
-        let llm_router = LlmRouter::new(
-            config.keys.openai_api_key.clone(),
-            config.keys.groq_api_key.clone(),
-        );
-
-        // Determine initial provider label
-        let provider_label = if config.keys.openai_api_key.is_some() {
-            "openai:gpt-4o-mini".to_string()
-        } else if config.keys.groq_api_key.is_some() {
-            "groq:llama3-8b".to_string()
-        } else {
-            "no provider configured".to_string()
-        };
-
-        logs.push(
-            "[SECURITY] Approval gate active — bash, write_file, call_subagent require confirmation."
-                .to_string(),
-        );
+        let provider_label = rt.provider_label.clone();
+        let session_id = rt.session_id.clone();
+        let mcp_server_count = rt.mcp_server_count;
 
         Self {
             running: true,
@@ -159,19 +113,29 @@ impl App {
             status: AppStatus::Ready,
             input: String::new(),
             log_scroll: 0,
-            brain,
-            llm_router,
-            mcp_manager: McpManager::new(),
-            history,
-            config,
-            swarm_router: SwarmRouter::default(),
+            brain: rt.brain,
+            llm_router: rt.llm_router,
+            mcp_manager: rt.mcp_manager,
+            history: rt.history,
+            config: rt.config,
+            swarm_router: rt.swarm_router,
             active_route: None,
             session_id,
             provider_label,
-            mcp_server_count: 0,
-            approval_gate: ApprovalGate::new(),
+            mcp_server_count,
+            approval_gate: rt.approval_gate,
             pending_approval: None,
         }
+    }
+
+    /// Create a new `App` directly from config + paths.
+    ///
+    /// Used in tests and as a convenience wrapper.
+    /// Production code should prefer `from_runtime()` to avoid duplicating
+    /// bootstrap logic.
+    pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
+        let (runtime, boot_log) = GoatRuntime::bootstrap(config, paths, startup_warnings);
+        Self::from_runtime(runtime, boot_log)
     }
 
     pub fn quit(&mut self) {

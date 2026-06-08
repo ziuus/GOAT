@@ -179,7 +179,13 @@ impl DoctorStatus {
 ///
 /// `has_openai_key` / `has_groq_key`: whether the keys are configured
 /// (the actual key values must not be passed here to avoid accidental logging).
-pub fn run_doctor(paths: &GoatPaths, has_openai_key: bool, has_groq_key: bool) -> Vec<DoctorCheck> {
+/// `headless_ready`: whether `--headless` was requested (checked for compatibility).
+pub fn run_doctor(
+    paths: &GoatPaths,
+    has_openai_key: bool,
+    has_groq_key: bool,
+    headless_ready: bool,
+) -> Vec<DoctorCheck> {
     let mut checks = Vec::new();
 
     // ── OS / Platform ─────────────────────────────────────────────────────────
@@ -350,6 +356,39 @@ pub fn run_doctor(paths: &GoatPaths, has_openai_key: bool, has_groq_key: bool) -
         });
     }
 
+    // ── Provider count ────────────────────────────────────────────────────────
+    let provider_count = [has_openai_key, has_groq_key]
+        .iter()
+        .filter(|&&v| v)
+        .count();
+    checks.push(DoctorCheck {
+        status: if provider_count > 0 {
+            DoctorStatus::Ok
+        } else {
+            DoctorStatus::Fail
+        },
+        label: "Provider count".to_string(),
+        detail: format!(
+            "{} of 2 providers configured (OpenAI, Groq)",
+            provider_count
+        ),
+    });
+
+    // ── DB migration status ───────────────────────────────────────────────────
+    if GoatPaths::detect_legacy_db().is_some() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Warn,
+            label: "DB migration needed".to_string(),
+            detail: "Run: goat migrate-db   (copies ./goat_brain.db to XDG path)".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "DB migration".to_string(),
+            detail: "No legacy database in project root".to_string(),
+        });
+    }
+
     // ── Approval gate ─────────────────────────────────────────────────────────
     checks.push(DoctorCheck {
         status: DoctorStatus::Ok,
@@ -374,6 +413,17 @@ pub fn run_doctor(paths: &GoatPaths, has_openai_key: bool, has_groq_key: bool) -
             ),
         });
     }
+
+    // ── Headless mode ─────────────────────────────────────────────────────────
+    checks.push(DoctorCheck {
+        status: DoctorStatus::Ok,
+        label: "Headless mode".to_string(),
+        detail: if headless_ready {
+            "Running in headless mode".to_string()
+        } else {
+            "Available — run: goat --headless".to_string()
+        },
+    });
 
     checks
 }
@@ -500,14 +550,14 @@ mod tests {
     fn test_doctor_runs_without_panic() {
         let paths = GoatPaths::resolve().unwrap();
         // Doctor should never panic, even with missing files.
-        let checks = run_doctor(&paths, false, false);
+        let checks = run_doctor(&paths, false, false, false);
         assert!(!checks.is_empty());
     }
 
     #[test]
     fn test_doctor_no_provider_shows_fail() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, false, false);
+        let checks = run_doctor(&paths, false, false, false);
         let has_fail = checks
             .iter()
             .any(|c| c.status == DoctorStatus::Fail && c.label == "Provider");
@@ -517,7 +567,7 @@ mod tests {
     #[test]
     fn test_doctor_with_provider_shows_ok() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, true, false);
+        let checks = run_doctor(&paths, true, false, false);
         let has_ok = checks
             .iter()
             .any(|c| c.status == DoctorStatus::Ok && c.label == "Provider");

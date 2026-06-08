@@ -8,6 +8,149 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 1: Minimal Working Core
 
+### Added — Phase 1.4: Headless Mode + Runtime Separation (2026-06-08)
+
+**Version bump: 0.2.0 → 0.3.0**
+
+**New file: `src/runtime.rs`**
+- `GoatRuntime` struct — shared, surface-agnostic agent state
+  - Holds: `paths`, `config`, `startup_warnings`, `session_id`, `session_resumed`
+  - Holds: `brain`, `llm_router`, `swarm_router`, `approval_gate`, `mcp_manager`
+  - Holds: `history`, `provider_label`, `mcp_server_count`
+- `GoatRuntime::bootstrap(config, paths, warnings)` — single unified bootstrap
+  - Opens brain DB (XDG path), emits `[SYSTEM] Brain connected: ...` or WARN
+  - Resumes most-recent session or creates fresh UUID session
+  - Loads history for resumed session with message count
+  - Initializes `LlmRouter`, `SwarmRouter`, `ApprovalGate`, `McpManager`
+  - Returns `(GoatRuntime, boot_log)` where `boot_log` is a `Vec<String>` of startup messages
+  - Used by BOTH TUI and headless mode — no duplication
+- `format_approval_prompt()` — shared approval display helper
+
+**New file: `src/headless.rs`**
+- `headless::run(runtime)` — async headless agent loop
+- Prints banner with provider, session ID (truncated for readability), brain path, mode
+- Reads lines from stdin via `io::stdin().lock().lines()`
+- Exits cleanly on EOF (Ctrl+D) with `[GOAT] EOF received — goodbye!`
+- Handles slash commands: `/help`, `/status`, `/clear`, `/sessions`, `/tools`, `/exit`
+- `run_agent_turn()` — full ReAct LLM loop identical to TUI (same tools, same providers)
+  - Prints `[GOAT] Thinking…` on same line, clears with response
+  - Saves to brain/session like TUI
+  - Handles MCP tools
+- `prompt_approval_stdin()` — blocking stdin approval prompt
+  - Prints the full `ApprovalRequest::display_lines()` box
+  - Reads `y`/`n`/`a`/`d` from stdin in a loop; re-prompts on invalid input
+  - Denies on EOF (safe default) — never silently approves
+  - Calls same `ApprovalGate::resolve()` as TUI
+- MCP server shutdown on exit
+- `#[allow]` on `SwarmRouter` import (not yet used in headless but planned)
+
+**Modified: `src/cli.rs`**
+- Added `--headless` boolean flag (global, works with all subcommands)
+- Added `sessions` subcommand → `handle_sessions_command()`
+  - Opens brain DB read-only
+  - Lists all sessions: `id[:8]…  title`
+  - Prints "No sessions found" if empty
+  - Prints "No brain database found" if DB doesn't exist yet
+- Updated `handle_subcommand()` → passes `cli.headless` to `run_doctor()`
+- Improved `--help` long description: mode table with TUI / headless / subcommands
+- Updated `Command::Doctor` docs with new checks listed
+
+**Modified: `src/paths.rs`**
+- `run_doctor()` signature: added `headless_ready: bool` 4th parameter
+- New doctor checks:
+  - `Provider count`: `N of 2 providers configured (OpenAI, Groq)`
+  - `DB migration`: OK if no legacy DB, WARN if `./goat_brain.db` still exists
+  - `Headless mode`: OK, shows "Running in headless mode" or "Available — run: goat --headless"
+- ApprovalGate and Log directory checks preserved (restored after earlier edit)
+- Updated test calls: `run_doctor(&paths, false, false, false)` (all 3 tests updated)
+
+**Modified: `src/app.rs`**
+- Added `use crate::runtime::GoatRuntime`
+- New `App::from_runtime(rt: GoatRuntime, boot_log: Vec<String>) -> Self`
+  - Takes pre-bootstrapped GoatRuntime — brain, session, history, LLM, gate already initialized
+  - Renders TUI splash header, startup_warnings, then boot_log in TUI log panel
+  - Consumes all runtime fields into App struct directly
+- `App::new()` refactored to thin wrapper: calls `GoatRuntime::bootstrap()` then `from_runtime()`
+  - Preserved for backward compatibility and tests
+  - No bootstrap logic duplication — single source of truth in `runtime.rs`
+
+**Modified: `src/main.rs`**
+- Registered `mod headless;` and `mod runtime;`
+- Calls `GoatRuntime::bootstrap()` to create shared runtime
+- Routes to `headless::run(runtime)` if `--headless`, else `run_tui(runtime, boot_log)`
+- `run_tui()` extracted as separate function: creates `App::from_runtime()`, then enters TUI loop
+- TUI event loop unchanged: all Phase 1.2 UX preserved
+
+**CLI commands (all working):**
+```
+goat --version        → goat 0.3.0
+goat --headless       → starts headless stdin/stdout loop
+goat --help           → full usage with mode table
+goat --config <PATH>  → custom config (works with --headless)
+goat --db <PATH>      → custom database (works with --headless)
+goat config-path      → ~/.config/goat/goat.toml
+goat data-path        → ~/.local/share/goat
+goat db-path          → ~/.local/share/goat/goat.db
+goat sessions         → list sessions from brain DB
+goat doctor           → improved readiness report (6 new checks)
+goat migrate-db       → copy legacy DB to XDG path
+```
+
+**Headless mode behavior:**
+```
+$ goat --headless
+╔══════════════════════════════════════════════════╗
+║  GOAT Headless v0.3.0                          ║
+╚══════════════════════════════════════════════════╝
+Provider : openai:gpt-4o-mini
+Session  : 550e8400-e29b-...
+Brain    : /home/user/.local/share/goat/goat.db
+Mode     : new session / resumed session
+
+> list files in /tmp
+
+[AGENT] Using tool: bash
+╔══════════════ APPROVAL REQUIRED ══════════════╗
+  Tool   : bash
+  Action : ls /tmp
+  Risk   : MEDIUM
+  ...
+╚═══════════════════════════════════════════════╝
+
+Approve? [y] yes  [n] no  [a] always allow  [d] always deny: y
+[APPROVAL] ✓ Approved: bash
+[TOOL] ...output...
+[GOAT] The /tmp directory contains: ...
+
+> ^D
+[GOAT] EOF received — goodbye!
+```
+
+**Architecture after Phase 1.4:**
+```
+main()
+ ├─ CLI parse (clap)
+ ├─ GoatPaths::resolve()  → XDG paths
+ ├─ Config::load_from()   → config + warnings
+ ├─ handle_subcommand()   → doctor/sessions/paths/migrate (exits)
+ ├─ GoatRuntime::bootstrap() → shared brain/session/LLM/gate
+ │
+ ├─ --headless → headless::run(runtime)  [stdin/stdout]
+ └─ (default) → run_tui(runtime)         [ratatui TUI]
+```
+
+Future surfaces (web API, Tauri, daemon) follow same pattern:
+  `GoatRuntime::bootstrap()` once → pass to surface-specific loop.
+
+**Test results:**
+- `cargo fmt`: clean
+- `cargo check`: 0 errors, 14 dead_code warnings (public API — expected)
+- `cargo test`: 26/26 pass
+- `goat --version`: goat 0.3.0
+- `goat --headless /status /help /sessions /tools EOF`: all working
+- `goat sessions`: shows session list from DB
+- `goat doctor`: shows 15 checks including Provider count, DB migration, Headless mode
+
 ### Added — Phase 1.3: Foundation Cleanup (2026-06-08)
 
 **Version bump: 0.1.0 → 0.2.0** | Binary renamed: `GOAT` → `goat`

@@ -101,42 +101,78 @@
 - [x] `cargo check` 0 errors
 - [x] `cargo test` 16/16 pass
 
-- [ ] Move `goat_brain.db` to `~/.local/share/goat/goat_brain.db` (XDG data dir)
-- [ ] Update `brain.rs` path to use XDG via `dirs::data_dir()`
-- [ ] Add migration: if old `goat_brain.db` exists in project root, warn and optionally migrate
+#### 1.3 Foundation Cleanup ✅ COMPLETE
 
-#### 1.4 CLI Improvements
-- [ ] Add `clap` dependency
-- [ ] Implement `--version` flag
-- [ ] Implement `--config` flag for custom config path
-- [ ] Implement `--headless` flag for non-TUI mode (print responses to stdout)
-- [ ] Implement `--no-brain` flag to run without SQLite
+- [x] Move brain DB to XDG path (`~/.local/share/goat/goat.db`)
+- [x] `src/paths.rs` — `GoatPaths` struct, XDG path resolution
+- [x] `src/error.rs` — typed `GoatError` enum (thiserror)
+- [x] `src/cli.rs` — clap CLI: `--version`, `--config`, `--db`, subcommands
+- [x] `goat config-path`, `goat data-path`, `goat db-path` — path inspection commands
+- [x] `goat doctor` — system readiness health report
+- [x] `goat migrate-db` — copy legacy DB to XDG path
+- [x] `src/config.rs` — anyhow throughout, `ConfigLoadResult` with warnings
+- [x] Config `chmod 600` auto-applied on Unix at creation
+- [x] Config permission check (mode bits) in doctor + TUI startup warning
+- [x] UUID v4 session IDs for new sessions (old IDs preserved)
+- [x] Legacy DB detection: warns in doctor and stderr before TUI
+- [x] Logs moved to `~/.local/share/goat/logs/` (XDG, not `./logs/`)
+- [x] 10 new unit tests for paths, XDG, doctor, permissions
+- [x] `cargo test` 26/26 pass
+- [x] Version bumped to 0.2.0
 
-#### 1.5 Session ID Improvement
-- [ ] Add `uuid` dependency
-- [ ] Replace timestamp-based session IDs with UUID v4
-- [ ] Handle existing sessions gracefully
+#### 1.4 Headless Mode + Runtime Separation ✅ COMPLETE
 
-#### 1.6 Error Handling
-- [ ] Add `anyhow` for structured error propagation
-- [ ] Replace `Box<dyn Error>` with `anyhow::Error` throughout
-- [ ] Add context strings to all error returns
+- [x] `src/runtime.rs` — `GoatRuntime` struct: shared, surface-agnostic bootstrap
+  - [x] `GoatRuntime::bootstrap()` — single unified init: brain, session, LLM, gate
+  - [x] Shared by both TUI (`App::from_runtime()`) and headless (`headless::run()`)
+  - [x] Returns `(GoatRuntime, boot_log)` — no code duplication
+- [x] `src/headless.rs` — complete non-TUI agent loop
+  - [x] Banner: provider, session, brain path, mode (new/resumed)
+  - [x] Stdin line reader, EOF/Ctrl+D exit
+  - [x] Slash commands: `/help` `/status` `/clear` `/sessions` `/tools` `/exit`
+  - [x] Full ReAct LLM loop (same tools, same providers, same DB)
+  - [x] `prompt_approval_stdin()` — blocking y/n/a/d prompt, re-prompts on invalid, denies on EOF
+  - [x] Same `ApprovalGate` as TUI — deny-by-default
+  - [x] MCP server shutdown on exit
+- [x] `--headless` flag added to `Cli` (global, composable with `--config`, `--db`)
+- [x] `goat sessions` CLI subcommand — lists sessions from brain DB
+- [x] `goat doctor` improved:
+  - [x] Provider count: `N of 2 providers configured`
+  - [x] DB migration status: OK/WARN for legacy DB
+  - [x] Headless mode: shows readiness
+  - [x] ApprovalGate + Log directory preserved
+- [x] `App::from_runtime()` constructor added — TUI App now built from GoatRuntime
+- [x] `App::new()` preserved as thin wrapper (backward compat, tests)
+- [x] `main.rs` routes `--headless` → `headless::run()`, default → `run_tui()`
+- [x] All Phase 1.2 TUI UX preserved
+- [x] All 26 tests still pass
+- [x] Version bumped to 0.3.0
 
-### Documentation Update for Phase 1:
-- [ ] Update `README.md` with accurate install, run, and config instructions
-- [ ] Update `CHANGELOG.md` with Phase 1 entries
-- [ ] Update `GOAT_FEATURE_MATRIX.md` to reflect new working status
-- [ ] Update `GOAT_SECURITY_MODEL.md` with approval gate details
+**NOT implemented in Phase 1.4 (deferred):**
+- `--no-brain` flag (deferred to Phase 1.5 — needs runtime field)
+- Workspace/crate split (deferred — full multi-crate split is Phase 3+)
+- anyhow adoption in `brain.rs`, `llm.rs`, `tools.rs` (partial — deferred to Phase 1.5)
 
-### Exit Criteria:
+### Documentation Update for Phase 1: ✅ COMPLETE
+- [x] `README.md` with accurate install, run, and config instructions
+- [x] `CHANGELOG.md` with Phase 1.1 through 1.4 entries
+- [x] `GOAT_FEATURE_MATRIX.md` reflects new working status
+- [x] `GOAT_SECURITY_MODEL.md` with approval gate details
+- [x] `GOAT_ARCHITECTURE.md` documents runtime separation
+
+### Exit Criteria: ✅ ALL PASSED
 - `cargo check` passes ✅
 - `cargo run` launches the TUI ✅
+- `cargo run -- --headless` starts headless loop ✅
 - Basic chat works with one provider (OpenAI or Groq) ✅
 - `bash` tool prompts for approval before executing ✅
 - `write_file` tool prompts for approval before writing ✅
 - Brain DB is in XDG data dir ✅
+- `goat sessions` lists sessions ✅
+- `goat doctor` shows full readiness report ✅
 
 ---
+
 
 ## Phase 2: TUI Foundation
 

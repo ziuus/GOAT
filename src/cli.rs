@@ -1,11 +1,19 @@
 //! CLI argument parsing for GOAT using `clap`.
 //!
-//! This module defines the top-level CLI structure and handles all
-//! non-TUI subcommands (doctor, config-path, data-path, db-path, etc.).
+//! Defines the top-level CLI structure and handles all non-TUI subcommands.
 //!
-//! The TUI is launched only when no subcommand is given (or `run` is used).
-//! All other commands print to stdout and exit immediately, so they work
-//! without a terminal emulator (CI, scripts, health checks, etc.).
+//! # Mode selection
+//!
+//! | Invocation                    | Mode                      |
+//! |-------------------------------|---------------------------|
+//! | `goat`                        | Interactive TUI           |
+//! | `goat --headless`             | Headless stdin/stdout     |
+//! | `goat doctor`                 | Print readiness report    |
+//! | `goat config-path`            | Print config path         |
+//! | `goat data-path`              | Print data dir            |
+//! | `goat db-path`                | Print database path       |
+//! | `goat sessions`               | List recent sessions      |
+//! | `goat migrate-db`             | Migrate legacy DB         |
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -14,20 +22,27 @@ use std::path::PathBuf;
 ///
 /// Universal AI CLI/TUI agent platform.
 /// Run without arguments to launch the interactive TUI.
+/// Use --headless for non-TUI mode.
 #[derive(Parser, Debug)]
 #[command(
     name = "goat",
     version = env!("CARGO_PKG_VERSION"),
     about = "GOAT — Universal AI CLI/TUI agent platform",
     long_about = "GOAT (General Omniscient Agentic Tool) is a Rust-first, terminal-native \
-                  AI agent platform. Run without arguments to start the interactive TUI.\n\n\
-                  Config:   ~/.config/goat/goat.toml\n\
-                  Data:     ~/.local/share/goat/\n\
-                  Database: ~/.local/share/goat/goat.db\n\
-                  Logs:     ~/.local/share/goat/logs/"
+                  AI agent platform.\n\n\
+                  Modes:\n  \
+                    goat              Start interactive TUI\n  \
+                    goat --headless   Start headless stdin/stdout mode\n  \
+                    goat doctor       System readiness check\n  \
+                    goat sessions     List recent sessions\n\n\
+                  Paths:\n  \
+                    Config:   ~/.config/goat/goat.toml\n  \
+                    Data:     ~/.local/share/goat/\n  \
+                    Database: ~/.local/share/goat/goat.db\n  \
+                    Logs:     ~/.local/share/goat/logs/"
 )]
 pub struct Cli {
-    /// Path to a custom config file (overrides default ~/.config/goat/goat.toml).
+    /// Path to a custom config file (overrides ~/.config/goat/goat.toml).
     #[arg(long, value_name = "PATH", global = true)]
     pub config: Option<PathBuf>,
 
@@ -35,7 +50,11 @@ pub struct Cli {
     #[arg(long, value_name = "PATH", global = true)]
     pub db: Option<PathBuf>,
 
-    /// Subcommand to run. If omitted, the TUI is launched.
+    /// Run in headless mode: read from stdin, print to stdout. No TUI.
+    #[arg(long, global = true)]
+    pub headless: bool,
+
+    /// Subcommand to run. If omitted, the TUI (or --headless) mode is used.
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -56,23 +75,29 @@ pub enum Command {
 
     /// Check system readiness and print a health report.
     ///
-    /// Checks: config file, config permissions, data directory, database,
-    /// legacy DB migration, provider keys, approval gate, log directory.
+    /// Checks: OS, GOAT version, config file + permissions, data directory,
+    /// database, legacy DB migration status, provider keys, ApprovalGate,
+    /// headless readiness, log directory.
     #[command(name = "doctor")]
     Doctor,
 
     /// Migrate the legacy project-root goat_brain.db to the XDG data path.
     ///
-    /// Detects `./goat_brain.db` and copies it to the new location.
-    /// The original file is NOT deleted (manual removal required).
+    /// Copies ./goat_brain.db → XDG path. Original is NOT deleted.
     #[command(name = "migrate-db")]
     MigrateDb,
+
+    /// List recent sessions from the brain database.
+    ///
+    /// Shows session ID, title, and (if available) the first user message.
+    #[command(name = "sessions")]
+    Sessions,
 }
 
-/// Handle CLI subcommands that do not need the TUI.
+/// Handle CLI subcommands that do not need TUI or headless mode.
 ///
-/// Returns `true` if a subcommand was handled (program should exit after),
-/// `false` if the TUI should be launched.
+/// Returns `true` if a subcommand was handled (caller should exit after),
+/// `false` if the TUI or headless loop should be launched.
 pub async fn handle_subcommand(
     cli: &Cli,
     paths: &crate::paths::GoatPaths,
@@ -103,6 +128,7 @@ pub async fn handle_subcommand(
                 paths,
                 config.keys.openai_api_key.is_some(),
                 config.keys.groq_api_key.is_some(),
+                cli.headless,
             );
             crate::paths::print_doctor_results(&checks);
             Ok(true)
@@ -112,10 +138,51 @@ pub async fn handle_subcommand(
             handle_migrate_db(paths)?;
             Ok(true)
         }
+
+        Command::Sessions => {
+            handle_sessions_command(paths)?;
+            Ok(true)
+        }
     }
 }
 
-/// Copy the legacy `./goat_brain.db` to the XDG data path if found.
+// ── sessions command ──────────────────────────────────────────────────────────
+
+fn handle_sessions_command(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
+    use anyhow::Context;
+
+    if !paths.db_file.exists() {
+        println!("No brain database found at {}", paths.db_file.display());
+        println!("Run `goat` to create your first session.");
+        return Ok(());
+    }
+
+    let brain = crate::brain::Brain::new(&paths.db_file)
+        .with_context(|| format!("could not open database: {}", paths.db_file.display()))?;
+
+    let sessions = brain
+        .get_sessions()
+        .context("could not read sessions from database")?;
+
+    if sessions.is_empty() {
+        println!("No sessions found in {}", paths.db_file.display());
+        return Ok(());
+    }
+
+    println!("Sessions ({}):", sessions.len());
+    println!("{}", "─".repeat(70));
+    for (id, title) in &sessions {
+        // Shorten UUID for readability.
+        let short_id = if id.len() > 8 { &id[..8] } else { id.as_str() };
+        println!("  {}…  {}", short_id, title);
+    }
+    println!("{}", "─".repeat(70));
+    println!("Database: {}", paths.db_file.display());
+    Ok(())
+}
+
+// ── migrate-db command ────────────────────────────────────────────────────────
+
 fn handle_migrate_db(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
     use anyhow::Context;
 
@@ -135,7 +202,6 @@ fn handle_migrate_db(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Ensure data dir exists.
     paths.ensure_data_dir().with_context(|| {
         format!(
             "could not create data directory: {}",
