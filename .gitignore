@@ -1,2 +1,26 @@
 /target
 references/
+
+# SQLite database files (all variants)
+*.db
+*.db-shm
+*.db-wal
+
+# Legacy brain DB that may appear in project root
+goat_brain.db
+goat_brain.db-shm
+goat_brain.db-wal
+
+# Log files (logs go to XDG data dir now, but keep as safety net)
+logs/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.local

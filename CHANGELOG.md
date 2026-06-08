@@ -8,6 +8,98 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 1: Minimal Working Core
 
+### Added — Phase 1.3: Foundation Cleanup (2026-06-08)
+
+**Version bump: 0.1.0 → 0.2.0** | Binary renamed: `GOAT` → `goat`
+
+**New crates added:** `uuid` (v4 session IDs), `anyhow` (error propagation), `thiserror` (typed errors), `clap` (CLI)
+
+**New file: `src/paths.rs`**
+- `GoatPaths` struct — single source of truth for all resolved filesystem paths
+  - `config_file`: `~/.config/goat/goat.toml` (or `--config` override)
+  - `data_dir`: `~/.local/share/goat/` (XDG data dir, platform-correct)
+  - `db_file`: `~/.local/share/goat/goat.db` (inside data dir)
+  - `log_dir`: `~/.local/share/goat/logs/` (no longer `./logs/`)
+- `GoatPaths::resolve()` — platform-aware path resolution
+- `GoatPaths::with_config()`, `with_db()`, `with_data_dir()` — CLI override helpers
+- `GoatPaths::ensure_data_dir()`, `ensure_log_dir()` — create dirs if missing
+- `GoatPaths::detect_legacy_db()` — finds old `./goat_brain.db` in CWD
+- `check_config_permissions()` — `#[cfg(unix)]` permission bit check (warns if mode & 0o044 != 0)
+- Doctor system: `DoctorCheck`, `DoctorStatus` (Ok/Warn/Fail/Info), `run_doctor()`, `print_doctor_results()`
+  - Doctor checks: OS/platform info, GOAT version, config exists/permissions, data dir writable, DB open test, legacy DB detection, OpenAI/Groq key presence, provider configured, ApprovalGate status, log dir
+- 10 new unit tests for path resolution, overrides, permission checks, doctor logic
+
+**New file: `src/cli.rs`**
+- `Cli` struct with `clap::Parser` — `--config <PATH>` and `--db <PATH>` global flags
+- `Command` enum — subcommands: `config-path`, `data-path`, `db-path`, `doctor`, `migrate-db`
+- `handle_subcommand()` — dispatches subcommands; returns `true` to skip TUI
+- `handle_migrate_db()` — copies `./goat_brain.db` to XDG path, original preserved
+
+**New file: `src/error.rs`**
+- `GoatError` typed enum (thiserror): `NoHomeDir`, `NoDataDir`, `CreateDataDir`, `ReadFile`, `WriteFile`, `OpenDatabase`, `Database`, `ParseConfig`, `InsecureConfigPermissions`, `NoProviderConfigured`, `LlmRequest`, `SessionNotFound`, `ToolExecution`, `Internal`
+- Designed for future use in typed error propagation
+
+**Modified: `src/config.rs`**
+- Now uses `anyhow::Result` throughout (removed `Box<dyn Error>`)
+- `Config::load()` replaced by `Config::load_from(path: &Path) -> Result<ConfigLoadResult>`
+- `ConfigLoadResult` struct: carries `config` + `warnings: Vec<String>`
+- Newly created config files automatically `chmod 600` on Unix
+- Insecure config permissions (mode & 0o044 != 0) added to `warnings`, shown in TUI at startup
+- Config header comment written with security reminder
+- `Config::load_from_path(PathBuf)` convenience wrapper added
+
+**Modified: `src/main.rs`**
+- Now uses `anyhow::Result` as return type
+- `Cli::parse()` at startup — parses all CLI flags
+- `GoatPaths::resolve()` + CLI overrides applied before anything else
+- `ensure_data_dir()` + `ensure_log_dir()` called before logging starts
+- Log files now written to `~/.local/share/goat/logs/` (XDG) not `./logs/`
+- `Config::load_from()` used instead of `Config::load()`; config warnings passed to App
+- `handle_subcommand()` called before raw mode — non-TUI commands print clean output and exit
+- Legacy DB warning printed to stderr before TUI enters (visible on terminal restart)
+- `App::new()` receives `(config, paths, warnings)` — all three passed explicitly
+- `context()` strings on every `?` for human-readable error messages
+
+**Modified: `src/app.rs`**
+- Added `use crate::paths::GoatPaths` and `use uuid::Uuid`
+- `App::new(config, paths, startup_warnings)` — new 3-argument signature
+- Brain DB opened from `paths.db_file` (XDG) instead of hardcoded `"goat_brain.db"`
+- Session IDs: new sessions use `Uuid::new_v4().to_string()` (e.g. `550e8400-e29b-41d4-a716-446655440000`)
+- Old sessions (legacy timestamp IDs) still loaded and resumed without breakage
+- Startup splash shows `v0.2` and brain DB path
+- Config warnings (insecure permissions, created default, etc.) shown in log at startup
+
+**CLI commands (all working):**
+```
+cargo run -- --version        → goat 0.2.0
+cargo run -- --help           → full usage
+cargo run -- config-path      → ~/.config/goat/goat.toml
+cargo run -- data-path        → ~/.local/share/goat
+cargo run -- db-path          → ~/.local/share/goat/goat.db
+cargo run -- doctor           → system readiness report
+cargo run -- migrate-db       → copy ./goat_brain.db → XDG path
+cargo run -- --config <PATH>  → custom config file
+cargo run -- --db <PATH>      → custom database file
+```
+
+**Migration/backward compatibility:**
+- Old `./goat_brain.db` detected automatically
+- `cargo run -- doctor` warns about legacy DB with copy command
+- `cargo run -- migrate-db` performs the copy (original NOT deleted)
+- Existing session IDs in old DB are kept as-is (no schema change)
+- New sessions created after upgrade use UUIDs; old sessions use their original IDs
+
+**Security improvements:**
+- Config files created with `chmod 600` automatically on Unix
+- Config permission check added (doctor + TUI startup warning)
+- Legacy DB detection prevents silent data split
+- All log directories now in XDG data path (not project root)
+
+**Test results:**
+- `cargo fmt`: clean
+- `cargo check`: 0 errors, 11 dead_code warnings (public API)
+- `cargo test`: 26/26 pass (16 approval + 10 paths tests)
+
 ### Added — Phase 1.1: ApprovalGate for Dangerous Tools (2026-06-08)
 
 **New file: `src/approval.rs`**

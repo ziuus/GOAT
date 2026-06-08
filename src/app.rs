@@ -6,11 +6,13 @@ use crate::brain::Brain;
 use crate::config::Config;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::mcp::McpManager;
+use crate::paths::GoatPaths;
 use crate::swarm::{RouteDecision, SwarmRouter};
 use crate::tools::NativeTools;
 use serde_json::Value;
 use std::path::PathBuf;
 use tracing::info;
+use uuid::Uuid;
 
 const MAX_LOG_LINES: usize = 500;
 const MAX_HISTORY_MESSAGES: usize = 80;
@@ -74,34 +76,42 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: Config) -> Self {
-        let brain = Brain::new("goat_brain.db").ok();
+    /// Create a new `App`.
+    ///
+    /// - `config`: loaded GOAT configuration.
+    /// - `paths`: resolved XDG data/config paths for this session.
+    /// - `startup_warnings`: non-fatal warnings from config loading (e.g.
+    ///   insecure permissions) shown in the TUI log at startup.
+    pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
+        let brain = Brain::new(&paths.db_file).ok();
         let mut logs: Vec<String> = Vec::new();
 
         // Startup splash
-        logs.push(format!(
-            "[GOAT] v0.1 — Universal AI Agent Platform | Type your message and press Enter"
-        ));
-        logs.push(format!(
-            "[GOAT] Slash commands: /help /status /mcp /learn /route /clear"
-        ));
-        logs.push(format!(
-            "[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel"
-        ));
-
-        let mut session_id = format!(
-            "{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
+        logs.push(
+            "[GOAT] v0.2 — Universal AI Agent Platform | Type your message and press Enter"
+                .to_string(),
         );
+        logs.push("[GOAT] Slash commands: /help /status /mcp /learn /route /clear".to_string());
+        logs.push("[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel".to_string());
+
+        // Show any config-load warnings (e.g. insecure permissions) at the top.
+        for warning in &startup_warnings {
+            logs.push(warning.clone());
+        }
+
+        // ── Session management ────────────────────────────────────────────────
+        // New sessions get a UUID. Old sessions retain their existing IDs.
+        let mut session_id = Uuid::new_v4().to_string();
         let mut history = Vec::new();
 
         if let Some(ref b) = brain {
-            logs.push("[SYSTEM] Brain connected (SQLite).".to_string());
+            logs.push(format!(
+                "[SYSTEM] Brain connected: {}",
+                paths.db_file.display()
+            ));
             if let Ok(sessions) = b.get_sessions() {
                 if let Some((latest_id, _)) = sessions.first() {
+                    // Existing session — resume it (UUID or legacy ID).
                     session_id = latest_id.clone();
                     logs.push(format!("[SYSTEM] Resumed session: {}", session_id));
                     if let Ok(loaded_history) = b.load_session_history(&session_id) {
@@ -115,8 +125,9 @@ impl App {
                         }
                     }
                 } else {
+                    // No sessions yet — create a fresh UUID session.
                     let _ = b.create_session(&session_id, "New Session");
-                    logs.push(format!("[SYSTEM] Created new session: {}", session_id));
+                    logs.push(format!("[SYSTEM] Created session: {}", session_id));
                 }
             }
         } else {
@@ -137,7 +148,10 @@ impl App {
             "no provider configured".to_string()
         };
 
-        logs.push("[SECURITY] Approval gate active — bash, write_file, call_subagent require confirmation.".to_string());
+        logs.push(
+            "[SECURITY] Approval gate active — bash, write_file, call_subagent require confirmation."
+                .to_string(),
+        );
 
         Self {
             running: true,
