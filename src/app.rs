@@ -2,6 +2,7 @@ use crate::brain::Brain;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::swarm::{RouteDecision, SwarmRouter};
 use crate::config::Config;
+use crate::tools::NativeTools;
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -167,8 +168,9 @@ impl App {
             let mut tools: Option<Vec<Tool>> = None;
 
             let mcp_tools = self.mcp_manager.all_tools();
+            let mut mapped_tools = NativeTools::all_tools();
+
             if !mcp_tools.is_empty() {
-                let mut mapped_tools = Vec::new();
                 for tool in mcp_tools {
                     if let (Some(name), Some(desc), Some(schema)) = (
                         tool.get("name").and_then(|value| value.as_str()),
@@ -185,9 +187,9 @@ impl App {
                         });
                     }
                 }
-                if !mapped_tools.is_empty() {
-                    tools = Some(mapped_tools);
-                }
+            }
+            if !mapped_tools.is_empty() {
+                tools = Some(mapped_tools);
             }
 
             let route = self.swarm_router.route(self.history.last().and_then(|message| message.content.as_deref()).unwrap_or_default());
@@ -225,9 +227,16 @@ impl App {
 
                             let tool_result = {
                                 let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::json!({}));
-                                match self.mcp_manager.call_tool(&tc.function.name, args).await {
-                                    Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
-                                    Err(e) => format!("Error calling tool: {}", e),
+                                if let Some(native_result) = NativeTools::execute(&tc.function.name, args.clone()).await {
+                                    match native_result {
+                                        Ok(res) => res,
+                                        Err(e) => format!("Error executing native tool: {}", e),
+                                    }
+                                } else {
+                                    match self.mcp_manager.call_tool(&tc.function.name, args).await {
+                                        Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
+                                        Err(e) => format!("Error calling MCP tool: {}", e),
+                                    }
                                 }
                             };
 

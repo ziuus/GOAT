@@ -5,6 +5,7 @@ mod llm;
 mod config;
 mod swarm;
 mod ui;
+mod tools;
 
 use app::{App, InputMode};
 use crossterm::{
