@@ -40,11 +40,22 @@ impl Brain {
         )?;
 
         conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        )?;
+
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS interactions (
                 id INTEGER PRIMARY KEY,
+                session_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
             )",
             [],
         )?;
@@ -83,10 +94,34 @@ impl Brain {
         Ok(memories)
     }
 
-    pub fn log_interaction(&self, role: &str, content: &str) -> Result<()> {
+    pub fn create_session(&self, id: &str, title: &str) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO interactions (role, content) VALUES (?1, ?2)",
-            (role, content),
+            "INSERT INTO sessions (id, title) VALUES (?1, ?2)",
+            (id, title),
+        )?;
+        Ok(())
+    }
+
+    pub fn get_sessions(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT id, title FROM sessions ORDER BY created_at DESC")?;
+        let sessions = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(Result::ok)
+            .collect();
+        Ok(sessions)
+    }
+
+    pub fn load_session_history(&self, session_id: &str) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT role, content FROM interactions WHERE session_id = ?1 ORDER BY id ASC")?;
+        let history = stmt.query_map([session_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(Result::ok)
+            .collect();
+        Ok(history)
+    }
+
+    pub fn log_interaction(&self, session_id: &str, role: &str, content: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO interactions (session_id, role, content) VALUES (?1, ?2, ?3)",
+            (session_id, role, content),
         )?;
         Ok(())
     }

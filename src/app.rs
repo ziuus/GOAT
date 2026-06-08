@@ -3,6 +3,7 @@ use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::swarm::{RouteDecision, SwarmRouter};
 use crate::config::Config;
 use crate::tools::NativeTools;
+use crate::mcp::McpManager;
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -22,11 +23,12 @@ pub struct App {
     pub input_mode: InputMode,
     pub brain: Option<Brain>,
     pub llm_router: LlmRouter,
-    pub mcp_manager: crate::mcp::McpManager,
+    pub mcp_manager: McpManager,
     pub history: Vec<Message>,
     pub config: Config,
     pub swarm_router: SwarmRouter,
     pub active_route: Option<RouteDecision>,
+    pub session_id: String,
 }
 
 impl App {
@@ -37,10 +39,32 @@ impl App {
             "[SYSTEM] Awaiting MCP connections...".to_string(),
         ];
         
-        if brain.is_none() {
-            logs.push("[ERROR] Failed to initialize Brain (SQLite).".to_string());
-        } else {
+        let mut session_id = format!("{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+        let mut history = Vec::new();
+
+        if let Some(ref b) = brain {
             logs.push("[SYSTEM] Brain connected (SQLite).".to_string());
+            if let Ok(sessions) = b.get_sessions() {
+                if let Some((latest_id, _)) = sessions.first() {
+                    session_id = latest_id.clone();
+                    logs.push(format!("[SYSTEM] Resumed session: {}", session_id));
+                    if let Ok(loaded_history) = b.load_session_history(&session_id) {
+                        for (role, content) in loaded_history {
+                            history.push(Message {
+                                role,
+                                content: Some(content),
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                    }
+                } else {
+                    let _ = b.create_session(&session_id, "New Session");
+                    logs.push(format!("[SYSTEM] Created session: {}", session_id));
+                }
+            }
+        } else {
+            logs.push("[ERROR] Failed to initialize Brain (SQLite).".to_string());
         }
 
         let llm_router = LlmRouter::new(config.keys.openai_api_key.clone(), config.keys.groq_api_key.clone());
@@ -54,10 +78,11 @@ impl App {
             brain,
             llm_router,
             mcp_manager: crate::mcp::McpManager::new(),
-            history: Vec::new(),
+            history,
             config,
             swarm_router: SwarmRouter::default(),
             active_route: None,
+            session_id,
         }
     }
     
@@ -156,6 +181,10 @@ impl App {
     pub async fn handle_user_input(&mut self, msg: String) {
         self.push_log(format!("[USER] {}", msg));
         
+        if let Some(ref brain) = self.brain {
+            let _ = brain.log_interaction(&self.session_id, "user", &msg);
+        }
+
         self.history.push(Message {
             role: "user".to_string(),
             content: Some(msg),
@@ -217,7 +246,7 @@ impl App {
                     if let Some(content) = &response.content {
                         self.push_log(format!("[LLM] {}", content));
                         if let Some(ref brain) = self.brain {
-                            let _ = brain.log_interaction("assistant", content);
+                            let _ = brain.log_interaction(&self.session_id, "assistant", content);
                         }
                     }
 
