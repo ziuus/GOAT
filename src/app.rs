@@ -6,7 +6,7 @@ use crate::brain::Brain;
 use crate::config::Config;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::mcp::McpManager;
-use crate::models::ModelChain;
+use crate::models::{ModelChain, ProfileRegistry};
 use crate::paths::GoatPaths;
 use crate::runtime::GoatRuntime;
 use crate::swarm::{RouteDecision, SwarmRouter};
@@ -73,6 +73,8 @@ pub struct App {
     pub active_profile: String,
     /// Fallback chain for the active profile.
     pub model_chain: ModelChain,
+    /// Profile registry — needed for /profile switching.
+    pub profile_registry: ProfileRegistry,
     /// Number of running MCP servers.
     pub mcp_server_count: usize,
     /// The approval gate for this session.
@@ -94,11 +96,11 @@ impl App {
 
         // TUI splash header.
         logs.push(
-            "[GOAT] v0.3 — Universal AI Agent Platform | Type your message and press Enter"
+            "[GOAT] v0.4 — Universal AI Agent Platform | Type your message and press Enter"
                 .to_string(),
         );
         logs.push(
-            "[GOAT] Slash commands: /help /status /mcp /learn /route /clear /tools /sessions"
+            "[GOAT] Slash commands: /help /status /profile /profiles /mcp /learn /route /clear /tools /sessions /new"
                 .to_string(),
         );
         logs.push("[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel".to_string());
@@ -136,6 +138,7 @@ impl App {
             provider_label,
             active_profile,
             model_chain: rt.model_chain,
+            profile_registry: rt.profile_registry,
             mcp_server_count,
             approval_gate: rt.approval_gate,
             brain_disabled,
@@ -144,12 +147,9 @@ impl App {
     }
 
     /// Create a new `App` directly from config + paths.
-    ///
-    /// Used in tests and as a convenience wrapper.
-    /// Production code should prefer `from_runtime()` to avoid duplicating
-    /// bootstrap logic.
     pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
-        let (runtime, boot_log) = GoatRuntime::bootstrap(config, paths, startup_warnings, false);
+        let (runtime, boot_log) =
+            GoatRuntime::bootstrap(config, paths, startup_warnings, false, None);
         Self::from_runtime(runtime, boot_log)
     }
 
@@ -293,14 +293,18 @@ impl App {
         match name.as_str() {
             "/help" => {
                 self.push_log("[HELP] Available commands:");
-                self.push_log("[HELP]   /help         — show this help");
-                self.push_log("[HELP]   /status       — show system status");
-                self.push_log("[HELP]   /mcp          — start configured MCP servers");
-                self.push_log("[HELP]   /learn        — index project files into brain");
-                self.push_log("[HELP]   /route        — show current swarm route for input");
-                self.push_log("[HELP]   /clear        — clear the log display");
-                self.push_log("[HELP]   /tools        — list available tools");
-                self.push_log("[HELP]   /sessions     — show session info");
+                self.push_log("[HELP]   /help            — show this help");
+                self.push_log("[HELP]   /status          — show system status");
+                self.push_log("[HELP]   /profile         — show current profile");
+                self.push_log("[HELP]   /profile <name>  — switch to a profile");
+                self.push_log("[HELP]   /profiles        — list available profiles");
+                self.push_log("[HELP]   /new             — start a new session");
+                self.push_log("[HELP]   /mcp             — start configured MCP servers");
+                self.push_log("[HELP]   /learn           — index project files into brain");
+                self.push_log("[HELP]   /route           — show current swarm route for input");
+                self.push_log("[HELP]   /clear           — clear the log display");
+                self.push_log("[HELP]   /tools           — list available tools");
+                self.push_log("[HELP]   /sessions        — show session info");
                 self.push_log("[HELP]");
                 self.push_log("[HELP] Keys:");
                 self.push_log("[HELP]   Enter         — send message");
@@ -334,6 +338,11 @@ impl App {
                     } else {
                         "unavailable"
                     }
+                ));
+                self.push_log(format!(
+                    "[STATUS] Retries  : {} max / {}s timeout",
+                    self.config.llm.effective_max_retries(),
+                    self.config.llm.effective_timeout_secs()
                 ));
                 self.push_log(format!(
                     "[STATUS] History  : {} messages",
@@ -394,16 +403,26 @@ impl App {
             }
 
             "/sessions" => {
-                self.push_log(format!("[SESSION] Current session ID: {}", self.session_id));
+                self.push_log(format!("[SESSION] Current: {}", self.session_id));
                 if let Some(ref brain) = self.brain {
-                    match brain.get_sessions() {
-                        Ok(sessions) => {
+                    match brain.get_session_records() {
+                        Ok(records) => {
                             self.push_log(format!(
                                 "[SESSION] {} session(s) in brain:",
-                                sessions.len()
+                                records.len()
                             ));
-                            for (id, label) in sessions.iter().take(10) {
-                                self.push_log(format!("[SESSION]   {} — {}", id, label));
+                            for r in records.iter().take(10) {
+                                let short_id = if r.id.len() > 8 {
+                                    format!("{}…", &r.id[..8])
+                                } else {
+                                    r.id.clone()
+                                };
+                                let kind = if r.is_uuid() { "uuid" } else { "legacy" };
+                                let ts = r.updated_at.get(..16).unwrap_or(&r.updated_at);
+                                self.push_log(format!(
+                                    "[SESSION]   {}  [{}]  {}  {}",
+                                    short_id, kind, ts, r.title
+                                ));
                             }
                         }
                         Err(e) => {
@@ -412,6 +431,109 @@ impl App {
                     }
                 } else {
                     self.push_log("[SESSION] Brain not connected — session history unavailable.");
+                }
+                true
+            }
+
+            "/profile" => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                if arg.is_empty() {
+                    // Show current profile.
+                    self.push_log(format!("[PROFILE] Active : {}", self.active_profile));
+                    self.push_log(format!(
+                        "[PROFILE] Primary: {}",
+                        self.model_chain.primary_display()
+                    ));
+                    self.push_log(format!(
+                        "[PROFILE] Fallback: {}",
+                        self.model_chain.fallback_display()
+                    ));
+                    self.push_log(
+                        "[PROFILE] Use /profile <name> to switch. Use /profiles to list.",
+                    );
+                } else {
+                    // Switch to named profile.
+                    if self.status != AppStatus::Ready {
+                        self.push_log("[PROFILE] Cannot switch profile while agent is running. Wait for READY.");
+                    } else {
+                        match self.profile_registry.profiles.get(arg) {
+                            Some(chain) => {
+                                self.active_profile = arg.to_string();
+                                self.model_chain = chain.clone();
+                                // Update provider_label to first available entry.
+                                self.provider_label = self
+                                    .model_chain
+                                    .entries
+                                    .iter()
+                                    .find(|e| self.llm_router.is_provider_available(&e.provider))
+                                    .map(|e| e.display())
+                                    .unwrap_or_else(|| "no provider configured".to_string());
+                                self.push_log(format!(
+                                    "[PROFILE] Switched to '{}' — {} → {}",
+                                    arg,
+                                    self.model_chain.primary_display(),
+                                    self.model_chain.fallback_display()
+                                ));
+                                info!(profile = %arg, provider = %self.provider_label, "TUI profile switched");
+                            }
+                            None => {
+                                let available = self.profile_registry.profile_names().join(", ");
+                                self.push_log(format!(
+                                    "[PROFILE] Unknown profile '{}'. Available: {}",
+                                    arg, available
+                                ));
+                            }
+                        }
+                    }
+                }
+                true
+            }
+
+            "/profiles" => {
+                // Collect all log lines first to avoid borrow conflicts.
+                let names: Vec<String> = self
+                    .profile_registry
+                    .profile_names()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                let mut lines = Vec::new();
+                lines.push(format!("[PROFILES] {} profiles available:", names.len()));
+                for name in &names {
+                    let chain = self.profile_registry.profiles.get(name.as_str());
+                    let primary = chain.map(|c| c.primary_display()).unwrap_or_default();
+                    let fallback = chain.map(|c| c.fallback_display()).unwrap_or_default();
+                    let active_marker = if name == &self.active_profile {
+                        " ✓ (active)"
+                    } else {
+                        ""
+                    };
+                    lines.push(format!(
+                        "[PROFILES]   {:12}  {} → {}{}",
+                        name, primary, fallback, active_marker
+                    ));
+                }
+                lines.push("[PROFILES] Use /profile <name> to switch.".to_string());
+                for l in lines {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/new" => {
+                if self.status != AppStatus::Ready {
+                    self.push_log("[SESSION] Cannot start new session while agent is running. Wait for READY.");
+                } else {
+                    let new_id = Uuid::new_v4().to_string();
+                    self.session_id = new_id.clone();
+                    self.history.clear();
+                    if let Some(ref brain) = self.brain {
+                        let _ = brain.create_session(&new_id, "New Session");
+                    }
+                    self.push_log(format!("[SESSION] New session started: {}", new_id));
+                    self.push_log("[SESSION] History cleared. Ready for a fresh conversation.");
+                    self.log_scroll = 0;
+                    info!(session_id = %new_id, "TUI new session created");
                 }
                 true
             }

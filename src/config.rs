@@ -6,6 +6,40 @@
 //! The config file is created with safe defaults if it does not exist.
 //! On Unix, a warning is emitted (and stored in the startup log) if the
 //! file has group- or world-readable permissions.
+//!
+//! # Config file structure
+//!
+//! ```toml
+//! # API keys (or use environment variables)
+//! [keys]
+//! openai_api_key = "sk-..."
+//! groq_api_key   = "gsk_..."
+//!
+//! # LLM request settings
+//! [llm]
+//! max_retries             = 2
+//! timeout_secs            = 60
+//! fallback_on_rate_limit  = true
+//! fallback_on_network     = true
+//! fallback_on_server_error = true
+//!
+//! # Custom provider settings (optional — env vars preferred for keys)
+//! [providers.openrouter]
+//! enabled  = true
+//! base_url = "https://openrouter.ai/api/v1"
+//! # api_key_env = "OPENROUTER_API_KEY"  # override env var name
+//!
+//! [providers.ollama]
+//! enabled  = true
+//! base_url = "http://localhost:11434"
+//!
+//! # Model profiles
+//! [profiles]
+//! default = "balanced"
+//!
+//! [profiles.balanced]
+//! chain = ["openai:gpt-4o-mini", "groq:llama-3.3-70b-versatile"]
+//! ```
 
 use crate::models::ProfilesConfig;
 use anyhow::{Context, Result};
@@ -14,23 +48,221 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// ── Top-level Config ──────────────────────────────────────────────────────────
+
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct Config {
     #[serde(default)]
     pub keys: Keys,
     #[serde(default)]
     pub mcp_servers: HashMap<String, McpServerConfig>,
-    /// Model profile configuration.  Optional — built-in defaults are used
-    /// if this section is absent from the config file.
+    /// LLM request settings: retries, timeouts, fallback policy.
+    #[serde(default)]
+    pub llm: LlmConfig,
+    /// Per-provider custom settings (OpenRouter, Ollama, etc.).
+    #[serde(default)]
+    pub providers: HashMap<String, ProviderCustomConfig>,
+    /// Model profile configuration.  Optional — built-in defaults used if absent.
     #[serde(default)]
     pub profiles: ProfilesConfig,
 }
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct Keys {
     pub openai_api_key: Option<String>,
     pub groq_api_key: Option<String>,
+    /// OpenRouter API key (alternative: `OPENROUTER_API_KEY` env var).
+    pub openrouter_api_key: Option<String>,
 }
+
+// ── LLM settings ─────────────────────────────────────────────────────────────
+
+/// LLM request settings.  All fields have sensible defaults.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LlmConfig {
+    /// Maximum retry attempts per chain entry on transient errors.
+    /// Range: 0–10.  Default: 2.
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Request timeout in seconds.  Default: 60.
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
+
+    /// Whether to advance the fallback chain on HTTP 429 rate-limit errors.
+    #[serde(default = "default_true")]
+    pub fallback_on_rate_limit: bool,
+
+    /// Whether to retry and advance on network/timeout errors.
+    #[serde(default = "default_true")]
+    pub fallback_on_network: bool,
+
+    /// Whether to retry and advance on HTTP 5xx server errors.
+    #[serde(default = "default_true")]
+    pub fallback_on_server_error: bool,
+}
+
+impl LlmConfig {
+    /// Validate the config.  Returns a list of warnings for invalid values.
+    pub fn validate(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        if self.max_retries > 10 {
+            warnings.push(format!(
+                "[CONFIG] llm.max_retries = {} is very high (max recommended: 10) — using 10",
+                self.max_retries
+            ));
+        }
+        if self.timeout_secs == 0 {
+            warnings
+                .push("[CONFIG] llm.timeout_secs = 0 is invalid — using default (60)".to_string());
+        }
+        if self.timeout_secs > 600 {
+            warnings.push(format!(
+                "[CONFIG] llm.timeout_secs = {} is very long (max recommended: 600)",
+                self.timeout_secs
+            ));
+        }
+        warnings
+    }
+
+    /// Effective max_retries, clamped to safe range.
+    pub fn effective_max_retries(&self) -> u32 {
+        self.max_retries.min(10)
+    }
+
+    /// Effective timeout_secs, falling back to default if 0.
+    pub fn effective_timeout_secs(&self) -> u64 {
+        if self.timeout_secs == 0 {
+            default_timeout_secs()
+        } else {
+            self.timeout_secs
+        }
+    }
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: default_max_retries(),
+            timeout_secs: default_timeout_secs(),
+            fallback_on_rate_limit: true,
+            fallback_on_network: true,
+            fallback_on_server_error: true,
+        }
+    }
+}
+
+fn default_max_retries() -> u32 {
+    2
+}
+fn default_timeout_secs() -> u64 {
+    60
+}
+fn default_true() -> bool {
+    true
+}
+
+// ── Per-provider custom config ────────────────────────────────────────────────
+
+/// Custom settings for a specific provider (e.g. OpenRouter, Ollama).
+///
+/// Example TOML:
+/// ```toml
+/// [providers.openrouter]
+/// enabled  = true
+/// base_url = "https://openrouter.ai/api/v1"
+///
+/// [providers.ollama]
+/// enabled  = true
+/// base_url = "http://localhost:11434"
+/// ```
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProviderCustomConfig {
+    /// Whether this provider is enabled.  Default: true.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Base URL for the provider's API.
+    /// For Ollama: "http://localhost:11434"
+    /// For OpenRouter: "https://openrouter.ai/api/v1"
+    pub base_url: Option<String>,
+
+    /// Environment variable name containing the API key.
+    /// If not set, uses the standard name for the provider.
+    pub api_key_env: Option<String>,
+}
+
+impl Default for ProviderCustomConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            base_url: None,
+            api_key_env: None,
+        }
+    }
+}
+
+impl Config {
+    /// Return the effective base URL for a provider.
+    pub fn provider_base_url(&self, provider: &str) -> Option<String> {
+        self.providers
+            .get(provider)
+            .and_then(|p| p.base_url.clone())
+    }
+
+    /// Return the effective API key for a provider.
+    ///
+    /// Priority: config key field → custom env var → default env var.
+    /// Never returns an empty string.
+    pub fn provider_api_key(&self, provider: &str) -> Option<String> {
+        match provider {
+            "openai" => self
+                .keys
+                .openai_api_key
+                .clone()
+                .or_else(|| std::env::var("OPENAI_API_KEY").ok()),
+            "groq" => self
+                .keys
+                .groq_api_key
+                .clone()
+                .or_else(|| std::env::var("GROQ_API_KEY").ok()),
+            "openrouter" => {
+                // Custom env var name takes precedence.
+                let env_name = self
+                    .providers
+                    .get("openrouter")
+                    .and_then(|p| p.api_key_env.as_deref())
+                    .unwrap_or("OPENROUTER_API_KEY");
+                self.keys
+                    .openrouter_api_key
+                    .clone()
+                    .or_else(|| std::env::var(env_name).ok())
+            }
+            "ollama" => None, // Ollama is local — no API key needed.
+            _ => {
+                // Generic fallback: look for a custom api_key_env.
+                let env_name = self
+                    .providers
+                    .get(provider)
+                    .and_then(|p| p.api_key_env.as_deref())?;
+                std::env::var(env_name).ok()
+            }
+        }
+        .filter(|k| !k.is_empty())
+    }
+
+    /// Whether a provider is enabled per config.
+    pub fn provider_enabled(&self, provider: &str) -> bool {
+        self.providers
+            .get(provider)
+            .map(|p| p.enabled)
+            .unwrap_or(true) // default: enabled if not mentioned
+    }
+}
+
+// ── MCP server config ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct McpServerConfig {
@@ -40,6 +272,8 @@ pub struct McpServerConfig {
     pub env: HashMap<String, String>,
 }
 
+// ── ConfigLoadResult ──────────────────────────────────────────────────────────
+
 /// Outcome of loading the config file — carries both the loaded config and
 /// any non-fatal warnings that should be shown to the user.
 pub struct ConfigLoadResult {
@@ -48,8 +282,10 @@ pub struct ConfigLoadResult {
     pub warnings: Vec<String>,
 }
 
+// ── Config loading ────────────────────────────────────────────────────────────
+
 impl Config {
-    /// Load config from the default path `~/.config/goat/goat.toml`.
+    /// Load config from `~/.config/goat/goat.toml` (or a custom path).
     ///
     /// If the file does not exist, a default config is written and returned.
     /// If the file exists but has unsafe permissions, a warning is added.
@@ -110,6 +346,11 @@ impl Config {
             }
         }
 
+        // Validate LLM config.
+        for w in config.llm.validate() {
+            warnings.push(w);
+        }
+
         // Attempt to read OpenCode fallback key if no keys configured.
         let config = maybe_apply_fallback_key(config);
 
@@ -164,10 +405,109 @@ impl Config {
 /// If the config has no keys configured, try to read from the OpenCode
 /// fallback source. Mutates and returns the config.
 fn maybe_apply_fallback_key(mut config: Config) -> Config {
-    if config.keys.openai_api_key.is_none() && config.keys.groq_api_key.is_none() {
+    let has_any_key = config.keys.openai_api_key.is_some()
+        || config.keys.groq_api_key.is_some()
+        || config.keys.openrouter_api_key.is_some()
+        || std::env::var("OPENAI_API_KEY").is_ok()
+        || std::env::var("GROQ_API_KEY").is_ok()
+        || std::env::var("OPENROUTER_API_KEY").is_ok();
+
+    if !has_any_key {
         if let Some((key, _url)) = Config::get_fallback_api_key() {
             config.keys.openai_api_key = Some(key);
         }
     }
     config
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_llm_config_defaults() {
+        let cfg = LlmConfig::default();
+        assert_eq!(cfg.max_retries, 2);
+        assert_eq!(cfg.timeout_secs, 60);
+        assert!(cfg.fallback_on_rate_limit);
+        assert!(cfg.fallback_on_network);
+        assert!(cfg.fallback_on_server_error);
+    }
+
+    #[test]
+    fn test_llm_config_validate_high_retries() {
+        let cfg = LlmConfig {
+            max_retries: 99,
+            ..LlmConfig::default()
+        };
+        let warnings = cfg.validate();
+        assert!(!warnings.is_empty());
+        assert!(warnings[0].contains("max_retries"));
+        assert_eq!(cfg.effective_max_retries(), 10);
+    }
+
+    #[test]
+    fn test_llm_config_validate_zero_timeout() {
+        let cfg = LlmConfig {
+            timeout_secs: 0,
+            ..LlmConfig::default()
+        };
+        let warnings = cfg.validate();
+        assert!(!warnings.is_empty());
+        assert_eq!(cfg.effective_timeout_secs(), 60);
+    }
+
+    #[test]
+    fn test_llm_config_validate_clean() {
+        let cfg = LlmConfig::default();
+        assert!(cfg.validate().is_empty());
+    }
+
+    #[test]
+    fn test_config_provider_enabled_default_true() {
+        let config = Config::default();
+        assert!(config.provider_enabled("openrouter")); // not in map → default true
+    }
+
+    #[test]
+    fn test_config_provider_enabled_explicit_false() {
+        let mut config = Config::default();
+        config.providers.insert(
+            "openrouter".to_string(),
+            ProviderCustomConfig {
+                enabled: false,
+                base_url: None,
+                api_key_env: None,
+            },
+        );
+        assert!(!config.provider_enabled("openrouter"));
+    }
+
+    #[test]
+    fn test_config_provider_base_url() {
+        let mut config = Config::default();
+        config.providers.insert(
+            "ollama".to_string(),
+            ProviderCustomConfig {
+                enabled: true,
+                base_url: Some("http://localhost:11434".to_string()),
+                api_key_env: None,
+            },
+        );
+        assert_eq!(
+            config.provider_base_url("ollama"),
+            Some("http://localhost:11434".to_string())
+        );
+        assert_eq!(config.provider_base_url("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_config_ollama_no_api_key() {
+        let config = Config::default();
+        // Ollama should always return None for api_key (local, no auth needed).
+        // Only skip this assertion if OPENROUTER_API_KEY is somehow set in env.
+        assert_eq!(config.provider_api_key("ollama"), None);
+    }
 }

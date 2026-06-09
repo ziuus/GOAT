@@ -8,6 +8,149 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 1: Minimal Working Core
 
+### Added — Phase 1.6: Profile Selection, OpenRouter/Ollama, Retry Config, Session Control (2026-06-09)
+
+**Version bump: 0.4.0 → 0.5.0**
+
+**`src/config.rs` — extended**
+- New `LlmConfig` struct: `max_retries`, `timeout_secs`, `fallback_on_rate_limit`, `fallback_on_network`, `fallback_on_server_error`
+  - Configurable via `[llm]` section in `goat.toml`
+  - Sensible defaults: max_retries=2, timeout_secs=60, all fallback flags=true
+  - `.validate()` — returns user-readable warnings for bad values
+  - `.effective_max_retries()` / `.effective_timeout_secs()` — clamped safe values
+- New `ProviderCustomConfig`: `enabled`, `base_url`, `api_key_env`
+  - Configurable via `[providers.openrouter]` / `[providers.ollama]` etc.
+- `Config.providers: HashMap<String, ProviderCustomConfig>` field
+- `Config.llm: LlmConfig` field (serde default — backward compatible)
+- `Config.keys.openrouter_api_key` field
+- `Config::provider_api_key(provider)` — unified key resolution (config → env var)
+- `Config::provider_base_url(provider)` — unified base URL resolution
+- `Config::provider_enabled(provider)` — per-provider enable flag
+- 8 unit tests
+
+**`src/llm.rs` — rewrite**
+- `LlmRouter::from_config(config)` — primary constructor from full `Config`
+  - Uses `LlmConfig` for timeout (reqwest client), retries, and fallback policy
+  - Reads OpenRouter and Ollama keys/URLs from config
+- `LlmRouter::new()` kept for backward compat
+- New provider: **OpenRouter** (OpenAI-compatible API)
+  - Adds required `HTTP-Referer` and `X-Title` headers
+  - Key: `OPENROUTER_API_KEY` env var or `openrouter_api_key` in config
+  - Base URL: `https://openrouter.ai/api/v1` (customizable)
+- New provider: **Ollama** (local OpenAI-compatible endpoint)
+  - No API key required — uses local server
+  - Base URL: `http://localhost:11434` (customizable via `[providers.ollama] base_url`)
+  - Graceful error if Ollama is not running
+- `is_error_fallback_allowed()` — checks per-error-class `fallback_on_*` config flags
+- `is_provider_implemented()` now includes `openrouter` and `ollama`
+- Anthropic and Gemini: planned, still not implemented (clearly documented)
+
+**`src/brain.rs` — rewrite (anyhow cleanup)**
+- All errors now use `anyhow::Result` with `.context()` strings
+- New `SessionRecord` struct: `id`, `title`, `created_at`, `updated_at`, `is_uuid()`
+  - `is_uuid()` — detects v4 UUID format (8-4-4-4-12) vs legacy numeric IDs
+- `Brain::get_session_records()` — returns `Vec<SessionRecord>` with full metadata
+- `Brain::log_interaction()` — now updates `sessions.updated_at` on every message
+- Migration 001: `sessions.updated_at` column
+  - Added automatically if column is absent (safe for old DBs)
+  - Uses `NULL` default (SQLite limitation), back-fills from `created_at`
+  - Old sessions still list — no data loss
+- 6 unit tests covering brain open, session CRUD, timestamps, uuid detection, migration
+
+**`src/runtime.rs` — updates**
+- `GoatRuntime::bootstrap()` accepts `profile_override: Option<String>`
+  - Validates profile name early; warns and falls back to default if invalid
+  - Clear boot log message: `[WARN] Profile '...' not found — falling back to default`
+- Uses `LlmRouter::from_config(&config)` instead of `LlmRouter::new()`
+- New method: `GoatRuntime::switch_profile(name)` — `Result<(), String>`
+  - Validates profile name, updates `active_profile`, `model_chain`, `provider_label`
+  - Used by headless `/profile <name>` command
+- New method: `GoatRuntime::create_new_session()` — creates UUID session, clears history
+
+**`src/cli.rs` — updates**
+- New global flag: `--profile <name>` — select model profile at startup
+  - Works with TUI: `goat --profile coding`
+  - Works with headless: `goat --headless --profile cheap`
+  - Invalid names: warns and falls back (does not hard-exit)
+- New subcommand: `goat new-session`
+  - Creates a new UUID session in the brain DB (if it exists)
+  - Prints UUID to stdout (scriptable)
+  - Does not destroy old sessions
+- `goat sessions` — improved output
+  - Shows: ID (short), Type (uuid/legacy), Created, Updated, Title
+  - Tabular columnar format
+- `goat models` — improved output
+  - Shows OpenRouter, Ollama status (✓/✗) alongside OpenAI/Groq
+  - Shows LLM retry/timeout config
+  - Shows fallback status per profile entry
+  - Legend, usage hint
+- `goat doctor` — improved
+  - Uses `Config::provider_api_key()` (consistent with runtime)
+  - Shows OpenRouter key status
+  - Shows Ollama config status
+  - Shows Anthropic/Gemini as Planned
+  - Shows LLM retry config (`max_retries`, `timeout_secs`, fallback flags)
+
+**`src/app.rs` (TUI) — updates**
+- New field: `profile_registry: ProfileRegistry` (from GoatRuntime)
+- New slash commands:
+  - `/profile` — show current profile, primary, fallback
+  - `/profile <name>` — switch profile at runtime (only when READY, not during agent run)
+  - `/profiles` — list all profiles with primary/fallback/active markers
+  - `/new` — start a new session (clears history, creates UUID in brain)
+- `/status` — now shows `Retries: N max / Xs timeout`
+- `/sessions` — now uses `get_session_records()` with uuid/legacy/timestamp display
+- `/help` — updated with all new commands
+- Splash header updated: v0.4 → v0.4 with new commands listed
+
+**`src/headless.rs` — updates**
+- New slash commands: `/profile`, `/profiles`, `/new`
+  - `/profile <name>` uses `GoatRuntime::switch_profile()`
+  - `/new` uses `GoatRuntime::create_new_session()`
+- `/status` — shows `Retries: N max / Xs timeout`
+- `/sessions` — uses `get_session_records()`
+- `/help` — updated with all new commands
+- Banner slash command list updated
+
+**`src/paths.rs` doctor — updates**
+- `run_doctor()` now accepts `has_openrouter_key`, `ollama_enabled`, `llm_config` params
+- New checks:
+  - OpenRouter key: OK/INFO
+  - Ollama (local): INFO (no key needed, configured or not)
+  - Anthropic: INFO (planned, not implemented)
+  - Gemini: INFO (planned, not implemented)
+  - LLM retry config: OK/WARN (shows max_retries, timeout_secs, fallback flags)
+- Total: 23 doctor checks (was 17)
+- 5 unit tests updated/added for new params
+
+### Not implemented in Phase 1.6 (deferred)
+- Anthropic provider — API format too different for this phase (planned, no stub)
+- Gemini provider — planned, no stub
+- `/new` + `/profile` while agent is running: correctly denied with clear message
+- Per-profile custom `max_retries`/`timeout_secs` overrides (global config only for now)
+- Session title from first message (always "New Session" for now)
+
+### Exit Criteria: ALL PASSED
+- `cargo fmt` ✅
+- `cargo check` — 0 errors, 19 dead_code warnings (public API surface) ✅
+- `cargo test` — **63/63** ✅ (was 47, +16 new tests)
+- `goat 0.5.0` ✅
+- `goat --profile coding` — selects coding profile ✅
+- `goat --headless --profile cheap /status` — shows cheap profile + fallback ✅
+- Invalid profile falls back gracefully with warning ✅
+- `goat new-session` — prints UUID, creates in DB ✅
+- `goat sessions` — shows uuid/legacy, timestamps ✅
+- `goat doctor` — 23 checks, OpenRouter/Ollama/Anthropic/Gemini/LLM config ✅
+- `goat models` — providers (including OpenRouter/Ollama), retry config, profiles ✅
+- `/profile`, `/profiles`, `/new` work in headless mode ✅
+- OpenRouter implemented (real requests, no fake) ✅
+- Ollama implemented (real requests, graceful if not running) ✅
+- `brain.rs` fully ported to anyhow ✅
+- Session timestamps (created_at, updated_at) ✅
+- DB migration safe for old databases ✅
+
+---
+
 ### Added — Phase 1.5: Provider Abstraction + Model Profiles + Fallback Chain (2026-06-08)
 
 **Version bump: 0.3.0 → 0.4.0**

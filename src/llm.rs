@@ -1,48 +1,32 @@
 //! LLM provider router with fallback chain and retry policy.
 //!
 //! `LlmRouter` dispatches completion requests to OpenAI-compatible providers.
-//! The public API:
-//!
-//! - [`LlmRouter::completion`] — single-provider call (raw, no fallback)
-//! - [`LlmRouter::completion_with_fallback`] — tries each entry in a
-//!   [`ModelChain`] until one succeeds or all are exhausted
-//!
-//! # Retry policy
-//!
-//! On retryable errors (network timeout, 5xx), the same provider/model is
-//! retried up to `MAX_RETRIES` times before advancing to the next chain entry.
-//! Non-retryable errors (401 auth, 400 bad request, 404 model not found) stop
-//! immediately — never retried, never advance the chain for that entry.
-//!
-//! # Fallback chain
-//!
-//! On recoverable errors (rate limit, server error, network) AFTER retries are
-//! exhausted, the chain advances to the next `provider:model` entry.
-//! Auth failures (401) are non-recoverable and stop the chain immediately to
-//! avoid burning time on subsequent providers.
 //!
 //! # Working providers
 //!
-//! - `openai` — OpenAI API (https://api.openai.com/v1)
-//! - `groq` — Groq API (https://api.groq.com/openai/v1)
+//! | Provider    | API Style      | Requires          |
+//! |-------------|----------------|-------------------|
+//! | openai      | OpenAI API     | OPENAI_API_KEY    |
+//! | groq        | OpenAI-compat  | GROQ_API_KEY      |
+//! | openrouter  | OpenAI-compat  | OPENROUTER_API_KEY|
+//! | ollama      | OpenAI-compat  | local server      |
 //!
-//! Planned (not implemented): `anthropic`, `gemini`, `ollama`, `openrouter`.
+//! Planned (not implemented): `anthropic`, `gemini`.
+//!
+//! # Retry policy (configurable via `[llm]` in goat.toml)
+//!
+//! - Retryable (NetworkError, ServerError): retry same entry up to `max_retries`.
+//! - Recoverable (RateLimit, ServerError, NetworkError): advance chain after retries.
+//! - Non-recoverable (AuthFailed, BadRequest, ModelNotFound): stop immediately.
+//! - Fallback can be disabled per error class via `fallback_on_*` config flags.
 
+use crate::config::{Config, LlmConfig};
 use crate::models::{ModelChain, ModelEntry};
 use crate::provider::ProviderError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{info, warn};
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-/// Maximum times to retry the *same* provider/model on retryable errors
-/// before advancing the chain.
-const MAX_RETRIES: u32 = 2;
-
-/// Request timeout per attempt.
-const REQUEST_TIMEOUT_SECS: u64 = 120;
 
 // ── Wire types ────────────────────────────────────────────────────────────────
 
@@ -83,7 +67,6 @@ pub struct Message {
     pub tool_call_id: Option<String>,
 }
 
-// Internal OpenAI-compatible request body.
 #[derive(Serialize)]
 struct OpenAiRequest {
     model: String,
@@ -92,7 +75,6 @@ struct OpenAiRequest {
     tools: Option<Vec<Tool>>,
 }
 
-// OpenAI-compatible response body.
 #[derive(Deserialize, Debug)]
 pub struct OpenAiResponse {
     pub choices: Vec<Choice>,
@@ -104,7 +86,6 @@ pub struct Choice {
     pub finish_reason: Option<String>,
 }
 
-/// Response content from the model — returned to the agent loop.
 #[derive(Deserialize, Debug)]
 pub struct MessageContent {
     pub content: Option<String>,
@@ -116,75 +97,74 @@ pub struct MessageContent {
 
 pub struct LlmRouter {
     client: Client,
+    /// Configuration for LLM retries, timeouts, and fallback policy.
+    pub llm_config: LlmConfig,
+    // ── OpenAI ────────────────────────────────────────────────────────────────
     pub openai_key: Option<String>,
     pub openai_base_url: Option<String>,
+    // ── Groq ─────────────────────────────────────────────────────────────────
     pub groq_key: Option<String>,
+    // ── OpenRouter ────────────────────────────────────────────────────────────
+    pub openrouter_key: Option<String>,
+    pub openrouter_base_url: String,
+    // ── Ollama ────────────────────────────────────────────────────────────────
+    pub ollama_base_url: String,
 }
 
 impl LlmRouter {
-    /// Create a new router from explicit keys.
-    ///
-    /// Falls back to `OPENAI_API_KEY` / `GROQ_API_KEY` env vars if not provided.
-    /// Falls back to the OpenCode/freellmapi key if nothing else is configured.
-    pub fn new(openai_key: Option<String>, groq_key: Option<String>) -> Self {
+    /// Build from a loaded `Config`.
+    pub fn from_config(config: &Config) -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+            .timeout(Duration::from_secs(config.llm.effective_timeout_secs()))
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        let mut final_openai_key = openai_key.or_else(|| std::env::var("OPENAI_API_KEY").ok());
-        let mut final_base_url = None;
+        // OpenAI key — config → env → OpenCode fallback.
+        let mut openai_key = config.provider_api_key("openai");
+        let mut openai_base_url = config.provider_base_url("openai");
 
-        if final_openai_key.is_none() {
-            if let Some((key, url)) = crate::config::Config::get_fallback_api_key() {
-                final_openai_key = Some(key);
-                final_base_url = Some(url);
+        if openai_key.is_none() {
+            if let Some((key, url)) = Config::get_fallback_api_key() {
+                openai_key = Some(key);
+                openai_base_url = Some(url);
             }
         }
 
+        // OpenRouter defaults.
+        let openrouter_base_url = config
+            .provider_base_url("openrouter")
+            .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
+
+        // Ollama defaults.
+        let ollama_base_url = config
+            .provider_base_url("ollama")
+            .unwrap_or_else(|| "http://localhost:11434".to_string());
+
         Self {
             client,
-            openai_key: final_openai_key,
-            openai_base_url: final_base_url,
-            groq_key: groq_key.or_else(|| std::env::var("GROQ_API_KEY").ok()),
+            llm_config: config.llm.clone(),
+            openai_key,
+            openai_base_url,
+            groq_key: config.provider_api_key("groq"),
+            openrouter_key: config.provider_api_key("openrouter"),
+            openrouter_base_url,
+            ollama_base_url,
         }
     }
 
-    // ── Single-provider completion (raw, no fallback) ─────────────────────────
-
-    /// Call a specific provider/model directly.
-    ///
-    /// Returns a typed [`ProviderError`] on failure — callers can decide
-    /// whether to fall back or propagate the error.
-    pub async fn completion(
-        &self,
-        provider: &str,
-        model: &str,
-        messages: Vec<Message>,
-        tools: Option<Vec<Tool>>,
-    ) -> Result<MessageContent, ProviderError> {
-        match provider {
-            "openai" => self.openai_completion(model, messages, tools).await,
-            "groq" => self.groq_completion(model, messages, tools).await,
-            other => Err(ProviderError::UnknownProvider {
-                provider: other.to_string(),
-            }),
-        }
+    /// Legacy constructor (kept for backward compat with tests).
+    pub fn new(openai_key: Option<String>, groq_key: Option<String>) -> Self {
+        let mut config = Config::default();
+        config.keys.openai_api_key = openai_key;
+        config.keys.groq_api_key = groq_key;
+        Self::from_config(&config)
     }
 
     // ── Fallback chain ────────────────────────────────────────────────────────
 
     /// Try each entry in `chain` in order until one succeeds.
     ///
-    /// Returns the successful response and the `provider:model` string that
-    /// was used (so the caller can log/display it).
-    ///
-    /// # Fallback rules
-    /// - Retryable errors (network, 5xx): retry same entry up to `MAX_RETRIES`.
-    /// - Recoverable errors (rate limit, 5xx after retries): advance chain.
-    /// - Non-recoverable (401 auth, 400 bad request, 404): stop immediately.
-    /// - `ollama` / unknown providers: skip with a warning (not implemented).
-    /// - All entries exhausted: return [`ProviderError::ChainExhausted`].
+    /// Returns `(MessageContent, used_provider_label)`.
     pub async fn completion_with_fallback(
         &self,
         chain: &ModelChain,
@@ -200,11 +180,14 @@ impl LlmRouter {
             let label = entry.display();
 
             // Skip providers that are planned but not implemented.
+            if !self.is_provider_implemented(&entry.provider) {
+                warn!(entry = %label, "skipping unimplemented provider in chain");
+                continue;
+            }
+
+            // Skip providers that are not available (no key / not running).
             if !self.is_provider_available(&entry.provider) {
-                warn!(
-                    entry = %label,
-                    "skipping unimplemented provider in chain"
-                );
+                warn!(entry = %label, "provider not available (no key/connection) — skipping");
                 continue;
             }
 
@@ -217,17 +200,11 @@ impl LlmRouter {
                     info!(entry = %label, attempt = i + 1, total, "chain entry succeeded");
                     return Ok((content, label));
                 }
-                Err(ref e) if !e.is_recoverable() => {
-                    // Non-recoverable — stop chain immediately.
-                    warn!(
-                        entry = %label,
-                        error = %e,
-                        "non-recoverable error — stopping chain"
-                    );
+                Err(ref e) if !self.is_error_fallback_allowed(e) => {
+                    warn!(entry = %label, error = %e, "non-recoverable or fallback-disabled error — stopping chain");
                     return Err(e.clone());
                 }
                 Err(ref e) => {
-                    // Recoverable — log and try next entry.
                     warn!(
                         entry = %label,
                         error = %e,
@@ -241,16 +218,30 @@ impl LlmRouter {
         Err(ProviderError::ChainExhausted { count: total })
     }
 
-    /// Retry a single chain entry up to `MAX_RETRIES` times on retryable errors.
+    /// Whether the LLM config policy permits advancing the chain for this error.
+    fn is_error_fallback_allowed(&self, e: &ProviderError) -> bool {
+        if !e.is_recoverable() {
+            return false;
+        }
+        match e {
+            ProviderError::RateLimit { .. } => self.llm_config.fallback_on_rate_limit,
+            ProviderError::NetworkError { .. } => self.llm_config.fallback_on_network,
+            ProviderError::ServerError { .. } => self.llm_config.fallback_on_server_error,
+            _ => e.is_recoverable(),
+        }
+    }
+
+    /// Single-provider call with retry.
     async fn try_with_retry(
         &self,
         entry: &ModelEntry,
         messages: Vec<Message>,
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, ProviderError> {
+        let max = self.llm_config.effective_max_retries();
         let mut last_err: Option<ProviderError> = None;
 
-        for attempt in 0..=MAX_RETRIES {
+        for attempt in 0..=max {
             if attempt > 0 {
                 let delay = Duration::from_millis(500 * u64::from(attempt));
                 info!(
@@ -272,7 +263,7 @@ impl LlmRouter {
                 .await
             {
                 Ok(content) => return Ok(content),
-                Err(e) if e.is_retryable() && attempt < MAX_RETRIES => {
+                Err(e) if e.is_retryable() && attempt < max => {
                     warn!(entry = %entry.display(), attempt, error = %e, "retryable error");
                     last_err = Some(e);
                 }
@@ -283,25 +274,45 @@ impl LlmRouter {
         Err(last_err.unwrap_or(ProviderError::ChainExhausted { count: 0 }))
     }
 
+    // ── Single-provider completion (raw) ──────────────────────────────────────
+
+    pub async fn completion(
+        &self,
+        provider: &str,
+        model: &str,
+        messages: Vec<Message>,
+        tools: Option<Vec<Tool>>,
+    ) -> Result<MessageContent, ProviderError> {
+        match provider {
+            "openai" => self.openai_completion(model, messages, tools).await,
+            "groq" => self.groq_completion(model, messages, tools).await,
+            "openrouter" => self.openrouter_completion(model, messages, tools).await,
+            "ollama" => self.ollama_completion(model, messages, tools).await,
+            other => Err(ProviderError::UnknownProvider {
+                provider: other.to_string(),
+            }),
+        }
+    }
+
     // ── Provider status helpers ───────────────────────────────────────────────
 
-    /// Whether a provider is implemented and has a key configured.
+    /// Whether a provider is coded and can receive requests.
+    pub fn is_provider_implemented(&self, provider: &str) -> bool {
+        matches!(provider, "openai" | "groq" | "openrouter" | "ollama")
+    }
+
+    /// Whether a provider has a key (or no key needed) and is ready to use.
     pub fn is_provider_available(&self, provider: &str) -> bool {
         match provider {
             "openai" => self.openai_key.is_some(),
             "groq" => self.groq_key.is_some(),
-            // These are planned but not implemented — always unavailable.
-            "anthropic" | "gemini" | "ollama" | "openrouter" => false,
+            "openrouter" => self.openrouter_key.is_some(),
+            "ollama" => true, // local — no key needed; may still fail at call time
             _ => false,
         }
     }
 
-    /// Whether a provider is implemented (has code, regardless of key).
-    pub fn is_provider_implemented(provider: &str) -> bool {
-        matches!(provider, "openai" | "groq")
-    }
-
-    /// Human-readable status for a provider (for doctor/models output).
+    /// Human-readable status label for a provider (no secrets).
     pub fn provider_status_label(&self, provider: &str) -> &'static str {
         match provider {
             "openai" => {
@@ -318,15 +329,21 @@ impl LlmRouter {
                     "not configured (set GROQ_API_KEY or groq_api_key in config)"
                 }
             }
+            "openrouter" => {
+                if self.openrouter_key.is_some() {
+                    "ready"
+                } else {
+                    "not configured (set OPENROUTER_API_KEY or openrouter_api_key in config)"
+                }
+            }
+            "ollama" => "local (no key required — server must be running)",
             "anthropic" => "planned — not implemented",
             "gemini" => "planned — not implemented",
-            "ollama" => "planned — not implemented",
-            "openrouter" => "planned — not implemented",
             _ => "unknown provider",
         }
     }
 
-    // ── Provider-specific implementations ─────────────────────────────────────
+    // ── Provider implementations ──────────────────────────────────────────────
 
     async fn openai_completion(
         &self,
@@ -369,6 +386,94 @@ impl LlmRouter {
         .await
     }
 
+    /// OpenRouter — OpenAI-compatible API with required HTTP headers.
+    ///
+    /// OpenRouter requires `HTTP-Referer` and `X-Title` headers for routing.
+    async fn openrouter_completion(
+        &self,
+        model: &str,
+        messages: Vec<Message>,
+        tools: Option<Vec<Tool>>,
+    ) -> Result<MessageContent, ProviderError> {
+        let key = self
+            .openrouter_key
+            .as_ref()
+            .ok_or(ProviderError::NotConfigured {
+                provider: "openrouter".to_string(),
+            })?;
+        let url = format!(
+            "{}/chat/completions",
+            self.openrouter_base_url.trim_end_matches('/')
+        );
+
+        let req_body = OpenAiRequest {
+            model: model.to_string(),
+            messages,
+            tools,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .bearer_auth(key)
+            .header("HTTP-Referer", "https://github.com/ziuus/GOAT")
+            .header("X-Title", "GOAT")
+            .json(&req_body)
+            .send()
+            .await
+            .map_err(|e| self.classify_network_error("openrouter", e))?;
+
+        self.parse_openai_response("openrouter", model, response)
+            .await
+    }
+
+    /// Ollama — OpenAI-compatible endpoint at `/v1/chat/completions`.
+    ///
+    /// Ollama must be running locally. No API key required.
+    async fn ollama_completion(
+        &self,
+        model: &str,
+        messages: Vec<Message>,
+        tools: Option<Vec<Tool>>,
+    ) -> Result<MessageContent, ProviderError> {
+        let url = format!(
+            "{}/v1/chat/completions",
+            self.ollama_base_url.trim_end_matches('/')
+        );
+
+        let req_body = OpenAiRequest {
+            model: model.to_string(),
+            messages,
+            // Ollama tool call support varies by model — pass through.
+            tools,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&req_body)
+            .send()
+            .await
+            .map_err(|e| {
+                // Connection refused → Ollama is not running.
+                if e.is_connect() {
+                    ProviderError::NetworkError {
+                        provider: "ollama".to_string(),
+                        detail: format!(
+                            "cannot connect to Ollama at {} — is Ollama running?",
+                            self.ollama_base_url
+                        ),
+                    }
+                } else {
+                    self.classify_network_error("ollama", e)
+                }
+            })?;
+
+        self.parse_openai_response("ollama", model, response).await
+    }
+
+    // ── Shared HTTP helpers ───────────────────────────────────────────────────
+
     async fn call_openai_compatible(
         &self,
         provider: &str,
@@ -391,37 +496,26 @@ impl LlmRouter {
             .json(&req_body)
             .send()
             .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    ProviderError::NetworkError {
-                        provider: provider.to_string(),
-                        detail: "request timed out".to_string(),
-                    }
-                } else if e.is_connect() {
-                    ProviderError::NetworkError {
-                        provider: provider.to_string(),
-                        detail: "connection refused or unreachable".to_string(),
-                    }
-                } else {
-                    ProviderError::NetworkError {
-                        provider: provider.to_string(),
-                        detail: e.to_string(),
-                    }
-                }
-            })?;
+            .map_err(|e| self.classify_network_error(provider, e))?;
 
+        self.parse_openai_response(provider, model, response).await
+    }
+
+    async fn parse_openai_response(
+        &self,
+        provider: &str,
+        model: &str,
+        response: reqwest::Response,
+    ) -> Result<MessageContent, ProviderError> {
         let status = response.status().as_u16();
-
         if !response.status().is_success() {
             let err_text = response.text().await.unwrap_or_default();
             return Err(ProviderError::from_http(provider, model, status, &err_text));
         }
-
         let res_body: OpenAiResponse = response.json().await.map_err(|e| ProviderError::Other {
             provider: provider.to_string(),
             detail: format!("failed to parse response: {}", e),
         })?;
-
         res_body
             .choices
             .into_iter()
@@ -431,5 +525,24 @@ impl LlmRouter {
                 provider: provider.to_string(),
                 detail: "no choices returned".to_string(),
             })
+    }
+
+    fn classify_network_error(&self, provider: &str, e: reqwest::Error) -> ProviderError {
+        if e.is_timeout() {
+            ProviderError::NetworkError {
+                provider: provider.to_string(),
+                detail: "request timed out".to_string(),
+            }
+        } else if e.is_connect() {
+            ProviderError::NetworkError {
+                provider: provider.to_string(),
+                detail: "connection refused or unreachable".to_string(),
+            }
+        } else {
+            ProviderError::NetworkError {
+                provider: provider.to_string(),
+                detail: e.to_string(),
+            }
+        }
     }
 }

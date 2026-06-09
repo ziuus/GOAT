@@ -21,7 +21,6 @@
 use crate::approval::{ApprovalDecision, ApprovalRequest};
 use crate::llm::{FunctionDeclaration, Message, Tool};
 use crate::runtime::GoatRuntime;
-use crate::swarm::SwarmRouter;
 use crate::tools::NativeTools;
 use anyhow::Result;
 use serde_json::Value;
@@ -132,7 +131,7 @@ fn print_banner(rt: &GoatRuntime) {
     );
     println!();
     println!("Type a message and press Enter. Ctrl+D or Ctrl+C to exit.");
-    println!("Slash commands: /help /status /clear /sessions /tools");
+    println!("Slash commands: /help /status /profile /profiles /clear /sessions /tools /new /exit");
     println!();
 }
 
@@ -146,12 +145,16 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
     match name.as_str() {
         "/help" => {
             println!("[HELP] Headless commands:");
-            println!("[HELP]   /help     — show this help");
-            println!("[HELP]   /status   — show provider/session/brain status");
-            println!("[HELP]   /clear    — clear screen and reset");
-            println!("[HELP]   /sessions — list recent sessions");
-            println!("[HELP]   /tools    — list available tools");
-            println!("[HELP]   /exit     — exit GOAT headless");
+            println!("[HELP]   /help            — show this help");
+            println!("[HELP]   /status          — show provider/session/brain status");
+            println!("[HELP]   /profile         — show current profile");
+            println!("[HELP]   /profile <name>  — switch to a profile");
+            println!("[HELP]   /profiles        — list available profiles");
+            println!("[HELP]   /new             — start a new session");
+            println!("[HELP]   /clear           — clear screen and reset");
+            println!("[HELP]   /sessions        — list recent sessions");
+            println!("[HELP]   /tools           — list available tools");
+            println!("[HELP]   /exit            — exit GOAT headless");
             println!("[HELP]");
             println!("[HELP] Approval (when prompted):");
             println!("[HELP]   y — approve once");
@@ -176,6 +179,11 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
                     "unavailable"
                 }
             );
+            println!(
+                "[STATUS] Retries  : {} max / {}s timeout",
+                rt.config.llm.effective_max_retries(),
+                rt.config.llm.effective_timeout_secs()
+            );
             println!("[STATUS] History  : {} messages", rt.history.len());
             println!("[STATUS] MCP      : {} server(s)", rt.mcp_server_count);
             true
@@ -192,11 +200,18 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
         "/sessions" => {
             println!("[SESSION] Current: {}", rt.session_id);
             if let Some(ref brain) = rt.brain {
-                match brain.get_sessions() {
-                    Ok(sessions) => {
-                        println!("[SESSION] {} session(s) in brain:", sessions.len());
-                        for (id, title) in sessions.iter().take(10) {
-                            println!("[SESSION]   {} — {}", id, title);
+                match brain.get_session_records() {
+                    Ok(records) => {
+                        println!("[SESSION] {} session(s) in brain:", records.len());
+                        for r in records.iter().take(10) {
+                            let short_id = if r.id.len() > 8 {
+                                format!("{}…", &r.id[..8])
+                            } else {
+                                r.id.clone()
+                            };
+                            let kind = if r.is_uuid() { "uuid" } else { "legacy" };
+                            let ts = r.updated_at.get(..16).unwrap_or(&r.updated_at);
+                            println!("[SESSION]   {}  [{}]  {}  {}", short_id, kind, ts, r.title);
                         }
                     }
                     Err(e) => println!("[SESSION] Error: {}", e),
@@ -204,6 +219,57 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             } else {
                 println!("[SESSION] Brain not connected.");
             }
+            true
+        }
+
+        "/profile" => {
+            let arg = parts.get(1).copied().unwrap_or("").trim();
+            if arg.is_empty() {
+                println!("[PROFILE] Active : {}", rt.active_profile);
+                println!("[PROFILE] Primary: {}", rt.model_chain.primary_display());
+                println!("[PROFILE] Fallback: {}", rt.model_chain.fallback_display());
+                println!("[PROFILE] Use /profile <name> to switch. Use /profiles to list.");
+            } else {
+                match rt.switch_profile(arg) {
+                    Ok(()) => {
+                        println!(
+                            "[PROFILE] Switched to '{}' — {} → {}",
+                            arg,
+                            rt.model_chain.primary_display(),
+                            rt.model_chain.fallback_display()
+                        );
+                    }
+                    Err(e) => println!("[PROFILE] {}", e),
+                }
+            }
+            true
+        }
+
+        "/profiles" => {
+            let names = rt.profile_registry.profile_names();
+            println!("[PROFILES] {} profiles available:", names.len());
+            for name in &names {
+                let chain = rt.profile_registry.profiles.get(*name);
+                let primary = chain.map(|c| c.primary_display()).unwrap_or_default();
+                let fallback = chain.map(|c| c.fallback_display()).unwrap_or_default();
+                let active_marker = if *name == rt.active_profile.as_str() {
+                    " ✓ (active)"
+                } else {
+                    ""
+                };
+                println!(
+                    "[PROFILES]   {:12}  {} → {}{}",
+                    name, primary, fallback, active_marker
+                );
+            }
+            println!("[PROFILES] Use /profile <name> to switch.");
+            true
+        }
+
+        "/new" => {
+            let new_id = rt.create_new_session();
+            println!("[SESSION] New session started: {}", new_id);
+            println!("[SESSION] History cleared. Ready for a fresh conversation.");
             true
         }
 

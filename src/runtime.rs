@@ -9,10 +9,10 @@
 //!
 //! ```text
 //!  main()
-//!   ├─ GoatRuntime::bootstrap(config, paths, warnings, no_brain)
+//!   ├─ GoatRuntime::bootstrap(config, paths, warnings, no_brain, profile_override)
 //!   │     ├─ ProfileRegistry::from_config()  → profile/chain setup
 //!   │     ├─ Brain::new(paths.db_file)        → SQLite (optional via --no-brain)
-//!   │     ├─ LlmRouter::new(keys)
+//!   │     ├─ LlmRouter::from_config(config)   → uses LlmConfig for retry/timeout
 //!   │     ├─ SwarmRouter::default()
 //!   │     ├─ ApprovalGate::new()
 //!   │     └─ session resume / UUID create
@@ -86,18 +86,35 @@ impl GoatRuntime {
     /// Bootstrap the shared agent runtime from config and paths.
     ///
     /// - `no_brain`: when `true`, skip SQLite entirely (ephemeral session).
+    /// - `profile_override`: when `Some(name)`, use that profile instead of the config default.
     pub fn bootstrap(
         config: Config,
         paths: GoatPaths,
         startup_warnings: Vec<String>,
         no_brain: bool,
+        profile_override: Option<String>,
     ) -> (Self, Vec<String>) {
         let mut boot_log: Vec<String> = Vec::new();
 
         // ── Profile registry ──────────────────────────────────────────────────
         let profile_registry = ProfileRegistry::from_config(&config.profiles);
-        let active_profile = profile_registry.default_profile.clone();
-        let model_chain = profile_registry.default_chain().clone();
+
+        // If a profile was specified on the CLI, validate it early.
+        let active_profile = if let Some(ref name) = profile_override {
+            if profile_registry.profiles.contains_key(name.as_str()) {
+                name.clone()
+            } else {
+                boot_log.push(format!(
+                    "[WARN] Profile '{}' not found — falling back to default '{}'",
+                    name, profile_registry.default_profile
+                ));
+                profile_registry.default_profile.clone()
+            }
+        } else {
+            profile_registry.default_profile.clone()
+        };
+
+        let model_chain = profile_registry.resolve(&active_profile).1.clone();
 
         boot_log.push(format!(
             "[SYSTEM] Profile: {} | Chain: {}{}",
@@ -183,10 +200,7 @@ impl GoatRuntime {
         }
 
         // ── Provider / LLM ────────────────────────────────────────────────────
-        let llm_router = LlmRouter::new(
-            config.keys.openai_api_key.clone(),
-            config.keys.groq_api_key.clone(),
-        );
+        let llm_router = LlmRouter::from_config(&config);
 
         // Build the display label from the first available entry in the chain.
         let provider_label = model_chain
@@ -232,6 +246,53 @@ impl GoatRuntime {
         };
 
         (runtime, boot_log)
+    }
+
+    // ── Runtime mutations ─────────────────────────────────────────────────────
+
+    /// Switch to a different profile at runtime.
+    ///
+    /// Returns `Ok(())` on success, `Err(reason)` if the profile name is unknown.
+    pub fn switch_profile(&mut self, name: &str) -> Result<(), String> {
+        if let Some(chain) = self.profile_registry.profiles.get(name) {
+            self.active_profile = name.to_string();
+            self.model_chain = chain.clone();
+            // Update provider_label to reflect new chain's primary entry.
+            self.provider_label = self
+                .model_chain
+                .entries
+                .iter()
+                .find(|e| self.llm_router.is_provider_available(&e.provider))
+                .map(|e| e.display())
+                .unwrap_or_else(|| "no provider configured".to_string());
+            info!(profile = %name, provider = %self.provider_label, "profile switched");
+            Ok(())
+        } else {
+            let available = self.profile_registry.profile_names().join(", ");
+            Err(format!(
+                "profile '{}' not found. Available: {}",
+                name, available
+            ))
+        }
+    }
+
+    /// Create a new session and switch to it.
+    ///
+    /// Saves the current session (already persisted via log_interaction) then
+    /// creates a fresh UUID session in the brain (if available).
+    /// Returns the new session ID.
+    pub fn create_new_session(&mut self) -> String {
+        use uuid::Uuid;
+        let new_id = Uuid::new_v4().to_string();
+        self.session_id = new_id.clone();
+        self.session_resumed = false;
+        self.history.clear();
+
+        if let Some(ref brain) = self.brain {
+            let _ = brain.create_session(&new_id, "New Session");
+        }
+        info!(session_id = %new_id, "new session created");
+        new_id
     }
 }
 

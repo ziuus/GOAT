@@ -177,14 +177,17 @@ impl DoctorStatus {
 
 /// Run all doctor checks and return a list of results.
 ///
-/// `has_openai_key` / `has_groq_key`: whether the keys are configured
-/// (the actual key values must not be passed here to avoid accidental logging).
-/// `headless_ready`: whether `--headless` was requested (checked for compatibility).
+/// `has_*_key`: booleans — actual key values must NOT be passed here.
+/// `headless_ready`: whether `--headless` was requested.
+/// `llm_config`: LLM retry/timeout settings to display.
 pub fn run_doctor(
     paths: &GoatPaths,
     has_openai_key: bool,
     has_groq_key: bool,
+    has_openrouter_key: bool,
+    ollama_enabled: bool,
     headless_ready: bool,
+    llm_config: Option<&crate::config::LlmConfig>,
 ) -> Vec<DoctorCheck> {
     let mut checks = Vec::new();
 
@@ -417,6 +420,70 @@ pub fn run_doctor(
         });
     }
 
+    // ── Provider: OpenRouter ───────────────────────────────────────────────────
+    if has_openrouter_key {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "OpenRouter key".to_string(),
+            detail: "Configured (key hidden)".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "OpenRouter key".to_string(),
+            detail:
+                "Not configured (optional). Set OPENROUTER_API_KEY or openrouter_api_key in config"
+                    .to_string(),
+        });
+    }
+
+    // ── Provider: Ollama ────────────────────────────────────────────────────────
+    checks.push(DoctorCheck {
+        status: if ollama_enabled {
+            DoctorStatus::Info
+        } else {
+            DoctorStatus::Info
+        },
+        label: "Ollama (local)".to_string(),
+        detail: if ollama_enabled {
+            "Provider config found. No key required — server must be running at configured URL"
+                .to_string()
+        } else {
+            "Available (local, no key). Configure [providers.ollama] base_url in goat.toml to use"
+                .to_string()
+        },
+    });
+
+    // ── Anthropic / Gemini (planned) ───────────────────────────────────────────
+    checks.push(DoctorCheck {
+        status: DoctorStatus::Info,
+        label: "Anthropic".to_string(),
+        detail: "Planned — not implemented. Will be added in a future phase.".to_string(),
+    });
+    checks.push(DoctorCheck {
+        status: DoctorStatus::Info,
+        label: "Gemini".to_string(),
+        detail: "Planned — not implemented. Will be added in a future phase.".to_string(),
+    });
+
+    // ── LLM retry/timeout config ────────────────────────────────────────────────
+    if let Some(llm) = llm_config {
+        let warnings = llm.validate();
+        checks.push(DoctorCheck {
+            status: if warnings.is_empty() { DoctorStatus::Ok } else { DoctorStatus::Warn },
+            label: "LLM retry config".to_string(),
+            detail: format!(
+                "max_retries={} timeout={}s fallback_rate_limit={} fallback_network={} fallback_5xx={}{}",
+                llm.effective_max_retries(),
+                llm.effective_timeout_secs(),
+                llm.fallback_on_rate_limit,
+                llm.fallback_on_network,
+                llm.fallback_on_server_error,
+                if warnings.is_empty() { String::new() } else { format!(" ({})", warnings.len()) }
+            ),
+        });
+    }
+
     // ── DB migration status ───────────────────────────────────────────────────
     if GoatPaths::detect_legacy_db().is_some() {
         checks.push(DoctorCheck {
@@ -593,14 +660,14 @@ mod tests {
     fn test_doctor_runs_without_panic() {
         let paths = GoatPaths::resolve().unwrap();
         // Doctor should never panic, even with missing files.
-        let checks = run_doctor(&paths, false, false, false);
+        let checks = run_doctor(&paths, false, false, false, false, false, None);
         assert!(!checks.is_empty());
     }
 
     #[test]
     fn test_doctor_no_provider_shows_fail() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, false, false, false);
+        let checks = run_doctor(&paths, false, false, false, false, false, None);
         let has_fail = checks
             .iter()
             .any(|c| c.status == DoctorStatus::Fail && c.label == "Provider");
@@ -610,10 +677,35 @@ mod tests {
     #[test]
     fn test_doctor_with_provider_shows_ok() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, true, false, false);
+        let checks = run_doctor(&paths, true, false, false, false, false, None);
         let has_ok = checks
             .iter()
             .any(|c| c.status == DoctorStatus::Ok && c.label == "Provider");
         assert!(has_ok, "should be ok when a provider is configured");
+    }
+
+    #[test]
+    fn test_doctor_with_llm_config_shows_retry() {
+        use crate::config::LlmConfig;
+        let paths = GoatPaths::resolve().unwrap();
+        let llm = LlmConfig {
+            max_retries: 3,
+            timeout_secs: 30,
+            ..LlmConfig::default()
+        };
+        let checks = run_doctor(&paths, true, false, false, false, false, Some(&llm));
+        let has_retry = checks
+            .iter()
+            .any(|c| c.label == "LLM retry config" && c.detail.contains("max_retries=3"));
+        assert!(has_retry, "should show retry config in doctor");
+    }
+
+    #[test]
+    fn test_doctor_with_openrouter_key_shows_ok() {
+        let paths = GoatPaths::resolve().unwrap();
+        let checks = run_doctor(&paths, false, false, true, false, false, None);
+        let or_check = checks.iter().find(|c| c.label == "OpenRouter key");
+        assert!(or_check.is_some());
+        assert_eq!(or_check.unwrap().status, DoctorStatus::Ok);
     }
 }
