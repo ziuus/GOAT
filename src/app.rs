@@ -3,6 +3,7 @@ use crate::approval::{
     call_subagent_approval_request,
 };
 use crate::brain::Brain;
+use crate::command_registry::{CommandRegistry, CommandStatus};
 use crate::config::Config;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::mcp::McpManager;
@@ -117,6 +118,10 @@ pub struct App {
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
     /// Active view for Phase 3.0 UI
     pub active_view: ActiveView,
+    /// Current slash-command suggestions (populated while input starts with '/')
+    pub cmd_suggestions: Vec<String>,
+    /// Selected index in cmd_suggestions popup (for Up/Down navigation)
+    pub cmd_suggestion_idx: usize,
 }
 
 impl App {
@@ -200,6 +205,8 @@ impl App {
             subagent_manager: rt.subagent_manager,
             external_agent_manager: rt.external_agent_manager,
             active_view: ActiveView::Chat,
+            cmd_suggestions: Vec::new(),
+            cmd_suggestion_idx: 0,
         }
     }
 
@@ -212,6 +219,69 @@ impl App {
 
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    // ── Slash command suggestions ─────────────────────────────────────────────
+
+    /// Call this whenever `self.input` changes to keep suggestions in sync.
+    /// Clears suggestions when input is empty or doesn't start with '/'.
+    pub fn update_suggestions(&mut self) {
+        if self.input.is_empty() || !self.input.starts_with('/') {
+            self.cmd_suggestions.clear();
+            self.cmd_suggestion_idx = 0;
+            return;
+        }
+        let registry = CommandRegistry::build();
+        // The whole input (including any args) is the prefix for matching.
+        let prefix = self.input.trim();
+        self.cmd_suggestions = registry
+            .suggest(prefix)
+            .iter()
+            .map(|c| format!("{:<28} {}", c.name, c.description))
+            .collect();
+        // Cap at 12 to avoid flooding the popup
+        self.cmd_suggestions.truncate(12);
+        // Reset selection when suggestions change
+        self.cmd_suggestion_idx = 0;
+    }
+
+    /// Move selection up in the suggestion list.
+    pub fn suggestion_up(&mut self) {
+        if self.cmd_suggestions.is_empty() {
+            return;
+        }
+        if self.cmd_suggestion_idx > 0 {
+            self.cmd_suggestion_idx -= 1;
+        }
+    }
+
+    /// Move selection down in the suggestion list.
+    pub fn suggestion_down(&mut self) {
+        if self.cmd_suggestions.is_empty() {
+            return;
+        }
+        if self.cmd_suggestion_idx + 1 < self.cmd_suggestions.len() {
+            self.cmd_suggestion_idx += 1;
+        }
+    }
+
+    /// Apply tab completion: replace input with the first (or selected) suggestion name.
+    pub fn complete_suggestion(&mut self) {
+        if self.cmd_suggestions.is_empty() {
+            return;
+        }
+        let registry = CommandRegistry::build();
+        let prefix = self.input.trim().to_string();
+        let suggestions = registry.suggest(&prefix);
+        let selected = self
+            .cmd_suggestion_idx
+            .min(suggestions.len().saturating_sub(1));
+        if let Some(cmd) = suggestions.get(selected) {
+            // Replace the whole input with the command name followed by a space
+            self.input = format!("{} ", cmd.name);
+            self.cmd_suggestions.clear();
+            self.cmd_suggestion_idx = 0;
+        }
     }
 
     pub fn push_log(&mut self, log: impl Into<String>) {
@@ -446,86 +516,113 @@ impl App {
             }
             "/command" | "/palette" => {
                 self.active_view = ActiveView::CommandPalette;
-                self.push_log("[SYSTEM] Opened Command Palette. Use /view chat to return.");
+                let registry = CommandRegistry::build();
+                // If args were passed, treat as search filter
+                let filter = if _args.is_empty() { None } else { Some(_args) };
+                self.push_log("[SYSTEM] Command Palette — use /view chat to return");
+                self.push_log("[SYSTEM] ─────────────────────────────────────────────────────────");
+                for line in registry.format_palette(filter) {
+                    self.push_log(format!("[HELP] {}", line));
+                }
+                self.push_log("[SYSTEM] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Type any command in the input below to run it.");
+                self.push_log("[HELP] Use Tab to auto-complete slash commands.");
                 true
             }
             "/help" => {
                 self.active_view = ActiveView::Help;
+                let registry = CommandRegistry::build();
                 let ver = env!("CARGO_PKG_VERSION");
-                self.push_log(format!("[HELP] 🐐 GOAT v{} — Available Commands", ver));
+                self.push_log(format!("[HELP] 🐐 GOAT v{} — Command Reference", ver));
+                self.push_log("[HELP] ═════════════════════════════════════════════════════════");
+                self.push_log("[HELP] ✅ = working  ⚡ = partial  🔮 = planned (not implemented)");
+                self.push_log("[HELP] Tab = autocomplete  /commands all = show all incl. planned");
                 self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] General:");
-                self.push_log("[HELP]   /help             — this help");
-                self.push_log("[HELP]   /status           — system status (provider, memory, git)");
-                self.push_log("[HELP]   /ui               — UI info and future plans");
-                self.push_log("[HELP]   /clear            — clear log display");
-                self.push_log("[HELP]   /tools            — list available tools");
+                for line in registry.format_help(false) {
+                    self.push_log(format!("[HELP]{}", line));
+                }
                 self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Sessions:");
-                self.push_log("[HELP]   /new              — start a new session");
-                self.push_log("[HELP]   /sessions         — list recent sessions");
-                self.push_log("[HELP]   /profile          — show active profile");
-                self.push_log("[HELP]   /profile <name>   — switch profile");
-                self.push_log("[HELP]   /profiles         — list available profiles");
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Project & Dev:");
-                self.push_log("[HELP]   /project          — show/manage project context");
-                self.push_log("[HELP]   /project scan     — index current project");
-                self.push_log("[HELP]   /repo-map         — show repository map + symbols");
-                self.push_log("[HELP]   /repo-map refresh — force rescan");
-                self.push_log("[HELP]   /check            — run project check (cargo check, etc.)");
-                self.push_log("[HELP]   /test [args]      — run project tests");
-                self.push_log("[HELP]   /lint             — run linter (clippy, ruff, etc.)");
-                self.push_log("[HELP]   /format           — run formatter");
-                self.push_log("[HELP]   /patch            — show pending file patch");
-                self.push_log("[HELP]   /patch apply      — apply pending patch");
-                self.push_log("[HELP]   /patch discard    — discard pending patch");
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Memory & Skills:");
-                self.push_log("[HELP]   /memory           — view memory status");
-                self.push_log("[HELP]   /memory show user — show USER.md contents");
-                self.push_log("[HELP]   /memory show mem  — show MEMORY.md contents");
-                self.push_log("[HELP]   /recall <query>   — search conversation history");
-                self.push_log("[HELP]   /skills           — list available skills");
-                self.push_log("[HELP]   /skill <name>     — activate a skill");
-                self.push_log("[HELP]   /skill create <n> — scaffold a new skill");
-                self.push_log("[HELP]   /skill search <q> — search skills");
-                self.push_log("[HELP]   /skill clear      — deactivate skill");
-                self.push_log("[HELP]   /save-skill <n>   — extract skill from session");
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Infrastructure:");
-                self.push_log("[HELP]   /mcp              — start configured MCP servers");
-                self.push_log("[HELP]   /learn            — index project files into brain");
-                self.push_log("[HELP]   /route            — show swarm route for current input");
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Subagents (Phase 2.7):");
-                self.push_log("[HELP]   /subagents        — list internal subagents");
-                self.push_log("[HELP]   /subagent <name>  — show subagent details");
-                self.push_log("[HELP]   /ask-agent <n> <t>— run a subagent turn");
-                self.push_log(
-                    "[HELP]   /review           — ask reviewer to review current patch/plan",
-                );
-                self.push_log("[HELP]   /debug            — ask debugger to analyze recent error");
-                self.push_log(
-                    "[HELP]   /test-plan        — ask tester for a verification strategy",
-                );
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Keyboard:");
-                self.push_log("[HELP]   Enter     — send message");
-                self.push_log("[HELP]   ↑         — recall previous command (history)");
-                self.push_log("[HELP]   ↓         — forward through history");
-                self.push_log("[HELP]   Ctrl+C    — quit");
-                self.push_log("[HELP]   Ctrl+L    — clear log (same as /clear)");
-                self.push_log("[HELP]   ↑↓        — scroll log (when input empty)");
-                self.push_log("[HELP]   PgUp/PgDn — fast scroll log");
-                self.push_log("[HELP]   Home/End  — jump to top/bottom of log");
-                self.push_log("[HELP]   Esc       — clear input / scroll to bottom");
-                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
-                self.push_log("[HELP] Approval (when overlay is visible):");
-                self.push_log("[HELP]   y  — approve this action once");
-                self.push_log("[HELP]   n  — deny");
-                self.push_log("[HELP]   a  — always allow this tool (session)");
-                self.push_log("[HELP]   d  — always deny this tool (session)");
+                self.push_log("[HELP] Keys: Enter=send  ↑=history  Tab=complete  Ctrl+C=quit");
+                self.push_log("[HELP] Ctrl+1..9=views  Ctrl+P=palette  Ctrl+L=clear");
+                self.push_log("[HELP] Approval: y=approve  n=deny  a=always-allow  d=always-deny");
+                true
+            }
+            "/commands" | "/cmd" => {
+                let registry = CommandRegistry::build();
+                match _args {
+                    "all" => {
+                        let ver = env!("CARGO_PKG_VERSION");
+                        self.push_log(format!(
+                            "[HELP] All GOAT Commands (incl. planned) — v{}",
+                            ver
+                        ));
+                        self.push_log(
+                            "[HELP] ─────────────────────────────────────────────────────────",
+                        );
+                        for line in registry.format_help(true) {
+                            self.push_log(format!("[HELP]{}", line));
+                        }
+                    }
+                    "planned" => {
+                        self.push_log("[HELP] 🔮 Planned Commands (not yet implemented):");
+                        self.push_log(
+                            "[HELP] ─────────────────────────────────────────────────────────",
+                        );
+                        for cmd in registry
+                            .all(true)
+                            .iter()
+                            .filter(|c| matches!(c.status, CommandStatus::Planned))
+                        {
+                            self.push_log(format!(
+                                "[HELP]   🔮 {:<28} {}",
+                                cmd.usage, cmd.description
+                            ));
+                        }
+                    }
+                    q if q.starts_with("search ") => {
+                        let query = q.trim_start_matches("search ").trim();
+                        let results = registry.search(query, true);
+                        self.push_log(format!(
+                            "[HELP] Search results for '{}': {} found",
+                            query,
+                            results.len()
+                        ));
+                        self.push_log(
+                            "[HELP] ─────────────────────────────────────────────────────────",
+                        );
+                        for cmd in &results {
+                            self.push_log(format!(
+                                "[HELP]   {} {:<28} {}",
+                                cmd.status.label(),
+                                cmd.usage,
+                                cmd.description
+                            ));
+                        }
+                        if results.is_empty() {
+                            self.push_log(format!("[HELP]   No commands matching '{}'", query));
+                        }
+                    }
+                    _ => {
+                        // Default: list working commands
+                        let ver = env!("CARGO_PKG_VERSION");
+                        self.push_log(format!(
+                            "[HELP] GOAT v{} Commands (working & partial):",
+                            ver
+                        ));
+                        self.push_log(
+                            "[HELP] ─────────────────────────────────────────────────────────",
+                        );
+                        for line in registry.format_help(false) {
+                            self.push_log(format!("[HELP]{}", line));
+                        }
+                        self.push_log(
+                            "[HELP] ─────────────────────────────────────────────────────────",
+                        );
+                        self.push_log("[HELP] /commands all        — show ALL including planned");
+                        self.push_log("[HELP] /commands planned    — show only planned commands");
+                        self.push_log("[HELP] /commands search <q> — search by name/description");
+                    }
+                }
                 true
             }
 

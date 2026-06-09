@@ -1,0 +1,1657 @@
+/// GOAT Unified Command Registry — Phase 3.1
+///
+/// This module defines a central registry of all slash commands available in
+/// GOAT. It powers:
+///   - `/help` grouped output
+///   - `/palette` command palette
+///   - `/commands` listing and search
+///   - TUI slash-command recommendation popup (prefix filtering)
+///   - Headless text output
+///
+/// SECURITY: The registry does not execute commands. It only provides metadata.
+/// Command routing is still handled by `app.rs` and `headless.rs`.
+/// Planned commands are listed but CANNOT execute — the routers check status.
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+/// Unique identifier for a command.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CommandId(pub &'static str);
+
+/// Category groupings for commands.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CommandCategory {
+    General,
+    Sessions,
+    Models,
+    Project,
+    Repo,
+    Coding,
+    Patches,
+    Memory,
+    Skills,
+    Tools,
+    Mcp,
+    Subagents,
+    ExternalAgents,
+    Ui,
+    Logs,
+    System,
+    /// Commands planned for future phases — not yet implemented.
+    Future,
+}
+
+impl CommandCategory {
+    pub fn label(&self) -> &'static str {
+        match self {
+            CommandCategory::General => "General",
+            CommandCategory::Sessions => "Sessions",
+            CommandCategory::Models => "Models",
+            CommandCategory::Project => "Project",
+            CommandCategory::Repo => "Repo Map",
+            CommandCategory::Coding => "Coding",
+            CommandCategory::Patches => "Patches",
+            CommandCategory::Memory => "Memory",
+            CommandCategory::Skills => "Skills",
+            CommandCategory::Tools => "Tools",
+            CommandCategory::Mcp => "MCP",
+            CommandCategory::Subagents => "Subagents",
+            CommandCategory::ExternalAgents => "External Agents",
+            CommandCategory::Ui => "UI / Views",
+            CommandCategory::Logs => "Logs",
+            CommandCategory::System => "System",
+            CommandCategory::Future => "Future (Planned)",
+        }
+    }
+
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            CommandCategory::General => "💬",
+            CommandCategory::Sessions => "📁",
+            CommandCategory::Models => "🤖",
+            CommandCategory::Project => "📂",
+            CommandCategory::Repo => "🗺",
+            CommandCategory::Coding => "⌨",
+            CommandCategory::Patches => "🩹",
+            CommandCategory::Memory => "🧠",
+            CommandCategory::Skills => "🎯",
+            CommandCategory::Tools => "🔧",
+            CommandCategory::Mcp => "🔌",
+            CommandCategory::Subagents => "👥",
+            CommandCategory::ExternalAgents => "🌐",
+            CommandCategory::Ui => "🖥",
+            CommandCategory::Logs => "📋",
+            CommandCategory::System => "⚙",
+            CommandCategory::Future => "🔮",
+        }
+    }
+}
+
+/// Implementation status of a command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandStatus {
+    /// Fully implemented and tested.
+    Working,
+    /// Implemented but incomplete or known limitations.
+    Partial,
+    /// Planned but not yet implemented. MUST NOT execute.
+    Planned,
+    /// Explicitly disabled or deprecated.
+    Disabled,
+}
+
+impl CommandStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            CommandStatus::Working => "✅",
+            CommandStatus::Partial => "⚡",
+            CommandStatus::Planned => "🔮",
+            CommandStatus::Disabled => "❌",
+        }
+    }
+
+    pub fn text(&self) -> &'static str {
+        match self {
+            CommandStatus::Working => "working",
+            CommandStatus::Partial => "partial",
+            CommandStatus::Planned => "planned",
+            CommandStatus::Disabled => "disabled",
+        }
+    }
+}
+
+/// Risk level for commands that trigger dangerous operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandRisk {
+    None,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl CommandRisk {
+    pub fn label(&self) -> &'static str {
+        match self {
+            CommandRisk::None => "",
+            CommandRisk::Low => "🟢 low",
+            CommandRisk::Medium => "🔵 medium",
+            CommandRisk::High => "🟡 high",
+            CommandRisk::Critical => "🔴 critical",
+        }
+    }
+}
+
+/// Which surfaces support this command.
+#[derive(Debug, Clone)]
+pub struct CommandSurface {
+    pub tui: bool,
+    pub headless: bool,
+    pub cli: bool,
+}
+
+impl CommandSurface {
+    pub fn both() -> Self {
+        Self {
+            tui: true,
+            headless: true,
+            cli: false,
+        }
+    }
+    pub fn tui_only() -> Self {
+        Self {
+            tui: true,
+            headless: false,
+            cli: false,
+        }
+    }
+    pub fn headless_only() -> Self {
+        Self {
+            tui: false,
+            headless: true,
+            cli: false,
+        }
+    }
+    pub fn all() -> Self {
+        Self {
+            tui: true,
+            headless: true,
+            cli: true,
+        }
+    }
+}
+
+/// Full metadata for a single slash command.
+#[derive(Debug, Clone)]
+pub struct CommandMetadata {
+    /// Primary slash command name, e.g. "/help"
+    pub name: &'static str,
+    /// Aliases that resolve to this command.
+    pub aliases: &'static [&'static str],
+    pub category: CommandCategory,
+    /// One-line description shown in listings.
+    pub description: &'static str,
+    /// Usage syntax, e.g. "/skill <name>"
+    pub usage: &'static str,
+    /// Short examples.
+    pub examples: &'static [&'static str],
+    /// Keyboard shortcut if any (e.g. "Ctrl+P")
+    pub shortcut: Option<&'static str>,
+    pub surface: CommandSurface,
+    /// Whether this command requires ApprovalGate.
+    pub requires_approval: bool,
+    pub risk: CommandRisk,
+    pub status: CommandStatus,
+    /// Related feature name for cross-referencing.
+    pub related: Option<&'static str>,
+}
+
+impl CommandMetadata {
+    /// Returns true if this command should be shown in normal listings.
+    /// Planned commands are hidden by default unless explicitly requested.
+    pub fn is_visible(&self) -> bool {
+        !matches!(
+            self.status,
+            CommandStatus::Planned | CommandStatus::Disabled
+        )
+    }
+
+    /// Returns true if the command name or any alias starts with the prefix.
+    pub fn matches_prefix(&self, prefix: &str) -> bool {
+        let p = prefix.to_lowercase();
+        if self.name.starts_with(p.as_str()) {
+            return true;
+        }
+        self.aliases.iter().any(|a| a.starts_with(p.as_str()))
+    }
+
+    /// Returns true if the command name, description, or category label
+    /// contains the query string (case-insensitive).
+    pub fn matches_search(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.name.to_lowercase().contains(q.as_str())
+            || self.description.to_lowercase().contains(q.as_str())
+            || self.category.label().to_lowercase().contains(q.as_str())
+            || self
+                .aliases
+                .iter()
+                .any(|a| a.to_lowercase().contains(q.as_str()))
+    }
+
+    /// Short one-liner for popup suggestions: "/name — description"
+    pub fn suggestion_line(&self) -> String {
+        format!("{} — {}", self.name, self.description)
+    }
+}
+
+// ── Registry ──────────────────────────────────────────────────────────────────
+
+/// The unified command registry. Holds all `CommandMetadata` entries.
+pub struct CommandRegistry {
+    commands: Vec<CommandMetadata>,
+}
+
+impl CommandRegistry {
+    /// Build and return the global registry with all registered commands.
+    pub fn build() -> Self {
+        Self {
+            commands: all_commands(),
+        }
+    }
+
+    /// Return all commands, optionally including planned ones.
+    pub fn all(&self, include_planned: bool) -> Vec<&CommandMetadata> {
+        self.commands
+            .iter()
+            .filter(|c| include_planned || c.is_visible())
+            .collect()
+    }
+
+    /// Return commands matching a prefix (for TUI autocomplete popup).
+    /// Only returns working/partial commands by default.
+    pub fn suggest(&self, prefix: &str) -> Vec<&CommandMetadata> {
+        if prefix.is_empty() || prefix == "/" {
+            return self.commands.iter().filter(|c| c.is_visible()).collect();
+        }
+        self.commands
+            .iter()
+            .filter(|c| c.is_visible() && c.matches_prefix(prefix))
+            .collect()
+    }
+
+    /// Return all commands matching a search query (for /commands search).
+    pub fn search(&self, query: &str, include_planned: bool) -> Vec<&CommandMetadata> {
+        self.commands
+            .iter()
+            .filter(|c| (include_planned || c.is_visible()) && c.matches_search(query))
+            .collect()
+    }
+
+    /// Return commands grouped by category. Sorted by category then name.
+    pub fn grouped(&self, include_planned: bool) -> Vec<(CommandCategory, Vec<&CommandMetadata>)> {
+        let mut groups: std::collections::BTreeMap<
+            String,
+            (CommandCategory, Vec<&CommandMetadata>),
+        > = std::collections::BTreeMap::new();
+
+        for cmd in &self.commands {
+            if !include_planned && !cmd.is_visible() {
+                continue;
+            }
+            let key = format!("{:?}", cmd.category);
+            let entry = groups
+                .entry(key)
+                .or_insert_with(|| (cmd.category.clone(), Vec::new()));
+            entry.1.push(cmd);
+        }
+
+        groups.into_values().collect()
+    }
+
+    /// Look up a command by exact name or alias.
+    pub fn find(&self, name: &str) -> Option<&CommandMetadata> {
+        self.commands
+            .iter()
+            .find(|c| c.name == name || c.aliases.iter().any(|a| *a == name))
+    }
+
+    /// Return the first suggestion for tab completion of a prefix.
+    pub fn complete(&self, prefix: &str) -> Option<&str> {
+        self.suggest(prefix).into_iter().next().map(|c| c.name)
+    }
+
+    /// Format grouped help output as a Vec<String> for display.
+    pub fn format_help(&self, include_planned: bool) -> Vec<String> {
+        let mut out = Vec::new();
+        for (cat, cmds) in self.grouped(include_planned) {
+            out.push(format!("\n{} {}", cat.emoji(), cat.label().to_uppercase()));
+            out.push("─".repeat(50));
+            for cmd in cmds {
+                let status = cmd.status.label();
+                let risk = if !matches!(cmd.risk, CommandRisk::None) {
+                    format!(" {}", cmd.risk.label())
+                } else {
+                    String::new()
+                };
+                let shortcut = cmd.shortcut.map(|s| format!("  [{s}]")).unwrap_or_default();
+                out.push(format!(
+                    "  {status} {:<28} {}{risk}{shortcut}",
+                    cmd.usage, cmd.description
+                ));
+            }
+        }
+        out
+    }
+
+    /// Format palette output: grouped list with short descriptions.
+    pub fn format_palette(&self, filter: Option<&str>) -> Vec<String> {
+        let mut out = Vec::new();
+        let include_planned = false;
+
+        if let Some(query) = filter {
+            let results = self.search(query, false);
+            if results.is_empty() {
+                out.push(format!("  No commands found matching '{query}'"));
+                out.push(String::new());
+                out.push("  Try: /commands search <query>".to_string());
+            } else {
+                out.push(format!("  {} result(s) for '{query}':", results.len()));
+                out.push(String::new());
+                for cmd in results {
+                    out.push(format!(
+                        "  {} {:<28} {}",
+                        cmd.status.label(),
+                        cmd.usage,
+                        cmd.description
+                    ));
+                }
+            }
+            return out;
+        }
+
+        for (cat, cmds) in self.grouped(include_planned) {
+            out.push(format!("{} {}:", cat.emoji(), cat.label()));
+            for cmd in cmds {
+                let risk = if !matches!(cmd.risk, CommandRisk::None) {
+                    format!(" ⚠{}", cmd.risk.label())
+                } else {
+                    String::new()
+                };
+                out.push(format!("  {}{risk}  {}", cmd.usage, cmd.description));
+            }
+            out.push(String::new());
+        }
+        out.push("  (Type /commands all to see planned future commands)".to_string());
+        out
+    }
+}
+
+// ── Command Definitions ───────────────────────────────────────────────────────
+
+/// Build the master list of all commands.
+/// Every slash command handled in app.rs and headless.rs must be here.
+fn all_commands() -> Vec<CommandMetadata> {
+    vec![
+        // ── General ────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/help",
+            aliases: &[],
+            category: CommandCategory::General,
+            description: "Show all commands grouped by category",
+            usage: "/help",
+            examples: &["/help"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/status",
+            aliases: &[],
+            category: CommandCategory::General,
+            description: "Show provider, profile, session, brain, and tool status",
+            usage: "/status",
+            examples: &["/status"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/clear",
+            aliases: &[],
+            category: CommandCategory::General,
+            description: "Clear the chat log display",
+            usage: "/clear",
+            examples: &["/clear"],
+            shortcut: Some("Ctrl+L"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/ui",
+            aliases: &[],
+            category: CommandCategory::General,
+            description: "Show UI mode info and future UI surface plans",
+            usage: "/ui",
+            examples: &["/ui"],
+            shortcut: None,
+            surface: CommandSurface::tui_only(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/commands",
+            aliases: &["/cmd"],
+            category: CommandCategory::General,
+            description: "List commands. Subcommands: all, planned, search <q>",
+            usage: "/commands [all|planned|search <q>]",
+            examples: &["/commands", "/commands all", "/commands search repo"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        // ── Sessions ───────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/sessions",
+            aliases: &[],
+            category: CommandCategory::Sessions,
+            description: "List all sessions from brain database",
+            usage: "/sessions",
+            examples: &["/sessions"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("brain"),
+        },
+        CommandMetadata {
+            name: "/new",
+            aliases: &[],
+            category: CommandCategory::Sessions,
+            description: "Start a new session (clears history, creates new UUID)",
+            usage: "/new",
+            examples: &["/new"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("brain"),
+        },
+        // ── Models ─────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/profile",
+            aliases: &[],
+            category: CommandCategory::Models,
+            description: "Show or switch model profile (balanced/coding/cheap/powerful…)",
+            usage: "/profile [<name>]",
+            examples: &["/profile", "/profile coding", "/profile balanced"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("models"),
+        },
+        CommandMetadata {
+            name: "/profiles",
+            aliases: &[],
+            category: CommandCategory::Models,
+            description: "List all available model profiles with chains",
+            usage: "/profiles",
+            examples: &["/profiles"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("models"),
+        },
+        // ── Project ────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/project",
+            aliases: &[],
+            category: CommandCategory::Project,
+            description: "Show project context or run scan. Sub: scan, status",
+            usage: "/project [scan|status]",
+            examples: &["/project", "/project scan", "/project status"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("project"),
+        },
+        CommandMetadata {
+            name: "/learn",
+            aliases: &[],
+            category: CommandCategory::Project,
+            description: "Trigger project indexing (learn about project structure)",
+            usage: "/learn",
+            examples: &["/learn"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Partial,
+            related: Some("project"),
+        },
+        // ── Repo ───────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/repo-map",
+            aliases: &["/repo_map"],
+            category: CommandCategory::Repo,
+            description: "Show repository map (files, symbols, git status)",
+            usage: "/repo-map [refresh]",
+            examples: &["/repo-map", "/repo-map refresh"],
+            shortcut: Some("Ctrl+3"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("repo_map"),
+        },
+        // ── Coding ─────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/code",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Switch to ACT mode and run a coding task",
+            usage: "/code [<description>]",
+            examples: &["/code refactor auth module"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/plan",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Switch to PLAN mode for planning without execution",
+            usage: "/plan [<description>]",
+            examples: &["/plan design the new API"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/act",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Switch to ACT mode — allow code execution",
+            usage: "/act",
+            examples: &["/act"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/mode",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Show current workflow mode (PLAN / ACT)",
+            usage: "/mode",
+            examples: &["/mode"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/task",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Show current active coding task and its state",
+            usage: "/task",
+            examples: &["/task"],
+            shortcut: Some("Ctrl+2"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/verify",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Run check+test+lint to verify current code state",
+            usage: "/verify",
+            examples: &["/verify"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/check",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Run project check command (cargo check, go build, etc.)",
+            usage: "/check",
+            examples: &["/check"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("project"),
+        },
+        CommandMetadata {
+            name: "/test",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Run project test command (cargo test, pytest, etc.)",
+            usage: "/test",
+            examples: &["/test"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("project"),
+        },
+        CommandMetadata {
+            name: "/lint",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Run project lint command (clippy, ruff, eslint, etc.)",
+            usage: "/lint",
+            examples: &["/lint"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("project"),
+        },
+        CommandMetadata {
+            name: "/format",
+            aliases: &[],
+            category: CommandCategory::Coding,
+            description: "Run project formatter (cargo fmt, black, prettier, etc.)",
+            usage: "/format",
+            examples: &["/format"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Working,
+            related: Some("project"),
+        },
+        // ── Patches ────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/patch",
+            aliases: &[],
+            category: CommandCategory::Patches,
+            description: "Manage patches: list, show, apply, discard",
+            usage: "/patch [list|show|apply|discard]",
+            examples: &["/patch", "/patch list", "/patch apply", "/patch discard"],
+            shortcut: Some("Ctrl+4"),
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: Some("workflow"),
+        },
+        // ── Memory ─────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/memory",
+            aliases: &[],
+            category: CommandCategory::Memory,
+            description: "Manage memory: status, show, add-user <text>, add-note <text>",
+            usage: "/memory [status|show|add-user <t>|add-note <t>]",
+            examples: &[
+                "/memory",
+                "/memory status",
+                "/memory add-note I prefer Rust",
+            ],
+            shortcut: Some("Ctrl+6"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("memory"),
+        },
+        CommandMetadata {
+            name: "/recall",
+            aliases: &[],
+            category: CommandCategory::Memory,
+            description: "Search memory for a keyword or phrase",
+            usage: "/recall <query>",
+            examples: &["/recall auth", "/recall JWT verification"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("memory"),
+        },
+        // ── Skills ─────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/skills",
+            aliases: &[],
+            category: CommandCategory::Skills,
+            description: "List available skills from ~/.config/goat/skills/",
+            usage: "/skills",
+            examples: &["/skills"],
+            shortcut: Some("Ctrl+7"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("skills"),
+        },
+        CommandMetadata {
+            name: "/skill",
+            aliases: &[],
+            category: CommandCategory::Skills,
+            description: "Activate or manage a skill: <name>, search <q>, create <n>, path",
+            usage: "/skill <name|search <q>|create <n>|path>",
+            examples: &[
+                "/skill rust-expert",
+                "/skill search coding",
+                "/skill create my-skill",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("skills"),
+        },
+        CommandMetadata {
+            name: "/save-skill",
+            aliases: &[],
+            category: CommandCategory::Skills,
+            description: "Save current session as a reusable skill",
+            usage: "/save-skill <name>",
+            examples: &["/save-skill my-rust-workflow"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Partial,
+            related: Some("skills"),
+        },
+        // ── Tools ──────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/tools",
+            aliases: &[],
+            category: CommandCategory::Tools,
+            description: "List tools: categories, doctor, audit, or by name",
+            usage: "/tools [categories|doctor|audit]",
+            examples: &["/tools", "/tools categories", "/tools doctor"],
+            shortcut: Some("Ctrl+5"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("tool_registry"),
+        },
+        CommandMetadata {
+            name: "/tool",
+            aliases: &[],
+            category: CommandCategory::Tools,
+            description: "Show detailed info about a specific tool",
+            usage: "/tool <name>",
+            examples: &["/tool bash", "/tool write_file"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("tool_registry"),
+        },
+        // ── MCP ────────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/mcp",
+            aliases: &[],
+            category: CommandCategory::Mcp,
+            description: "Start MCP servers or show status",
+            usage: "/mcp [status]",
+            examples: &["/mcp", "/mcp status"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("mcp"),
+        },
+        // ── Subagents ──────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/subagents",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "List registered internal subagents",
+            usage: "/subagents",
+            examples: &["/subagents"],
+            shortcut: Some("Ctrl+8"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        CommandMetadata {
+            name: "/subagent",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "Show info about a specific subagent",
+            usage: "/subagent <name>",
+            examples: &["/subagent coder", "/subagent researcher"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        CommandMetadata {
+            name: "/ask-agent",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "Delegate a task to an internal subagent",
+            usage: "/ask-agent <name> <task>",
+            examples: &[
+                "/ask-agent coder refactor auth",
+                "/ask-agent researcher find JWT libs",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        CommandMetadata {
+            name: "/review",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "Ask the reviewer subagent to review current code",
+            usage: "/review",
+            examples: &["/review"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        CommandMetadata {
+            name: "/debug",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "Ask the debugger subagent to analyze current issues",
+            usage: "/debug",
+            examples: &["/debug"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        CommandMetadata {
+            name: "/test-plan",
+            aliases: &[],
+            category: CommandCategory::Subagents,
+            description: "Ask the tester subagent to create a test plan",
+            usage: "/test-plan",
+            examples: &["/test-plan"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("subagents"),
+        },
+        // ── External Agents ────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/external-agents",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "List configured external agent adapters",
+            usage: "/external-agents [list|status]",
+            examples: &["/external-agents", "/external-agents status"],
+            shortcut: Some("Ctrl+9"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/external-agent",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "Show details of a specific external agent",
+            usage: "/external-agent <name>",
+            examples: &["/external-agent opencode", "/external-agent claude-code"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/delegate-external",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "Delegate a task to an external agent (requires approval)",
+            usage: "/delegate-external <agent> <task>",
+            examples: &["/delegate-external opencode fix the build"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/external-runs",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "List recent external agent run records",
+            usage: "/external-runs",
+            examples: &["/external-runs"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/external-run",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "Show output of a specific external agent run",
+            usage: "/external-run <id>",
+            examples: &["/external-run abc123"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/compare-agents",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "Run the same task on multiple external agents and compare",
+            usage: "/compare-agents <agent1> <agent2> <task>",
+            examples: &["/compare-agents opencode claude-code refactor auth"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Working,
+            related: Some("external_agents"),
+        },
+        CommandMetadata {
+            name: "/route",
+            aliases: &[],
+            category: CommandCategory::ExternalAgents,
+            description: "Show swarm route decision for current input",
+            usage: "/route",
+            examples: &["/route"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Partial,
+            related: Some("swarm"),
+        },
+        // ── UI / Views ─────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/view",
+            aliases: &[],
+            category: CommandCategory::Ui,
+            description: "Switch active view: chat|tasks|repo|patches|tools|memory|skills|subagents|external",
+            usage: "/view <name>",
+            examples: &["/view chat", "/view repo", "/view subagents"],
+            shortcut: Some("Ctrl+1..9"),
+            surface: CommandSurface::tui_only(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/palette",
+            aliases: &["/command"],
+            category: CommandCategory::Ui,
+            description: "Open command palette. Optional search: /palette <query>",
+            usage: "/palette [<query>]",
+            examples: &["/palette", "/palette tools", "/palette memory"],
+            shortcut: Some("Ctrl+P"),
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        // ── System ─────────────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/exit",
+            aliases: &["/quit"],
+            category: CommandCategory::System,
+            description: "Exit GOAT (headless only; use Ctrl+C in TUI)",
+            usage: "/exit",
+            examples: &["/exit"],
+            shortcut: Some("Ctrl+C"),
+            surface: CommandSurface::headless_only(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        // ══════════════════════════════════════════════════════════════════════
+        // FUTURE / PLANNED COMMANDS — NOT YET IMPLEMENTED
+        // These are registered for documentation purposes only.
+        // DO NOT route execution for these commands.
+        // ══════════════════════════════════════════════════════════════════════
+        CommandMetadata {
+            name: "/branch",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Create or switch git branch",
+            usage: "/branch <name>",
+            examples: &["/branch feature/new-auth"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Low,
+            status: CommandStatus::Planned,
+            related: Some("git"),
+        },
+        CommandMetadata {
+            name: "/commit",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Stage and commit changes with AI-generated message",
+            usage: "/commit [<message>]",
+            examples: &["/commit", "/commit fix auth bug"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Planned,
+            related: Some("git"),
+        },
+        CommandMetadata {
+            name: "/pr",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Create a pull request with AI-generated description",
+            usage: "/pr",
+            examples: &["/pr"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Planned,
+            related: Some("git"),
+        },
+        CommandMetadata {
+            name: "/checkpoint",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Create a session checkpoint (save/restore point)",
+            usage: "/checkpoint [<label>]",
+            examples: &["/checkpoint before-refactor"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/rollback",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Restore to a previous checkpoint",
+            usage: "/rollback [<label>]",
+            examples: &["/rollback"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Planned,
+            related: Some("workflow"),
+        },
+        CommandMetadata {
+            name: "/undo",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Undo the last file write or patch application",
+            usage: "/undo",
+            examples: &["/undo"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Planned,
+            related: Some("patches"),
+        },
+        CommandMetadata {
+            name: "/redo",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Redo the last undone action",
+            usage: "/redo",
+            examples: &["/redo"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("patches"),
+        },
+        CommandMetadata {
+            name: "/retry",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Retry the last failed message or tool call",
+            usage: "/retry",
+            examples: &["/retry"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/compact",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Compact context — summarize history to reduce token usage",
+            usage: "/compact",
+            examples: &["/compact"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("memory"),
+        },
+        CommandMetadata {
+            name: "/cost",
+            aliases: &["/tokens"],
+            category: CommandCategory::Future,
+            description: "Show estimated token usage and cost for this session",
+            usage: "/cost",
+            examples: &["/cost"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/context",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Show current context window contents and token budget",
+            usage: "/context",
+            examples: &["/context"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/schedule",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Schedule a recurring task or reminder",
+            usage: "/schedule <cron> <task>",
+            examples: &["/schedule '0 9 * * 1' run tests"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/jobs",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "List scheduled and running background jobs",
+            usage: "/jobs",
+            examples: &["/jobs"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/browser",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Launch browser automation for a web task",
+            usage: "/browser <url>",
+            examples: &["/browser https://docs.rs/ratatui"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/computer-use",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Enable computer use mode (screen + mouse + keyboard control)",
+            usage: "/computer-use",
+            examples: &["/computer-use"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Critical,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/dashboard",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Open local web dashboard in browser",
+            usage: "/dashboard",
+            examples: &["/dashboard"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/voice",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Enable voice input mode (push-to-talk, local STT)",
+            usage: "/voice",
+            examples: &["/voice"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/export",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Export session transcript as Markdown or JSON",
+            usage: "/export [json|md]",
+            examples: &["/export md", "/export json"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("brain"),
+        },
+        CommandMetadata {
+            name: "/share",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Share a session or skill via secure link",
+            usage: "/share",
+            examples: &["/share"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/permissions",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Manage tool and path permissions for this session",
+            usage: "/permissions [list|allow <tool>|deny <tool>]",
+            examples: &["/permissions list", "/permissions allow bash"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("approval"),
+        },
+        CommandMetadata {
+            name: "/sandbox",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Enable isolated sandbox mode for all tool execution",
+            usage: "/sandbox [on|off]",
+            examples: &["/sandbox on"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("approval"),
+        },
+        CommandMetadata {
+            name: "/install-tool",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Install a new MCP or community tool",
+            usage: "/install-tool <name>",
+            examples: &["/install-tool playwright-mcp"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/marketplace",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Browse and install community skills and tools",
+            usage: "/marketplace",
+            examples: &["/marketplace"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/hooks",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Configure lifecycle hooks (on-submit, on-tool-call, etc.)",
+            usage: "/hooks [list|add|remove]",
+            examples: &["/hooks list"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Planned,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/fork",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Fork the current session into a new branch",
+            usage: "/fork",
+            examples: &["/fork"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Planned,
+            related: Some("brain"),
+        },
+        CommandMetadata {
+            name: "/message",
+            aliases: &[],
+            category: CommandCategory::Future,
+            description: "Send a direct message to another GOAT agent instance",
+            usage: "/message <agent-id> <text>",
+            examples: &["/message agent-2 continue the auth task"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Planned,
+            related: Some("subagents"),
+        },
+    ]
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registry() -> CommandRegistry {
+        CommandRegistry::build()
+    }
+
+    #[test]
+    fn test_registry_builds_without_panic() {
+        let r = registry();
+        assert!(!r.commands.is_empty());
+    }
+
+    #[test]
+    fn test_find_by_exact_name() {
+        let r = registry();
+        assert!(r.find("/help").is_some());
+        assert!(r.find("/status").is_some());
+        assert!(r.find("/memory").is_some());
+        assert!(r.find("/nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_find_by_alias() {
+        let r = registry();
+        let cmd = r.find("/command");
+        assert!(cmd.is_some());
+        assert_eq!(cmd.unwrap().name, "/palette");
+    }
+
+    #[test]
+    fn test_prefix_suggest_slash_only() {
+        let r = registry();
+        let suggestions = r.suggest("/");
+        // Should return all non-planned commands
+        assert!(!suggestions.is_empty());
+        // Planned commands should not appear
+        for s in &suggestions {
+            assert_ne!(s.status, CommandStatus::Planned);
+        }
+    }
+
+    #[test]
+    fn test_prefix_suggest_help() {
+        let r = registry();
+        let suggestions = r.suggest("/he");
+        assert!(!suggestions.is_empty());
+        assert!(suggestions.iter().any(|c| c.name == "/help"));
+    }
+
+    #[test]
+    fn test_prefix_suggest_empty_returns_all_working() {
+        let r = registry();
+        let s = r.suggest("");
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn test_search_finds_by_description() {
+        let r = registry();
+        let results = r.search("session", false);
+        assert!(!results.is_empty());
+        // /sessions and /new should both appear
+        let names: Vec<&str> = results.iter().map(|c| c.name).collect();
+        assert!(names.contains(&"/sessions") || names.contains(&"/new"));
+    }
+
+    #[test]
+    fn test_search_finds_by_category() {
+        let r = registry();
+        let results = r.search("memory", false);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_search_include_planned() {
+        let r = registry();
+        let without = r.search("future planned", false);
+        let with_planned = r.search("git", true);
+        // /branch, /commit, /pr are planned git commands
+        assert!(with_planned.iter().any(|c| c.name == "/branch"));
+        let _ = without; // just ensure no panic
+    }
+
+    #[test]
+    fn test_planned_commands_not_visible() {
+        let r = registry();
+        for cmd in r.all(false) {
+            assert_ne!(
+                cmd.status,
+                CommandStatus::Planned,
+                "Planned command {} should not appear in non-planned listing",
+                cmd.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_include_planned_has_more() {
+        let r = registry();
+        let without = r.all(false).len();
+        let with_planned = r.all(true).len();
+        assert!(with_planned > without);
+    }
+
+    #[test]
+    fn test_category_grouping() {
+        let r = registry();
+        let groups = r.grouped(false);
+        assert!(!groups.is_empty());
+        // All groups should have at least one command
+        for (cat, cmds) in &groups {
+            assert!(!cmds.is_empty(), "Category {:?} is empty", cat);
+        }
+    }
+
+    #[test]
+    fn test_complete_returns_first_match() {
+        let r = registry();
+        let c = r.complete("/st");
+        assert_eq!(c, Some("/status"));
+    }
+
+    #[test]
+    fn test_complete_no_match_returns_none() {
+        let r = registry();
+        let c = r.complete("/xyznonexistent");
+        assert!(c.is_none());
+    }
+
+    #[test]
+    fn test_no_planned_command_in_suggestions() {
+        let r = registry();
+        // /branch is planned — should NOT appear in suggestions
+        let suggestions = r.suggest("/branch");
+        assert!(suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_format_help_output_not_empty() {
+        let r = registry();
+        let help = r.format_help(false);
+        assert!(!help.is_empty());
+    }
+
+    #[test]
+    fn test_format_palette_output_not_empty() {
+        let r = registry();
+        let palette = r.format_palette(None);
+        assert!(!palette.is_empty());
+    }
+
+    #[test]
+    fn test_format_palette_with_filter() {
+        let r = registry();
+        let palette = r.format_palette(Some("memory"));
+        assert!(!palette.is_empty());
+        // Should contain memory-related commands
+        let output = palette.join("\n");
+        assert!(output.contains("memory") || output.contains("recall"));
+    }
+
+    #[test]
+    fn test_matches_prefix_case_insensitive() {
+        let r = registry();
+        let cmd = r.find("/help").unwrap();
+        assert!(cmd.matches_prefix("/he"));
+        assert!(cmd.matches_prefix("/HE"));
+        assert!(cmd.matches_prefix("/HELP"));
+        assert!(!cmd.matches_prefix("/status"));
+    }
+
+    #[test]
+    fn test_all_commands_have_name_and_description() {
+        let r = registry();
+        for cmd in r.all(true) {
+            assert!(!cmd.name.is_empty(), "Command has empty name");
+            assert!(
+                cmd.name.starts_with('/'),
+                "Command {} doesn't start with /",
+                cmd.name
+            );
+            assert!(
+                !cmd.description.is_empty(),
+                "Command {} has empty description",
+                cmd.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_dangerous_commands_have_approval() {
+        let r = registry();
+        for cmd in r.all(true) {
+            if matches!(cmd.risk, CommandRisk::High | CommandRisk::Critical) {
+                assert!(
+                    cmd.requires_approval,
+                    "High/Critical command {} must require approval",
+                    cmd.name
+                );
+            }
+        }
+    }
+}

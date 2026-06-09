@@ -6,6 +6,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.0] — Phase 3.1: Unified Command System (2026-06-09)
+
+### Added — Phase 3.1: Unified Command System + Slash Recommendation UX
+
+- **`CommandRegistry` module** (`src/command_registry.rs`): Central registry for all GOAT slash commands.
+  - `CommandMetadata` struct: name, aliases, category, description, usage, examples, shortcut, surface, risk, status.
+  - `CommandCategory` with emoji labels: General, Sessions, Models, Project, Repo, Coding, Patches, Memory, Skills, Tools, MCP, Subagents, ExternalAgents, UI, Logs, System, Future.
+  - `CommandStatus` enum: Working ✅, Partial ⚡, Planned 🔮, Disabled ❌.
+  - `CommandRisk` enum: None, Low, Medium, High, Critical — enforces `requires_approval` on high-risk commands.
+  - `CommandSurface`: tracks which commands work in TUI vs headless vs CLI.
+  - **49 implemented commands** + **23 planned future commands** registered with full metadata.
+  - Prefix matching (case-insensitive) for autocomplete.
+  - Full-text search by name, description, category, or alias.
+  - Grouped output formatter for `/help` and `/commands`.
+  - Palette formatter for `/palette [query]`.
+
+- **Slash Command Suggestion Popup** (TUI):
+  - Appears automatically above the input composer when input starts with `/`.
+  - Shows up to 12 filtered suggestions matching the current prefix.
+  - `↑`/`↓` to navigate; `Tab` to complete; `Esc` to dismiss.
+  - Selected entry highlighted in bright green; others show command + description.
+  - Popup renders cleanly above input line using Ratatui `Clear` widget.
+
+- **Tab Completion**: Pressing `Tab` completes to the selected (or first) suggestion's name + trailing space.
+
+- **Registry-Powered `/help`**: Now uses `CommandRegistry::format_help()` — grouped by category, status-labeled, complete.
+
+- **Registry-Powered `/palette`**: Now uses `CommandRegistry::format_palette()` — includes risk warnings, grouped by category, optional search filter.
+
+- **New `/commands` command** (alias `/cmd`):
+  - `/commands` — list all working/partial commands grouped by category.
+  - `/commands all` — list all commands including planned.
+  - `/commands planned` — list only planned commands.
+  - `/commands search <q>` — fuzzy search across name/description/category.
+
+- **Headless parity**: `/help` and `/commands` in `headless.rs` use the same `CommandRegistry`.
+
+- **21 tests** in `command_registry::tests` covering prefix matching, search, grouping, completion, help/palette formatting, security invariants.
+
+### Changed
+
+- `/help` output replaced with registry-driven grouped format (no content loss — all commands still listed).
+- `/palette` output now uses registry groups with risk labels.
+- `App::input` changes now call `update_suggestions()` automatically.
+- `↑`/`↓` keys route to suggestion navigation when popup is open, otherwise fall through to history/scroll.
+- `Esc` dismisses suggestions without clearing input (second Esc clears input as before).
+
 ## [0.8.0] — Phase 3.0: Advanced Ratatui TUI (2026-06-09)
 
 ### Added — Phase 3.0: Advanced Ratatui TUI

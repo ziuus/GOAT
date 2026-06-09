@@ -79,6 +79,11 @@ pub fn render(f: &mut Frame, app: &App) {
     if let Some(approval_lines) = app.pending_approval_lines() {
         render_approval_overlay(f, &approval_lines, rows[1]);
     }
+
+    // Slash command suggestion popup — appears just above the input composer.
+    if !app.cmd_suggestions.is_empty() {
+        render_suggestion_popup(f, app, rows[2]);
+    }
 }
 
 fn render_workspace(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
@@ -723,4 +728,91 @@ fn render_approval_overlay(f: &mut Frame, lines: &[String], area: ratatui::layou
         .wrap(Wrap { trim: false });
 
     f.render_widget(overlay_block, overlay_area);
+}
+
+// ── Slash command suggestion popup ────────────────────────────────────────────
+
+/// Renders a floating suggestion popup just above the input composer.
+///
+/// The popup shows up to 12 suggestions matching the current `/` prefix.
+/// The selected item is highlighted. Tab or Enter completes; Esc dismisses.
+fn render_suggestion_popup(f: &mut Frame, app: &App, input_area: ratatui::layout::Rect) {
+    let suggestions = &app.cmd_suggestions;
+    if suggestions.is_empty() {
+        return;
+    }
+
+    let popup_height = (suggestions.len() as u16 + 2).min(16);
+    let popup_width = 72u16.min(input_area.width.saturating_sub(4));
+
+    if popup_width < 20 || input_area.y < popup_height + 1 {
+        return; // Not enough space
+    }
+
+    // Position popup just above the input box, left-aligned with it.
+    let x = input_area.x + 2;
+    let y = input_area.y.saturating_sub(popup_height);
+
+    let popup_area = ratatui::layout::Rect {
+        x,
+        y,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    f.render_widget(Clear, popup_area);
+
+    let selected = app.cmd_suggestion_idx;
+
+    let items: Vec<Line> = suggestions
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            if i == selected {
+                // Highlighted selection — bright green on dark background
+                Line::from(Span::styled(
+                    format!(" ▶ {} ", s),
+                    Style::default()
+                        .fg(Color::Rgb(30, 30, 50))
+                        .bg(Color::Rgb(80, 220, 140))
+                        .add_modifier(Modifier::BOLD),
+                ))
+            } else {
+                // Dim unselected — styled by whether it's a slash command part or description
+                let (cmd_part, desc_part) = s
+                    .find("  ")
+                    .map(|pos| s.split_at(pos))
+                    .unwrap_or((s.as_str(), ""));
+                Line::from(vec![
+                    Span::styled(
+                        format!("   {}", cmd_part),
+                        Style::default()
+                            .fg(Color::Rgb(130, 200, 255))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        desc_part.to_string(),
+                        Style::default().fg(Color::Rgb(120, 130, 160)),
+                    ),
+                ])
+            }
+        })
+        .collect();
+
+    let block = Block::default()
+        .title(Span::styled(
+            " / Commands — Tab:complete  ↑↓:navigate  Esc:close ",
+            Style::default()
+                .fg(Color::Rgb(100, 220, 160))
+                .add_modifier(Modifier::BOLD),
+        ))
+        .borders(Borders::ALL)
+        .border_style(
+            Style::default()
+                .fg(Color::Rgb(65, 120, 200))
+                .add_modifier(Modifier::BOLD),
+        );
+
+    let popup = Paragraph::new(items).block(block);
+    f.render_widget(popup, popup_area);
 }

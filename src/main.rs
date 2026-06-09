@@ -2,6 +2,7 @@ mod app;
 mod approval;
 mod brain;
 mod cli;
+pub mod command_registry;
 pub mod config;
 pub mod error;
 pub mod external_agents;
@@ -220,8 +221,11 @@ async fn run_app(
                     // ── Normal input handling — always-active composer ─────────
                     match key.code {
                         KeyCode::Enter => {
+                            // If there are suggestions and user presses Enter,
+                            // only submit if input is a complete command or not a slash prefix.
                             let msg = app.input.trim().to_string();
                             if !msg.is_empty() {
+                                app.cmd_suggestions.clear();
                                 app.commit_to_history(&msg);
                                 app.input.clear();
                                 app.scroll_to_bottom();
@@ -232,24 +236,38 @@ async fn run_app(
                         }
 
                         KeyCode::Esc => {
-                            if !app.input.is_empty() {
+                            if !app.cmd_suggestions.is_empty() {
+                                // Esc closes suggestions without clearing input
+                                app.cmd_suggestions.clear();
+                            } else if !app.input.is_empty() {
                                 app.input.clear();
+                                app.update_suggestions();
                             } else {
                                 app.scroll_to_bottom();
                             }
                         }
 
-                        // ↑ / ↓ — input history when there's content or
-                        // when already browsing history; log scroll when input is empty.
+                        // Tab — complete the selected or first suggestion
+                        KeyCode::Tab => {
+                            app.complete_suggestion();
+                            app.update_suggestions();
+                        }
+
+                        // ↑ / ↓ — suggestion navigation when popup is open;
+                        // input history when input non-empty; log scroll when input is empty.
                         KeyCode::Up => {
-                            if !app.input.is_empty() || app.history_idx.is_some() {
+                            if !app.cmd_suggestions.is_empty() {
+                                app.suggestion_up();
+                            } else if !app.input.is_empty() || app.history_idx.is_some() {
                                 app.history_up();
                             } else {
                                 app.scroll_up(1);
                             }
                         }
                         KeyCode::Down => {
-                            if app.history_idx.is_some() {
+                            if !app.cmd_suggestions.is_empty() {
+                                app.suggestion_down();
+                            } else if app.history_idx.is_some() {
                                 app.history_down();
                             } else {
                                 app.scroll_down(1);
@@ -301,9 +319,11 @@ async fn run_app(
 
                         KeyCode::Char(c) => {
                             app.input.push(c);
+                            app.update_suggestions();
                         }
                         KeyCode::Backspace => {
                             app.input.pop();
+                            app.update_suggestions();
                         }
 
                         _ => {}

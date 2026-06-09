@@ -19,6 +19,7 @@
 //! - Empty line → ignored, prompt re-shown.
 
 use crate::approval::{ApprovalDecision, ApprovalRequest};
+use crate::command_registry::{CommandRegistry, CommandStatus};
 use crate::llm::{FunctionDeclaration, Message, Tool};
 use crate::runtime::GoatRuntime;
 use crate::tools::NativeTools;
@@ -154,43 +155,71 @@ async fn handle_slash_command(
 
     match name.as_str() {
         "/help" => {
-            println!("[HELP] Headless commands:");
-            println!("[HELP]   /help            — show this help");
-            println!("[HELP]   /status          — show provider/session/brain/repo status");
-            println!("[HELP]   /repo-map        — show repo map for current project");
-            println!("[HELP]   /repo-map refresh — force rescan repo map");
-            println!("[HELP]   /check           — run project check command");
-            println!("[HELP]   /test [filter]   — run project test command");
-            println!("[HELP]   /lint            — run project lint command");
-            println!("[HELP]   /format          — run project format command");
-            println!("[HELP]   /patch           — show pending code patches");
-            println!("[HELP]   /patch apply     — apply pending patch");
-            println!("[HELP]   /patch discard   — discard pending patch");
-            println!("[HELP]   /profile         — show current profile");
-            println!("[HELP]   /profile <name>  — switch to a profile");
-            println!("[HELP]   /profiles        — list available profiles");
-            println!("[HELP]   /new             — start a new session");
-            println!("[HELP]   /clear           — clear screen and reset");
-            println!("[HELP]   /sessions        — list recent sessions");
-            println!("[HELP]   /tools           — list available tools");
-            println!("[HELP]   /project         — manage project context");
-            println!("[HELP]   /memory          — view or manage curated memory");
-            println!("[HELP]   /recall <query>  — search conversation history");
-            println!("[HELP]   /exit            — exit GOAT headless");
-            println!("[HELP]");
-            println!("[HELP] Approval (when prompted):");
-            println!("[HELP]   y — approve once");
-            println!("[HELP]   n — deny");
-            println!("[HELP]   a — always allow this tool (session)");
-            println!("[HELP]   d — always deny this tool (session)");
-            println!("[HELP]");
-            println!("[HELP] Subagents (Phase 2.7):");
-            println!("[HELP]   /subagents        — list internal subagents");
-            println!("[HELP]   /subagent <name>  — show subagent details");
-            println!("[HELP]   /ask-agent <n> <t>— run a subagent turn");
-            println!("[HELP]   /review           — ask reviewer to review current patch/plan");
-            println!("[HELP]   /debug            — ask debugger to analyze recent error");
-            println!("[HELP]   /test-plan        — ask tester for a verification strategy");
+            let registry = CommandRegistry::build();
+            let ver = env!("CARGO_PKG_VERSION");
+            println!("[HELP] 🐐 GOAT v{} — Headless Command Reference", ver);
+            println!("[HELP] ═════════════════════════════════════════════════════════");
+            println!("[HELP] ✅ = working  ⚡ = partial  🔮 = planned (not yet implemented)");
+            println!("[HELP] /commands all = show all including planned future commands");
+            println!("[HELP] ─────────────────────────────────────────────────────────");
+            for line in registry.format_help(false) {
+                println!("[HELP]{}", line);
+            }
+            println!("[HELP] ─────────────────────────────────────────────────────────");
+            println!("[HELP] Approval: y=approve  n=deny  a=always-allow  d=always-deny");
+            println!("[HELP] Use /exit or Ctrl+D to quit.");
+            true
+        }
+
+        "/commands" | "/cmd" => {
+            let registry = CommandRegistry::build();
+            let args = parts.get(1).copied().unwrap_or("").trim();
+            match args {
+                "all" => {
+                    let ver = env!("CARGO_PKG_VERSION");
+                    println!("[HELP] All GOAT Commands (incl. planned) — v{}", ver);
+                    for line in registry.format_help(true) {
+                        println!("[HELP]{}", line);
+                    }
+                }
+                "planned" => {
+                    println!("[HELP] 🔮 Planned Commands (not yet implemented):");
+                    for cmd in registry
+                        .all(true)
+                        .iter()
+                        .filter(|c| matches!(c.status, CommandStatus::Planned))
+                    {
+                        println!("[HELP]   🔮 {:<28} {}", cmd.usage, cmd.description);
+                    }
+                }
+                q if q.starts_with("search ") => {
+                    let query = q.trim_start_matches("search ").trim();
+                    let results = registry.search(query, true);
+                    println!("[HELP] {} result(s) for '{}':", results.len(), query);
+                    for cmd in &results {
+                        println!(
+                            "[HELP]   {} {:<28} {}",
+                            cmd.status.label(),
+                            cmd.usage,
+                            cmd.description
+                        );
+                    }
+                    if results.is_empty() {
+                        println!("[HELP]   No commands matching '{}'.", query);
+                    }
+                }
+                _ => {
+                    let ver = env!("CARGO_PKG_VERSION");
+                    println!("[HELP] GOAT v{} Commands (working & partial):", ver);
+                    for line in registry.format_help(false) {
+                        println!("[HELP]{}", line);
+                    }
+                    println!("[HELP] ─────────────────────────────────────────────────────────");
+                    println!("[HELP] /commands all        — show ALL including planned");
+                    println!("[HELP] /commands planned    — show only planned commands");
+                    println!("[HELP] /commands search <q> — search by name/description");
+                }
+            }
             true
         }
 
