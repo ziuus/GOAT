@@ -260,6 +260,41 @@ pub enum Command {
         #[arg(default_value = "show")]
         action: String,
     },
+
+    /// Manage safety checkpoints.
+    #[command(name = "checkpoint")]
+    Checkpoint {
+        /// "list" (default), "create", "show", "diff"
+        #[arg(default_value = "list")]
+        action: String,
+        /// Optional argument (e.g. label for create, ID for show)
+        arg: Option<String>,
+    },
+
+    /// Rollback to a specific checkpoint.
+    #[command(name = "rollback")]
+    Rollback {
+        /// Checkpoint ID
+        id: String,
+    },
+
+    /// Manage git branches safely.
+    #[command(name = "branch")]
+    Branch {
+        /// "current" (default), "create"
+        #[arg(default_value = "current")]
+        action: String,
+        /// Branch name
+        name: Option<String>,
+    },
+
+    /// Prepare and create git commits.
+    #[command(name = "commit")]
+    Commit {
+        /// "message" (default), "create"
+        #[arg(default_value = "message")]
+        action: String,
+    },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -370,6 +405,108 @@ pub async fn handle_subcommand(
 
         Command::Patch { action } => {
             handle_patch_command(action);
+            Ok(true)
+        }
+
+        Command::Checkpoint { action, arg } => {
+            let root = std::env::current_dir().unwrap_or_default();
+            let manager = crate::checkpoint::CheckpointManager::new(&paths.data_dir);
+            match action.as_str() {
+                "create" => {
+                    let label = arg.as_deref().unwrap_or("manual");
+                    match manager.create_checkpoint(&root, label) {
+                        Ok(cp) => println!("Created checkpoint {} ({})", cp.id, cp.label),
+                        Err(e) => eprintln!("Failed to create checkpoint: {}", e),
+                    }
+                }
+                "list" => match manager.list_checkpoints() {
+                    Ok(cps) => {
+                        if cps.is_empty() {
+                            println!("No checkpoints found.");
+                        } else {
+                            println!("{} checkpoints:", cps.len());
+                            for cp in cps {
+                                println!(
+                                    "  {} | {} | {} files | {}",
+                                    cp.id,
+                                    cp.branch,
+                                    cp.changed_files.len(),
+                                    cp.label
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to list checkpoints: {}", e),
+                },
+                "show" | "diff" => {
+                    if let Some(id) = arg {
+                        match manager.get_checkpoint(id) {
+                            Ok(Some(cp)) => {
+                                println!("{} | {} | dirty: {}", cp.id, cp.branch, cp.is_dirty);
+                                println!("Label: {}", cp.label);
+                                println!("Changed files: {}", cp.changed_files.join(", "));
+                                if action == "diff" && !cp.diff_snapshot.is_empty() {
+                                    println!("\nDiff Snapshot:\n{}", cp.diff_snapshot);
+                                }
+                            }
+                            Ok(None) => println!("Checkpoint ID {} not found.", id),
+                            Err(e) => eprintln!("Error: {}", e),
+                        }
+                    } else {
+                        println!("Please provide a checkpoint ID.");
+                    }
+                }
+                _ => println!("Unknown action. Use list, create, show, diff."),
+            }
+            Ok(true)
+        }
+
+        Command::Rollback { id } => {
+            println!("Rollback via CLI requires ApprovalGate, which is interactive.");
+            println!(
+                "To rollback to {}, please launch GOAT (cargo run) and type /rollback {}",
+                id, id
+            );
+            Ok(true)
+        }
+
+        Command::Branch { action, name } => {
+            let root = std::env::current_dir().unwrap_or_default();
+            match action.as_str() {
+                "current" => {
+                    if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                        println!("Current branch: {}", git.branch);
+                    } else {
+                        println!("Not in a git repository.");
+                    }
+                }
+                "create" => {
+                    if let Some(n) = name {
+                        println!(
+                            "Branch creation requires approval. Please run GOAT interactively and type /branch create {}",
+                            n
+                        );
+                    } else {
+                        println!("Please specify a branch name.");
+                    }
+                }
+                _ => println!("Unknown action. Use current or create."),
+            }
+            Ok(true)
+        }
+
+        Command::Commit { action } => {
+            match action.as_str() {
+                "message" => {
+                    println!("Proposed commit message:\n\"Update files based on recent changes.\"");
+                }
+                "create" => {
+                    println!(
+                        "Commit creation requires approval. Please run GOAT interactively and type /commit create"
+                    );
+                }
+                _ => println!("Unknown action. Use message or create."),
+            }
             Ok(true)
         }
 

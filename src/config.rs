@@ -80,6 +80,9 @@ pub struct Config {
     /// External agent adapters config.
     #[serde(default)]
     pub external_agents: ExternalAgentsConfig,
+    /// Checkpoint system config.
+    #[serde(default)]
+    pub checkpoint: CheckpointConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -756,5 +759,24 @@ mod tests {
         // Ollama should always return None for api_key (local, no auth needed).
         // Only skip this assertion if OPENROUTER_API_KEY is somehow set in env.
         assert_eq!(config.provider_api_key("ollama"), None);
+    }
+}
+
+// ── Checkpoint ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CheckpointConfig {
+    pub enabled: bool,
+    pub auto_before_patch: bool,
+    pub max_checkpoints: usize,
+}
+
+impl Default for CheckpointConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_before_patch: true,
+            max_checkpoints: 20,
+        }
     }
 }

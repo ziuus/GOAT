@@ -1,6 +1,7 @@
 mod app;
 mod approval;
 mod brain;
+pub mod checkpoint;
 mod cli;
 pub mod command_registry;
 pub mod config;

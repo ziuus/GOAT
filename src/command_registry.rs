@@ -607,6 +607,63 @@ fn all_commands() -> Vec<CommandMetadata> {
             status: CommandStatus::Working,
             related: None,
         },
+        // ── Checkpoint & Git ───────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/checkpoint",
+            aliases: &[],
+            category: CommandCategory::Repo,
+            description: "Create or list safety checkpoints",
+            usage: "/checkpoint [create|list|show|diff|restore]",
+            examples: &["/checkpoint list", "/checkpoint create before-refactor"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: Some("rollback"),
+        },
+        CommandMetadata {
+            name: "/rollback",
+            aliases: &[],
+            category: CommandCategory::Repo,
+            description: "Rollback to a previous checkpoint (requires approval)",
+            usage: "/rollback <id>",
+            examples: &["/rollback a1b2c3d4"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: true,
+            risk: CommandRisk::High,
+            status: CommandStatus::Working,
+            related: Some("checkpoint"),
+        },
+        CommandMetadata {
+            name: "/branch",
+            aliases: &[],
+            category: CommandCategory::Repo,
+            description: "Manage git branches safely",
+            usage: "/branch [current|create]",
+            examples: &["/branch current", "/branch create feature/auth"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false, // create requires approval internally
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: None,
+        },
+        CommandMetadata {
+            name: "/commit",
+            aliases: &[],
+            category: CommandCategory::Repo,
+            description: "Prepare and create git commits",
+            usage: "/commit [message|create]",
+            examples: &["/commit message", "/commit create"],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false, // create requires approval internally
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Working,
+            related: None,
+        },
         // ── Coding ─────────────────────────────────────────────────────────────
         CommandMetadata {
             name: "/code",
@@ -1688,8 +1745,8 @@ mod tests {
     #[test]
     fn test_no_planned_command_in_suggestions() {
         let r = registry();
-        // /branch is planned — should NOT appear in suggestions
-        let suggestions = r.suggest("/branch");
+        // /fork is planned — should NOT appear in suggestions
+        let suggestions = r.suggest("/fork");
         assert!(suggestions.is_empty());
     }
 

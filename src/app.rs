@@ -155,6 +155,8 @@ pub struct App {
     pub sidebar_visible: bool,
     /// Whether the context panel is visible in dashboard mode (Ctrl+R toggle)
     pub context_visible: bool,
+    /// Checkpoint manager
+    pub checkpoint_manager: crate::checkpoint::CheckpointManager,
 }
 
 impl App {
@@ -206,6 +208,7 @@ impl App {
         let session_id = rt.session_id.clone();
         let mcp_server_count = rt.mcp_server_count;
         let brain_disabled = rt.brain_disabled;
+        let checkpoint_manager = crate::checkpoint::CheckpointManager::new(&rt.paths.data_dir);
 
         Self {
             running: true,
@@ -244,6 +247,7 @@ impl App {
             layout_mode: LayoutMode::Focus,
             sidebar_visible: true,
             context_visible: true,
+            checkpoint_manager,
         }
     }
 
@@ -462,6 +466,26 @@ impl App {
                     deferred.name, deferred.request.action_summary
                 ));
                 self.status = AppStatus::ToolRunning(deferred.name.clone());
+
+                // Auto-checkpoint before dangerous tools (write_file or bash if it might modify)
+                if self.config.checkpoint.enabled && self.config.checkpoint.auto_before_patch {
+                    if deferred.name == "write_file" || deferred.name == "bash" {
+                        let root = std::env::current_dir().unwrap_or_default();
+                        match self
+                            .checkpoint_manager
+                            .create_checkpoint(&root, "auto_before_exec")
+                        {
+                            Ok(cp) => self.push_log(format!(
+                                "[CHECKPOINT] Auto-created {} before execution.",
+                                cp.id
+                            )),
+                            Err(e) => self.push_log(format!(
+                                "[CHECKPOINT] Auto-checkpoint failed: {} (Continuing execution...)",
+                                e
+                            )),
+                        }
+                    }
+                }
 
                 let tool_result = execute_native_tool(&deferred.name, deferred.args.clone()).await;
 
@@ -696,6 +720,19 @@ impl App {
                     "[STATUS] MCP      : {} server(s)",
                     self.mcp_server_count
                 ));
+                let root = std::env::current_dir().unwrap_or_default();
+                if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                    self.push_log(format!(
+                        "[STATUS] Git      : {} ({})",
+                        git.branch,
+                        if git.is_dirty { "dirty" } else { "clean" }
+                    ));
+                }
+                if let Ok(cps) = self.checkpoint_manager.list_checkpoints() {
+                    if let Some(cp) = cps.first() {
+                        self.push_log(format!("[STATUS] Checkpt  : {} ({})", cp.id, cp.label));
+                    }
+                }
 
                 // Project & Memory context
                 let memory_manager =
@@ -1916,6 +1953,210 @@ impl App {
                 true
             }
 
+            "/checkpoint" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                let action = args.get(1).copied().unwrap_or("list");
+                let root = std::env::current_dir().unwrap_or_default();
+                match action {
+                    "create" => {
+                        let label = args.get(2).copied().unwrap_or("manual");
+                        match self.checkpoint_manager.create_checkpoint(&root, label) {
+                            Ok(cp) => self
+                                .push_log(format!("[CHECKPOINT] Created {} ({})", cp.id, cp.label)),
+                            Err(e) => {
+                                self.push_log(format!("[CHECKPOINT] Failed to create: {}", e))
+                            }
+                        }
+                    }
+                    "list" => match self.checkpoint_manager.list_checkpoints() {
+                        Ok(cps) => {
+                            if cps.is_empty() {
+                                self.push_log("[CHECKPOINT] No checkpoints found.".to_string());
+                            } else {
+                                self.push_log(format!("[CHECKPOINT] {} checkpoints:", cps.len()));
+                                for cp in cps.iter().take(10) {
+                                    self.push_log(format!(
+                                        "  {} | {} | {} files | {}",
+                                        cp.id,
+                                        cp.branch,
+                                        cp.changed_files.len(),
+                                        cp.label
+                                    ));
+                                }
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[CHECKPOINT] Failed to list: {}", e)),
+                    },
+                    "show" | "diff" => {
+                        if let Some(id) = args.get(2) {
+                            match self.checkpoint_manager.get_checkpoint(id) {
+                                Ok(Some(cp)) => {
+                                    self.push_log(format!(
+                                        "[CHECKPOINT] {} | {} | dirty: {}",
+                                        cp.id, cp.branch, cp.is_dirty
+                                    ));
+                                    self.push_log(format!("  Label: {}", cp.label));
+                                    self.push_log(format!(
+                                        "  Changed: {}",
+                                        cp.changed_files.join(", ")
+                                    ));
+                                    if action == "diff" && !cp.diff_snapshot.is_empty() {
+                                        self.push_log("  Diff Snapshot:".to_string());
+                                        for line in cp.diff_snapshot.lines() {
+                                            self.push_log(line.to_string());
+                                        }
+                                    }
+                                }
+                                Ok(None) => {
+                                    self.push_log(format!("[CHECKPOINT] ID {} not found.", id))
+                                }
+                                Err(e) => self.push_log(format!("[CHECKPOINT] Error: {}", e)),
+                            }
+                        } else {
+                            self.push_log(
+                                "[CHECKPOINT] Please provide a checkpoint ID.".to_string(),
+                            );
+                        }
+                    }
+                    "restore" => {
+                        self.push_log("[CHECKPOINT] Restore is not fully implemented yet. Use /rollback <id> to initiate approval workflow.".to_string());
+                    }
+                    _ => self.push_log(
+                        "[CHECKPOINT] Usage: /checkpoint [create|list|show|diff]".to_string(),
+                    ),
+                }
+                true
+            }
+
+            "/rollback" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                let root = std::env::current_dir().unwrap_or_default();
+                if let Some(id) = args.get(1) {
+                    if let Ok(Some(cp)) = self.checkpoint_manager.get_checkpoint(id) {
+                        self.push_log(format!(
+                            "[ROLLBACK] Initiating rollback to checkpoint {} ({})",
+                            cp.id, cp.label
+                        ));
+                        use crate::approval::{ApprovalRequest, RiskLevel};
+                        let req = ApprovalRequest {
+                            tool_name: "bash".to_string(),
+                            action_summary: format!(
+                                "git reset --hard && git clean -fd # rollback to {}",
+                                cp.id
+                            ),
+                            risk_level: RiskLevel::High,
+                            explanation: Some(format!(
+                                "This will overwrite your current working tree to match checkpoint {}.",
+                                cp.id
+                            )),
+                            working_directory: Some(root.to_string_lossy().to_string()),
+                        };
+                        let cmd_str = req.action_summary.clone();
+                        self.pending_approval = Some(DeferredToolCall {
+                            id: "manual".to_string(),
+                            name: "bash".to_string(),
+                            args: serde_json::json!({"command": cmd_str}),
+                            request: req,
+                            patch_id: None,
+                        });
+                        self.push_log(
+                            "[ROLLBACK] Requires approval. Please (A)pprove or (D)eny.".to_string(),
+                        );
+                    } else {
+                        self.push_log(format!("[ROLLBACK] Checkpoint {} not found.", id));
+                    }
+                } else {
+                    self.push_log("[ROLLBACK] Usage: /rollback <id>".to_string());
+                }
+                true
+            }
+
+            "/branch" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                let action = args.get(1).copied().unwrap_or("current");
+                let root = std::env::current_dir().unwrap_or_default();
+                match action {
+                    "current" => {
+                        if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                            self.push_log(format!("[BRANCH] Current: {}", git.branch));
+                        } else {
+                            self.push_log("[BRANCH] Not in a git repo.".to_string());
+                        }
+                    }
+                    "create" => {
+                        if let Some(name) = args.get(2) {
+                            use crate::approval::{ApprovalRequest, RiskLevel};
+                            let req = ApprovalRequest {
+                                tool_name: "bash".to_string(),
+                                action_summary: format!("git checkout -b {}", name),
+                                risk_level: RiskLevel::Medium,
+                                explanation: Some(format!(
+                                    "Create and switch to new branch: {}",
+                                    name
+                                )),
+                                working_directory: Some(root.to_string_lossy().to_string()),
+                            };
+                            let cmd_str = req.action_summary.clone();
+                            self.pending_approval = Some(DeferredToolCall {
+                                id: "manual".to_string(),
+                                name: "bash".to_string(),
+                                args: serde_json::json!({"command": cmd_str}),
+                                request: req,
+                                patch_id: None,
+                            });
+                            self.push_log(format!(
+                                "[BRANCH] Creation of {} requires approval.",
+                                name
+                            ));
+                        } else {
+                            self.push_log("[BRANCH] Please specify a branch name.".to_string());
+                        }
+                    }
+                    _ => {
+                        self.push_log("[BRANCH] Usage: /branch [current|create <name>]".to_string())
+                    }
+                }
+                true
+            }
+
+            "/commit" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                let action = args.get(1).copied().unwrap_or("message");
+                match action {
+                    "message" => {
+                        self.push_log(
+                            "[COMMIT] Proposed message: \"Update files based on recent changes.\""
+                                .to_string(),
+                        );
+                        self.push_log(
+                            "[COMMIT] (LLM-based generation is planned for Phase 3.5)".to_string(),
+                        );
+                    }
+                    "create" => {
+                        use crate::approval::{ApprovalRequest, RiskLevel};
+                        let root = std::env::current_dir().unwrap_or_default();
+                        let req = ApprovalRequest {
+                            tool_name: "bash".to_string(),
+                            action_summary: "git add . && git commit -m 'Update files'".to_string(),
+                            risk_level: RiskLevel::Medium,
+                            explanation: Some("Stage and commit all changes. (Planned: auto-generate message and only stage required files.)".to_string()),
+                            working_directory: Some(root.to_string_lossy().to_string()),
+                        };
+                        let cmd_str = req.action_summary.clone();
+                        self.pending_approval = Some(DeferredToolCall {
+                            id: "manual".to_string(),
+                            name: "bash".to_string(),
+                            args: serde_json::json!({"command": cmd_str}),
+                            request: req,
+                            patch_id: None,
+                        });
+                        self.push_log("[COMMIT] Committing changes requires approval.".to_string());
+                    }
+                    _ => self.push_log("[COMMIT] Usage: /commit [message|create]".to_string()),
+                }
+                true
+            }
+
             "/changes" | "/git-status" => {
                 let root = std::env::current_dir().unwrap_or_default();
                 if let Some(git) = crate::repo_map::GitStatus::read(&root) {
@@ -1939,6 +2180,12 @@ impl App {
                                 }
                             }
                         }
+                    }
+                    if git.is_dirty {
+                        self.push_log(
+                            "[GIT] Hint: Run /checkpoint create before making risky edits."
+                                .to_string(),
+                        );
                     }
                 } else {
                     self.push_log("[GIT] Not a git repository or git not available.");
