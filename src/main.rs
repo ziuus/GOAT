@@ -218,6 +218,7 @@ async fn run_app(
                         KeyCode::Enter => {
                             let msg = app.input.trim().to_string();
                             if !msg.is_empty() {
+                                app.commit_to_history(&msg);
                                 app.input.clear();
                                 app.scroll_to_bottom();
                                 info!(length = msg.len(), "submitting user input");
@@ -241,12 +242,31 @@ async fn run_app(
                             }
                         }
 
-                        KeyCode::Up => app.scroll_up(1),
-                        KeyCode::Down => app.scroll_down(1),
+                        // ↑ / ↓ — input history when there's content or
+                        // when already browsing history; log scroll when input is empty.
+                        KeyCode::Up => {
+                            if !app.input.is_empty() || app.history_idx.is_some() {
+                                app.history_up();
+                            } else {
+                                app.scroll_up(1);
+                            }
+                        }
+                        KeyCode::Down => {
+                            if app.history_idx.is_some() {
+                                app.history_down();
+                            } else {
+                                app.scroll_down(1);
+                            }
+                        }
                         KeyCode::PageUp => app.scroll_up(10),
                         KeyCode::PageDown => app.scroll_down(10),
                         KeyCode::Home => app.scroll_up(usize::MAX),
                         KeyCode::End => app.scroll_to_bottom(),
+
+                        // Ctrl+L — clear log (same as /clear)
+                        KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/clear").await;
+                        }
 
                         _ => {}
                     }

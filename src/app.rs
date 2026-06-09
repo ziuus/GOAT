@@ -86,6 +86,11 @@ pub struct App {
     pending_approval: Option<DeferredToolCall>,
     /// Explicitly activated skill for the session
     pub active_skill: Option<String>,
+    /// Command history for ↑ navigation in the input composer.
+    pub input_history: Vec<String>,
+    /// Current index into input_history when navigating with ↑/↓.
+    /// `None` means we are at the live input (not browsing history).
+    pub history_idx: Option<usize>,
 }
 
 impl App {
@@ -97,16 +102,30 @@ impl App {
     pub fn from_runtime(rt: GoatRuntime, boot_log: Vec<String>) -> Self {
         let mut logs: Vec<String> = Vec::new();
 
-        // TUI splash header.
+        // ── TUI splash header ─────────────────────────────────────────────────
+        let version = env!("CARGO_PKG_VERSION");
+        logs.push(format!(
+            "[GOAT] 🐐 GOAT v{} — General Omniscient Agentic Tool",
+            version
+        ));
         logs.push(
-            "[GOAT] v0.4 — Universal AI Agent Platform | Type your message and press Enter"
-                .to_string(),
+            "[GOAT] Type your message and press Enter to chat with the AI agent.".to_string(),
         );
         logs.push(
-            "[GOAT] Slash commands: /help /status /profile /profiles /mcp /learn /route /clear /tools /sessions /new"
-                .to_string(),
+            "[GOAT] ─────────────────────────────────────────────────────────────────".to_string(),
         );
-        logs.push("[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel".to_string());
+        logs.push(
+            "[HELP] Quick start: /help · /status · /doctor · /repo-map · /skills".to_string(),
+        );
+        logs.push("[HELP] Dev tools: /check · /test · /lint · /format · /patch".to_string());
+        logs.push("[HELP] Memory:    /memory · /recall <query> · /save-skill <name>".to_string());
+        logs.push("[HELP] Sessions:  /new · /sessions · /profile · /profiles".to_string());
+        logs.push(
+            "[HELP] Keys:      Enter=send · ↑=history · Ctrl+C=quit · Esc=cancel".to_string(),
+        );
+        logs.push(
+            "[GOAT] ─────────────────────────────────────────────────────────────────".to_string(),
+        );
 
         // Show startup_warnings (config permission issues, etc.).
         for warning in &rt.startup_warnings {
@@ -148,6 +167,8 @@ impl App {
             brain_disabled,
             pending_approval: None,
             active_skill: None,
+            input_history: Vec::new(),
+            history_idx: None,
         }
     }
 
@@ -212,6 +233,64 @@ impl App {
     /// Jump to the bottom of the log.
     pub fn scroll_to_bottom(&mut self) {
         self.log_scroll = 0;
+    }
+
+    // ── Input history navigation ───────────────────────────────────────────────
+
+    /// Navigate to the previous command in history (↑ key).
+    pub fn history_up(&mut self) {
+        if self.input_history.is_empty() {
+            return;
+        }
+        match self.history_idx {
+            None => {
+                // First press: go to the most recent history entry.
+                self.history_idx = Some(self.input_history.len() - 1);
+            }
+            Some(0) => {
+                // Already at the oldest entry — stay there.
+                self.history_idx = Some(0);
+            }
+            Some(i) => {
+                self.history_idx = Some(i - 1);
+            }
+        }
+        if let Some(idx) = self.history_idx {
+            self.input = self.input_history[idx].clone();
+        }
+    }
+
+    /// Navigate to the next command in history (↓ key).
+    pub fn history_down(&mut self) {
+        match self.history_idx {
+            None => {} // already at live input
+            Some(i) if i + 1 >= self.input_history.len() => {
+                // Past the end → return to live (empty) input.
+                self.history_idx = None;
+                self.input.clear();
+            }
+            Some(i) => {
+                self.history_idx = Some(i + 1);
+                self.input = self.input_history[i + 1].clone();
+            }
+        }
+    }
+
+    /// Record `text` into input history and reset the index to live input.
+    pub fn commit_to_history(&mut self, text: &str) {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        // Avoid duplicate consecutive entries.
+        if self.input_history.last().map(|s| s.as_str()) != Some(trimmed) {
+            self.input_history.push(trimmed.to_string());
+            // Cap history at 200 entries to prevent unbounded growth.
+            if self.input_history.len() > 200 {
+                self.input_history.remove(0);
+            }
+        }
+        self.history_idx = None;
     }
 
     // ── Approval gate integration ─────────────────────────────────────────────
@@ -297,35 +376,69 @@ impl App {
 
         match name.as_str() {
             "/help" => {
-                self.push_log("[HELP] Available commands:");
-                self.push_log("[HELP]   /help            — show this help");
-                self.push_log("[HELP]   /status          — show system status");
-                self.push_log("[HELP]   /profile         — show current profile");
-                self.push_log("[HELP]   /profile <name>  — switch to a profile");
-                self.push_log("[HELP]   /profiles        — list available profiles");
-                self.push_log("[HELP]   /new             — start a new session");
-                self.push_log("[HELP]   /mcp             — start configured MCP servers");
-                self.push_log("[HELP]   /learn           — index project files into brain");
-                self.push_log("[HELP]   /route           — show current swarm route for input");
-                self.push_log("[HELP]   /clear           — clear the log display");
-                self.push_log("[HELP]   /tools           — list available tools");
-                self.push_log("[HELP]   /sessions        — show session info");
-                self.push_log("[HELP]   /project         — manage project context");
-                self.push_log("[HELP]   /memory          — view or manage curated memory");
-                self.push_log("[HELP]   /recall <query>  — search conversation history");
-                self.push_log("[HELP]");
-                self.push_log("[HELP] Keys:");
-                self.push_log("[HELP]   Enter         — send message");
-                self.push_log("[HELP]   Ctrl+C        — quit");
-                self.push_log("[HELP]   ↑/↓           — scroll log");
-                self.push_log("[HELP]   Page Up/Down  — fast scroll");
-                self.push_log("[HELP]   Esc           — cancel input");
-                self.push_log("[HELP]");
-                self.push_log("[HELP] Approval (when overlay appears):");
-                self.push_log("[HELP]   y — approve once");
-                self.push_log("[HELP]   n — deny");
-                self.push_log("[HELP]   a — always allow this tool (session)");
-                self.push_log("[HELP]   d — always deny this tool (session)");
+                let ver = env!("CARGO_PKG_VERSION");
+                self.push_log(format!("[HELP] 🐐 GOAT v{} — Available Commands", ver));
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] General:");
+                self.push_log("[HELP]   /help             — this help");
+                self.push_log("[HELP]   /status           — system status (provider, memory, git)");
+                self.push_log("[HELP]   /ui               — UI info and future plans");
+                self.push_log("[HELP]   /clear            — clear log display");
+                self.push_log("[HELP]   /tools            — list available tools");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Sessions:");
+                self.push_log("[HELP]   /new              — start a new session");
+                self.push_log("[HELP]   /sessions         — list recent sessions");
+                self.push_log("[HELP]   /profile          — show active profile");
+                self.push_log("[HELP]   /profile <name>   — switch profile");
+                self.push_log("[HELP]   /profiles         — list available profiles");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Project & Dev:");
+                self.push_log("[HELP]   /project          — show/manage project context");
+                self.push_log("[HELP]   /project scan     — index current project");
+                self.push_log("[HELP]   /repo-map         — show repository map + symbols");
+                self.push_log("[HELP]   /repo-map refresh — force rescan");
+                self.push_log("[HELP]   /check            — run project check (cargo check, etc.)");
+                self.push_log("[HELP]   /test [args]      — run project tests");
+                self.push_log("[HELP]   /lint             — run linter (clippy, ruff, etc.)");
+                self.push_log("[HELP]   /format           — run formatter");
+                self.push_log("[HELP]   /patch            — show pending file patch");
+                self.push_log("[HELP]   /patch apply      — apply pending patch");
+                self.push_log("[HELP]   /patch discard    — discard pending patch");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Memory & Skills:");
+                self.push_log("[HELP]   /memory           — view memory status");
+                self.push_log("[HELP]   /memory show user — show USER.md contents");
+                self.push_log("[HELP]   /memory show mem  — show MEMORY.md contents");
+                self.push_log("[HELP]   /recall <query>   — search conversation history");
+                self.push_log("[HELP]   /skills           — list available skills");
+                self.push_log("[HELP]   /skill <name>     — activate a skill");
+                self.push_log("[HELP]   /skill create <n> — scaffold a new skill");
+                self.push_log("[HELP]   /skill search <q> — search skills");
+                self.push_log("[HELP]   /skill clear      — deactivate skill");
+                self.push_log("[HELP]   /save-skill <n>   — extract skill from session");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Infrastructure:");
+                self.push_log("[HELP]   /mcp              — start configured MCP servers");
+                self.push_log("[HELP]   /learn            — index project files into brain");
+                self.push_log("[HELP]   /route            — show swarm route for current input");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Keyboard:");
+                self.push_log("[HELP]   Enter     — send message");
+                self.push_log("[HELP]   ↑         — recall previous command (history)");
+                self.push_log("[HELP]   ↓         — forward through history");
+                self.push_log("[HELP]   Ctrl+C    — quit");
+                self.push_log("[HELP]   Ctrl+L    — clear log (same as /clear)");
+                self.push_log("[HELP]   ↑↓        — scroll log (when input empty)");
+                self.push_log("[HELP]   PgUp/PgDn — fast scroll log");
+                self.push_log("[HELP]   Home/End  — jump to top/bottom of log");
+                self.push_log("[HELP]   Esc       — clear input / scroll to bottom");
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Approval (when overlay is visible):");
+                self.push_log("[HELP]   y  — approve this action once");
+                self.push_log("[HELP]   n  — deny");
+                self.push_log("[HELP]   a  — always allow this tool (session)");
+                self.push_log("[HELP]   d  — always deny this tool (session)");
                 true
             }
 
@@ -583,7 +696,46 @@ impl App {
             "/clear" => {
                 self.logs.clear();
                 self.log_scroll = 0;
-                self.push_log("[GOAT] Log cleared. Type a message to continue.");
+                let ver = env!("CARGO_PKG_VERSION");
+                self.push_log(format!(
+                    "[GOAT] 🐐 GOAT v{} — Log cleared. Type a message to continue.",
+                    ver
+                ));
+                self.push_log(
+                    "[HELP] Quick: /help · /status · /repo-map · /skills · /memory".to_string(),
+                );
+                true
+            }
+
+            "/ui" => {
+                let ver = env!("CARGO_PKG_VERSION");
+                self.push_log(format!("[UI] 🐐 GOAT v{} — UI Information", ver));
+                self.push_log("[UI] ─────────────────────────────────────────────────────────");
+                self.push_log("[UI] Current UI: Ratatui TUI (Phase 2.4)");
+                self.push_log("[UI]   Layout   : 3-pane (header + log + input)");
+                self.push_log("[UI]   Colors   : 20+ RGB tags covering all message types");
+                self.push_log("[UI]   Approval : overlay modal with diff preview");
+                self.push_log("[UI]   Diff     : + lines green, - lines red");
+                self.push_log("[UI]   History  : ↑/↓ key navigation in input");
+                self.push_log("[UI] ─────────────────────────────────────────────────────────");
+                self.push_log("[UI] Planned: Phase 3.0 — Advanced Ratatui TUI:");
+                self.push_log("[UI]   Multi-pane: chat + tool log + session sidebar");
+                self.push_log("[UI]   Command palette (Ctrl+K)");
+                self.push_log("[UI]   Slash command autocomplete");
+                self.push_log("[UI]   Diff viewer pane with accept/reject");
+                self.push_log("[UI]   Repo map panel (tree view)");
+                self.push_log("[UI]   Animated streaming indicator");
+                self.push_log("[UI] ─────────────────────────────────────────────────────────");
+                self.push_log("[UI] Planned: Phase 4.1 — Web Dashboard:");
+                self.push_log("[UI]   Next.js + React + Tailwind CSS");
+                self.push_log("[UI]   Monaco/CodeMirror diff viewer");
+                self.push_log("[UI]   Session timeline, skills/memory browser");
+                self.push_log("[UI]   Glassmorphism/Aurora dark aesthetic");
+                self.push_log("[UI] ─────────────────────────────────────────────────────────");
+                self.push_log("[UI] Planned: Phase 5.0 — Tauri Desktop App");
+                self.push_log("[UI] Planned: Phase 6.0 — Voice Companion (opt-in only)");
+                self.push_log("[UI] ─────────────────────────────────────────────────────────");
+                self.push_log("[UI] See docs/GOAT_MULTI_FRONTEND_ARCHITECTURE.md for details.");
                 true
             }
 
@@ -909,7 +1061,114 @@ impl App {
                 true
             }
 
-            _ => false,
+            "/repo-map" | "/repo_map" => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                let root = std::env::current_dir().unwrap_or_default();
+                let refresh = arg == "refresh";
+                if refresh {
+                    self.push_log("[REPO-MAP] Rescanning repository…");
+                }
+                let scanner = crate::repo_map::RepoMapScanner::new(root.clone());
+                match scanner.scan() {
+                    Ok(repo_map) => {
+                        let compact = repo_map.to_compact_string(4000, true);
+                        for line in compact.lines() {
+                            self.push_log(format!("[REPO-MAP] {}", line));
+                        }
+                    }
+                    Err(e) => {
+                        self.push_log(format!("[REPO-MAP] Scan error: {}", e));
+                    }
+                }
+                true
+            }
+
+            "/check" => {
+                let root = std::env::current_dir().unwrap_or_default();
+                let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                if let Some(cmd) = cmds.check {
+                    self.push_log(format!("[DEV] check → {}", cmd));
+                    self.push_log("[DEV] Use 'goat check' CLI command to run with ApprovalGate.");
+                } else {
+                    self.push_log("[DEV] No check command detected for this project.");
+                    self.push_log(
+                        "[DEV] Tip: run 'goat check' from the CLI for interactive approval.",
+                    );
+                }
+                true
+            }
+
+            "/test" => {
+                let root = std::env::current_dir().unwrap_or_default();
+                let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                if let Some(cmd) = cmds.test {
+                    self.push_log(format!("[DEV] test → {}", cmd));
+                    self.push_log("[DEV] Use 'goat test' CLI command to run with ApprovalGate.");
+                } else {
+                    self.push_log("[DEV] No test command detected for this project.");
+                }
+                true
+            }
+
+            "/lint" => {
+                let root = std::env::current_dir().unwrap_or_default();
+                let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                if let Some(cmd) = cmds.lint {
+                    self.push_log(format!("[DEV] lint → {}", cmd));
+                    self.push_log("[DEV] Use 'goat lint' CLI command to run with ApprovalGate.");
+                } else {
+                    self.push_log("[DEV] No lint command detected for this project.");
+                }
+                true
+            }
+
+            "/format" => {
+                let root = std::env::current_dir().unwrap_or_default();
+                let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                if let Some(cmd) = cmds.format {
+                    self.push_log(format!("[DEV] format → {}", cmd));
+                    self.push_log("[DEV] Use 'goat format' CLI command to run with ApprovalGate.");
+                } else {
+                    self.push_log("[DEV] No format command detected for this project.");
+                }
+                true
+            }
+
+            "/patch" => {
+                let sub = parts.get(1).copied().unwrap_or("").trim();
+                match sub {
+                    "apply" => {
+                        self.push_log("[PATCH] No pending patch to apply.");
+                        self.push_log(
+                            "[PATCH] Patches are created when GOAT proposes a file write.",
+                        );
+                        self.push_log(
+                            "[PATCH] Full patch queue with apply/rollback planned for Phase 2.5.",
+                        );
+                    }
+                    "discard" => {
+                        self.push_log("[PATCH] No pending patch to discard.");
+                    }
+                    _ => {
+                        self.push_log("[PATCH] No pending patch in current session.");
+                        self.push_log("[PATCH] Patches appear when GOAT proposes to write a file.");
+                        self.push_log("[PATCH] Commands: /patch apply · /patch discard");
+                        self.push_log(
+                            "[PATCH] Full patch queue (Phase 2.5) will support multi-file diffs.",
+                        );
+                    }
+                }
+                true
+            }
+
+            _ => {
+                // Friendly error for unknown slash commands.
+                self.push_log(format!(
+                    "[WARN] Unknown command: {}  — type /help for a full list",
+                    name
+                ));
+                false
+            }
         }
     }
 

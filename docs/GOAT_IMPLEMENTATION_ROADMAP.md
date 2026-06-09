@@ -470,3 +470,103 @@
 | 7 | `whisper-rs` | Local STT |
 | 8 | `axum` | Web dashboard |
 | 8 | `tower` | HTTP middleware |
+
+---
+
+## Phase 2.4: UI/UX Architecture Review + TUI Polish ✅ COMPLETED
+
+**Goal:** Audit current TUI weaknesses, design multi-frontend architecture, polish Ratatui TUI.
+
+### Completed:
+- [x] `docs/GOAT_UI_UX_AUDIT.md` — 20-category audit vs OpenCode, Claude Code, Hermes, Antigravity, Cursor/Windsurf, Cline, Codex CLI, Gemini CLI, Aider, JCode
+- [x] `docs/GOAT_MULTI_FRONTEND_ARCHITECTURE.md` — TUI + Headless + Daemon + Web + Desktop + Voice architecture plan with tech stack per surface
+- [x] `docs/GOAT_UI_DESIGN_SYSTEM.md` — Comprehensive design system: palette (20+ RGB colors), typography, spacing, ASCII wireframes
+- [x] `src/ui.rs` — Polished: GOAT_VERSION constant (env!), 20+ tag colors (MEMORY, SKILL, PROJECT, REPO-MAP, DEV, PATCH, RESEARCH, etc.), diff +/- green/red, active skill in header, contextual input placeholder, wider approval overlay (86 cols), CRITICAL→red border in overlay
+- [x] `src/app.rs` — Input history (history_up/history_down/commit_to_history), ↑=history nav, updated startup splash with correct version, grouped /help, /ui command, /repo-map TUI slash command, /check /test /lint /format /patch in TUI, friendly "unknown command" error
+- [x] `src/main.rs` — ↑ key = history nav (when input non-empty), ↓ = history forward, Ctrl+L = /clear
+
+### Exit Criteria:
+- `cargo check` passes ✅
+- `cargo test` passes with 76/76 ✅
+- `cargo fmt` passes ✅
+- Header shows correct version (v0.7.0) ✅
+- Active skill shown in header ✅
+- /help grouped and complete ✅
+- Input history navigation (↑/↓) ✅
+- /ui command works ✅
+- /repo-map command works in TUI ✅
+- Diff +/- lines colored green/red ✅
+- All major log tags have distinct colors ✅
+- 3 major docs created ✅
+
+---
+
+## Phase 3.0: Advanced Ratatui TUI (Planned)
+
+**Goal:** Multi-pane layout, command palette, sidebar, autocomplete, diff pane.
+
+### Planned:
+- [ ] Multi-pane layout: chat + tool log + session sidebar
+- [ ] Command palette (Ctrl+K)
+- [ ] Slash command autocomplete popup
+- [ ] Session sidebar with list/switch
+- [ ] Dedicated diff viewer pane with accept/reject
+- [ ] Multi-line input composer
+- [ ] Repo map pane (tree view)
+- [ ] Memory/skills panel
+- [ ] Animated streaming indicator
+- [ ] Auto-deny timeout for high-risk approvals
+
+---
+
+## Phase 4.0: Daemon + WebSocket API (Planned)
+
+**Goal:** Local HTTP/WebSocket daemon for multi-frontend support.
+
+### Planned:
+- [ ] axum-based daemon (goat serve)
+- [ ] WebSocket event stream (messages, tool calls, approvals)
+- [ ] Sessions REST API
+- [ ] Approval request/response API
+- [ ] Memory/skills read API
+- [ ] Local-only bind (no remote access without explicit config)
+
+---
+
+## Phase 4.1: Web Dashboard (Planned)
+
+**Goal:** Next.js + React premium web UI.
+
+### Planned:
+- [ ] Next.js 15 + React 19 + TypeScript
+- [ ] WebSocket client → GOAT daemon
+- [ ] Chat panel with streaming
+- [ ] Monaco diff viewer (accept/reject)
+- [ ] Session list + timeline
+- [ ] Glassmorphism/Aurora dark aesthetic
+- [ ] Skills/memory browser
+
+---
+
+## Phase 5.0: Tauri Desktop App (Planned)
+
+**Goal:** Native desktop app wrapping GOAT core + web UI.
+
+### Planned:
+- [ ] Tauri 2.x shell (Rust core reused)
+- [ ] System tray integration
+- [ ] Native notifications for approvals
+- [ ] OS file picker
+
+---
+
+## Phase 6.0: Voice Companion (Planned, opt-in only)
+
+**Goal:** Optional voice interface — fully opt-in, never listens without permission.
+
+### Planned:
+- [ ] voice.enabled = false default
+- [ ] WebRTC mic capture with explicit permission
+- [ ] Whisper.cpp local STT (or Whisper API)
+- [ ] Optional TTS output
+- [ ] Visual listening indicator always visible

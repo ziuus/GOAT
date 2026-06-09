@@ -8,7 +8,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 2: GOAT Brain Foundation
 
-### Added — Phase 2.3: Agentic Coding Upgrade (2026-06-09)
+### Added — Phase 2.4: UI/UX Architecture Review + TUI Polish (2026-06-09)
+
+**Version bump: 0.6.0 → 0.7.0**
+
+- **UI/UX Audit (`docs/GOAT_UI_UX_AUDIT.md`):** 20-category audit of current TUI vs OpenCode, Claude Code, Hermes, Antigravity, Cursor, Cline, Codex CLI, Gemini CLI, Aider, JCode. Each issue tagged with severity and fix path (Ratatui now / Phase 3.0 / Phase 4.x).
+- **Multi-Frontend Architecture (`docs/GOAT_MULTI_FRONTEND_ARCHITECTURE.md`):** Full plan for GOAT's UI surface strategy: Ratatui TUI, Headless, Daemon+API, Next.js Web Dashboard, Tauri Desktop, Voice Companion. Tech stack, security guarantees, and rationale per surface.
+- **Design System (`docs/GOAT_UI_DESIGN_SYSTEM.md`):** Complete visual language for all GOAT frontends: 20+ RGB color tokens, typography (Inter/JetBrains Mono for web), spacing, ASCII/wireframe sketches of TUI/web/voice layouts, CSS glassmorphism tokens.
+- **TUI Polish (`src/ui.rs`):**
+  - `GOAT_VERSION` constant using `env!("CARGO_PKG_VERSION")` — header now shows actual version.
+  - Extended color palette to 20+ tag-specific colors: `[MEMORY]`, `[SKILL]`/`[SKILLS]`, `[PROJECT]`, `[REPO-MAP]`, `[DEV]`, `[PATCH]`, `[RESEARCH]`, `[UI]`, `[RECALL]`, plus `[TOOLS]` distinction.
+  - Diff line colorization: `+ lines` green (COLOR_DIFF_ADD), `- lines` red (COLOR_DIFF_REMOVE), `@@ hunk headers` blue.
+  - Active skill shown in header (truncated to 12 chars): `│ 🎯 skill-name`.
+  - `GOAT_VERSION` replaces hardcoded `v0.1` in header.
+  - Contextual input placeholder changes based on `AppStatus` (Thinking, Running, Error).
+  - Input border brightens when user is typing.
+  - Approval overlay width expanded to 86 cols.
+  - Approval overlay shows CRITICAL→red border, and applies diff colors to `+`/`-`/`@@` lines in preview.
+  - Log panel scroll hint updated to include PgUp/PgDn info.
+- **Input History (`src/app.rs`):**
+  - `App.input_history: Vec<String>` and `App.history_idx: Option<usize>` fields.
+  - `history_up()`, `history_down()`, `commit_to_history()` methods.
+  - Cap at 200 entries; no duplicate consecutive entries.
+- **Help & Commands (`src/app.rs`):**
+  - `/help` completely rewritten: grouped into General, Sessions, Project & Dev, Memory & Skills, Infrastructure, Keyboard, Approval — all Phase 2.x slash commands included.
+  - `/ui` command: shows current TUI info and lists all planned future UI surfaces (3.0/4.0/4.1/5.0/6.0).
+  - `/clear` enhanced: shows current version after clearing.
+  - `/repo-map` and `/repo-map refresh` work in TUI slash commands (via `RepoMapScanner`).
+  - `/check`, `/test`, `/lint`, `/format` in TUI: detect project command and inform user to use CLI for execution.
+  - `/patch`, `/patch apply`, `/patch discard` in TUI.
+  - Unknown slash commands now show friendly "type /help for a full list" message.
+  - Startup splash updated: correct version string, grouped hint lines for quick start.
+- **Key Bindings (`src/main.rs`):**
+  - `↑` key: if input non-empty or browsing history → `history_up()`; if input empty → scroll log up.
+  - `↓` key: if browsing history → `history_down()`; else → scroll log down.
+  - `Enter`: calls `commit_to_history()` before clearing input.
+  - `Ctrl+L`: clears log (same as `/clear`).
+
 
 **Version bump: 0.5.0 → 0.6.0**
 
