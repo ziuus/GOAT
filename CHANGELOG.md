@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.11.0] — Phase 3.3: Interactive Repo/File Tree + Patch/Diff UX (2026-06-09)
+
+### Added — Phase 3.3: Interactive Repo/File Tree + Patch/Diff UX
+
+#### Interactive Repo View (`/repo`)
+- **`/repo` command** replaces `/repo-map`. Renders a beautiful visual tree of the project structure in the `ActiveView::RepoMap` UI layout.
+- Added `/repo refresh` (force rescan), `/repo summary` (log compact summary), and `/repo context`.
+- Cached `repo_map` in `App` state to allow rendering the visual tree dynamically.
+
+#### Safe File Preview (`/open` | `/preview`)
+- Safely read text files from disk and display their contents in the chat log.
+- **Security Check**: Auto-detects and blocks previews for `.env`, `id_rsa`, `key`, `credentials`, etc.
+- **Redaction Check**: Pipes the file content through the `redact_secrets` module.
+- Auto-truncates large files to prevent UI flooding.
+
+#### Enhanced Patch UX & Diff Viewer (`/diff`)
+- Improved the `ActiveView::Patches` rendering by including file paths, colorized patch status, and a small snippet of the diff inline in the UI.
+- **`/diff [patch-id]`**: Displays the full unified diff of a pending patch directly in the chat with correct syntax coloring (+/- lines).
+- Also functions as a local git diff shortcut when no arguments are provided.
+
+#### Git Status View (`/changes` | `/git-status`)
+- Fast command to view the current branch, dirty state, and list of changed files based on `git status -s`.
+
 ## [0.10.0] — Phase 3.2: Premium Focus Layout (2026-06-09)
 
 ### Added — Phase 3.2: Premium Focus Layout + OpenCode-style Clean TUI

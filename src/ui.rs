@@ -673,7 +673,7 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
         }
 
         ActiveView::RepoMap => {
-            let lines = vec![
+            let mut lines = vec![
                 Line::from(""),
                 Line::from(Span::styled(
                     " 🗂  Repository Map",
@@ -682,38 +682,84 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
                         .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
-                Line::from(Span::styled(
+            ];
+
+            if let Some(repo_map) = &app.repo_map {
+                lines.push(Line::from(Span::styled(
+                    format!(" Root: {}", repo_map.root),
+                    Style::default().fg(Color::Rgb(140, 160, 210)),
+                )));
+                if let Some(ref git) = repo_map.git_status {
+                    let git_style = if git.is_dirty {
+                        Style::default().fg(Color::Rgb(220, 160, 80))
+                    } else {
+                        Style::default().fg(Color::Rgb(100, 180, 120))
+                    };
+                    lines.push(Line::from(Span::styled(
+                        format!(
+                            " Branch: {} ({})",
+                            git.branch,
+                            if git.is_dirty { "dirty" } else { "clean" }
+                        ),
+                        git_style,
+                    )));
+                }
+                if !repo_map.stack.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        format!(" Stack: {}", repo_map.stack.join(", ")),
+                        Style::default().fg(Color::Rgb(160, 140, 200)),
+                    )));
+                }
+                lines.push(Line::from(""));
+
+                for line in repo_map.to_tree_lines() {
+                    let style = if line.starts_with(" 📁") {
+                        Style::default()
+                            .fg(Color::Rgb(110, 160, 220))
+                            .add_modifier(Modifier::BOLD)
+                    } else if line.starts_with("   📄") || line.starts_with(" 📄") {
+                        Style::default().fg(Color::Rgb(180, 195, 235))
+                    } else {
+                        Style::default().fg(COLOR_DIM)
+                    };
+                    lines.push(Line::from(Span::styled(line, style)));
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        " ℹ️  {} files scanned ({} ignored directories)",
+                        repo_map.total_files_scanned, repo_map.ignored_dirs_skipped
+                    ),
+                    Style::default().fg(COLOR_DIM),
+                )));
+            } else {
+                lines.push(Line::from(Span::styled(
                     " No repo map is loaded in this view.",
                     Style::default().fg(Color::Rgb(110, 125, 170)),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
+                )));
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
                     " Run in chat to load the map:",
                     Style::default().fg(COLOR_DIM),
-                )),
-                Line::from(Span::styled(
-                    "   /repo-map           show current map",
+                )));
+                lines.push(Line::from(Span::styled(
+                    "   /repo               load default map",
                     Style::default().fg(COLOR_HELP).add_modifier(Modifier::BOLD),
-                )),
-                Line::from(Span::styled(
-                    "   /repo-map refresh   force rescan",
+                )));
+                lines.push(Line::from(Span::styled(
+                    "   /repo refresh       force rescan",
                     Style::default().fg(COLOR_HELP),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
+                )));
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
                     " The map shows your project's files, symbols,",
                     Style::default().fg(COLOR_DIM),
-                )),
-                Line::from(Span::styled(
+                )));
+                lines.push(Line::from(Span::styled(
                     " dependencies, and detected stack.",
                     Style::default().fg(COLOR_DIM),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
-                    " Interactive tree view is planned for Phase 3.3.",
-                    Style::default().fg(Color::Rgb(60, 75, 115)),
-                )),
-            ];
+                )));
+            }
             (" 🗂 Repo Map ", lines)
         }
 
@@ -768,13 +814,43 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
                 ];
                 for p in &app.workflow.patches {
                     l.push(Line::from(Span::styled(
-                        format!(" ─ ID: {}", p.id),
-                        Style::default().fg(Color::Rgb(130, 150, 200)),
+                        format!(" ─ Patch ID: {}   📄 {}", p.id, p.file_path),
+                        Style::default()
+                            .fg(Color::Rgb(130, 150, 200))
+                            .add_modifier(Modifier::BOLD),
                     )));
+                    let status_color = match p.status {
+                        crate::task::PatchStatus::Pending => COLOR_STATUS,
+                        crate::task::PatchStatus::Applied => COLOR_APPROVAL_OK,
+                        crate::task::PatchStatus::Discarded => COLOR_ERROR,
+                    };
                     l.push(Line::from(Span::styled(
                         format!("   Status: {:?}", p.status),
-                        Style::default().fg(COLOR_STATUS),
+                        Style::default().fg(status_color),
                     )));
+
+                    let diff_lines: Vec<&str> = p.unified_diff.lines().collect();
+                    let max_diff_lines = 10;
+                    for line in diff_lines.iter().take(max_diff_lines) {
+                        let style = if line.starts_with('+') {
+                            Style::default().fg(COLOR_APPROVAL_OK)
+                        } else if line.starts_with('-') {
+                            Style::default().fg(COLOR_ERROR)
+                        } else {
+                            Style::default().fg(COLOR_DIM)
+                        };
+                        l.push(Line::from(Span::styled(format!("     {}", line), style)));
+                    }
+                    if diff_lines.len() > max_diff_lines {
+                        l.push(Line::from(Span::styled(
+                            format!(
+                                "     ... ({} more lines) - use /diff {} to view full diff",
+                                diff_lines.len() - max_diff_lines,
+                                p.id
+                            ),
+                            Style::default().fg(COLOR_DIM),
+                        )));
+                    }
                     l.push(Line::from(""));
                 }
                 l.push(Line::from(Span::styled(

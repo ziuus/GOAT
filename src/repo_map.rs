@@ -242,6 +242,32 @@ impl RepoMap {
 
         out
     }
+
+    /// Build a structured tree view lines for the UI.
+    pub fn to_tree_lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+
+        let mut paths: Vec<&crate::repo_map::FileInfo> = self.files.iter().collect();
+        paths.sort_by(|a, b| a.path.cmp(&b.path));
+
+        let mut current_dir = String::new();
+        for f in paths {
+            let parts: Vec<&str> = f.path.split('/').collect();
+            if parts.len() > 1 {
+                let dir = parts[..parts.len() - 1].join("/");
+                if dir != current_dir {
+                    lines.push(format!(" 📁 {}/", dir));
+                    current_dir = dir;
+                }
+                let file = parts.last().unwrap();
+                lines.push(format!("   📄 {} (~{} lines)", file, f.line_count));
+            } else {
+                lines.push(format!(" 📄 {} (~{} lines)", f.path, f.line_count));
+            }
+        }
+
+        lines
+    }
 }
 
 // ── Symbol extraction ────────────────────────────────────────────────────────

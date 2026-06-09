@@ -141,6 +141,8 @@ pub struct App {
     pub subagent_manager: crate::subagents::SubagentManager,
     /// External Agent Manager
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
+    /// Cached Repo Map for the UI
+    pub repo_map: Option<crate::repo_map::RepoMap>,
     /// Active view for Phase 3.0 UI
     pub active_view: ActiveView,
     /// Current slash-command suggestions (populated while input starts with '/')
@@ -235,6 +237,7 @@ impl App {
             tool_registry: rt.tool_registry,
             subagent_manager: rt.subagent_manager,
             external_agent_manager: rt.external_agent_manager,
+            repo_map: None,
             active_view: ActiveView::Chat,
             cmd_suggestions: Vec::new(),
             cmd_suggestion_idx: 0,
@@ -1802,23 +1805,192 @@ impl App {
                 true
             }
 
-            "/repo-map" | "/repo_map" => {
+            "/repo-map" | "/repo_map" | "/repo" => {
                 let arg = parts.get(1).copied().unwrap_or("").trim();
                 let root = std::env::current_dir().unwrap_or_default();
-                let refresh = arg == "refresh";
-                if refresh {
-                    self.push_log("[REPO-MAP] Rescanning repository…");
-                }
-                let scanner = crate::repo_map::RepoMapScanner::new(root.clone());
-                match scanner.scan() {
-                    Ok(repo_map) => {
-                        let compact = repo_map.to_compact_string(4000, true);
-                        for line in compact.lines() {
-                            self.push_log(format!("[REPO-MAP] {}", line));
+
+                if arg == "refresh" || self.repo_map.is_none() {
+                    if arg == "refresh" {
+                        self.push_log("[REPO] Rescanning repository…");
+                    } else {
+                        self.push_log("[REPO] Loading repo map…");
+                    }
+                    let scanner = crate::repo_map::RepoMapScanner::new(root.clone());
+                    match scanner.scan() {
+                        Ok(repo_map) => {
+                            self.repo_map = Some(repo_map);
+                            if arg == "refresh" {
+                                self.push_log("[REPO] Scan complete.");
+                            }
+                        }
+                        Err(e) => {
+                            self.push_log(format!("[REPO] Scan error: {}", e));
                         }
                     }
-                    Err(e) => {
-                        self.push_log(format!("[REPO-MAP] Scan error: {}", e));
+                }
+
+                if let Some(repo_map) = &self.repo_map {
+                    if arg == "summary" || arg == "context" || arg == "" || arg == "map" {
+                        let compact = repo_map.to_compact_string(4000, true);
+                        for line in compact.lines() {
+                            self.push_log(format!("[REPO] {}", line));
+                        }
+                        if arg == "context" {
+                            self.push_log("[REPO] Note: Full source files are NOT injected by default to save context budget.");
+                        }
+                    } else if arg == "refresh" {
+                        // already handled
+                    } else {
+                        self.push_log("[REPO] Unknown argument. Use: /repo refresh | /repo summary | /repo context");
+                    }
+                }
+                true
+            }
+
+            "/open" | "/preview" => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                if arg.is_empty() {
+                    self.push_log("[PREVIEW] Usage: /open <path>");
+                } else {
+                    let path = std::path::Path::new(arg);
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or_default()
+                        .to_lowercase();
+                    let suspicious = [
+                        ".env",
+                        "id_rsa",
+                        "secret",
+                        "key",
+                        ".pem",
+                        ".p12",
+                        "credentials",
+                    ];
+                    if suspicious.iter().any(|s| name.contains(s)) {
+                        self.push_log(format!(
+                            "[PREVIEW] Refusing to open potentially sensitive file: {}",
+                            arg
+                        ));
+                    } else if !path.exists() || !path.is_file() {
+                        self.push_log(format!("[PREVIEW] File not found or not a file: {}", arg));
+                    } else {
+                        match std::fs::read_to_string(path) {
+                            Ok(content) => {
+                                let lines: Vec<&str> = content.lines().collect();
+                                let max_lines = 200;
+                                let display_content = if lines.len() > max_lines {
+                                    let mut c = lines[..max_lines].join("\n");
+                                    c.push_str(&format!(
+                                        "\n\n... ({} lines truncated)",
+                                        lines.len() - max_lines
+                                    ));
+                                    c
+                                } else {
+                                    content.clone()
+                                };
+                                let redacted = crate::approval::redact_secrets(&display_content);
+                                self.push_log(format!("[PREVIEW] 📄 {}", arg));
+                                self.push_log(format!("[PREVIEW] {} lines", lines.len()));
+                                self.push_log(
+                                    "─────────────────────────────────────────────────────────"
+                                        .to_string(),
+                                );
+                                for line in redacted.lines() {
+                                    self.push_log(line.to_string());
+                                }
+                                self.push_log(
+                                    "─────────────────────────────────────────────────────────"
+                                        .to_string(),
+                                );
+                            }
+                            Err(e) => {
+                                self.push_log(format!(
+                                    "[PREVIEW] Could not read file (might be binary): {}",
+                                    e
+                                ));
+                            }
+                        }
+                    }
+                }
+                true
+            }
+
+            "/changes" | "/git-status" => {
+                let root = std::env::current_dir().unwrap_or_default();
+                if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                    self.push_log(format!("[GIT] Branch: {}", git.branch));
+                    self.push_log(format!(
+                        "[GIT] Status: {}",
+                        if git.is_dirty { "Dirty" } else { "Clean" }
+                    ));
+                    self.push_log(format!("[GIT] Changed files: {}", git.changed_files_count));
+
+                    if git.changed_files_count > 0 {
+                        if let Ok(out) = std::process::Command::new("git")
+                            .args(["status", "-s"])
+                            .current_dir(&root)
+                            .output()
+                        {
+                            let status_text = String::from_utf8_lossy(&out.stdout);
+                            for line in status_text.lines() {
+                                if !line.trim().is_empty() {
+                                    self.push_log(format!("  {}", line));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    self.push_log("[GIT] Not a git repository or git not available.");
+                }
+                true
+            }
+
+            "/diff" => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                if arg.is_empty() {
+                    let root = std::env::current_dir().unwrap_or_default();
+                    if let Ok(out) = std::process::Command::new("git")
+                        .args(["diff", "--stat"])
+                        .current_dir(&root)
+                        .output()
+                    {
+                        let diff_text = String::from_utf8_lossy(&out.stdout);
+                        if diff_text.trim().is_empty() {
+                            self.push_log("[DIFF] No local git changes.");
+                        } else {
+                            self.push_log("[DIFF] Local git changes (stat):".to_string());
+                            for line in diff_text.lines() {
+                                self.push_log(line.to_string());
+                            }
+                            self.push_log(
+                                "[DIFF] Use 'git diff' in a real terminal to see full diffs."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                } else {
+                    let patch_opt = self
+                        .workflow
+                        .patches
+                        .iter()
+                        .find(|p| p.id == arg)
+                        .map(|p| (p.id.clone(), p.file_path.clone(), p.unified_diff.clone()));
+                    if let Some((id, file_path, diff)) = patch_opt {
+                        self.push_log(format!("[DIFF] Patch ID: {}", id));
+                        self.push_log(format!("[DIFF] File: {}", file_path));
+                        self.push_log(
+                            "─────────────────────────────────────────────────────────".to_string(),
+                        );
+                        let redacted = crate::approval::redact_secrets(&diff);
+                        for line in redacted.lines() {
+                            self.push_log(line.to_string());
+                        }
+                        self.push_log(
+                            "─────────────────────────────────────────────────────────".to_string(),
+                        );
+                    } else {
+                        self.push_log(format!("[DIFF] Patch ID '{}' not found.", arg));
                     }
                 }
                 true

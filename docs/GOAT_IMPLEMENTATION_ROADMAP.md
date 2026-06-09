@@ -514,6 +514,29 @@
 - [x] Tasks, Patches, Repo, Skills, Subagents views
 - [x] Global keyboard shortcuts (`Ctrl+1-9`, `Ctrl+P`)
 
+## Phase 3.1: Unified Command System ✅ COMPLETED
+**Goal:** Unified slash commands and command registry
+- [x] Refactored `handle_slash_command` logic
+- [x] CommandRegistry holding all `CommandMetadata`
+- [x] Tab autocompletion logic
+- [x] Slash command suggestion popup overlay
+
+## Phase 3.2: Premium Focus Layout ✅ COMPLETED
+**Goal:** OpenCode-style clean and distraction-free UI
+- [x] Implement LayoutMode (Focus, Dashboard, Compact)
+- [x] `/layout` toggle command
+- [x] Centralized, wide input composer and chat area
+- [x] Premium empty state design
+
+## Phase 3.3: Interactive Repo/File Tree + Patch/Diff UX ✅ COMPLETED
+**Goal:** In-terminal repo browsing and git/diff inspection
+- [x] `RepoMap` tree formatting (`to_tree_lines`)
+- [x] `/repo` command to scan and browse the workspace
+- [x] `/open` / `/preview` for safe, redacted file viewing
+- [x] Patch view diff rendering
+- [x] `/changes` and `/git-status` implementation
+- [x] `/diff` shortcut for both patch diffs and local git diffs
+
 ---
 
 ## Phase 4.0: Daemon + WebSocket API (Planned)
