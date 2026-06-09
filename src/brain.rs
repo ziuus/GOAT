@@ -13,6 +13,8 @@
 
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
+
+use crate::project::ProjectMetadata;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
@@ -114,9 +116,16 @@ impl Brain {
                 size_bytes    INTEGER NOT NULL,
                 modified_unix INTEGER NOT NULL,
                 indexed_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS projects (
+                root_path     TEXT PRIMARY KEY,
+                metadata_json TEXT NOT NULL,
+                last_scan     DATETIME DEFAULT CURRENT_TIMESTAMP
             );",
         )
         .context("failed to initialize brain schema")?;
+
 
         // ── Migration 001: add updated_at if it doesn't exist (safe for old DBs)
         // SQLite does not support ADD COLUMN IF NOT EXISTS, so we use a pragma check.
@@ -182,6 +191,17 @@ impl Brain {
                 (id, title),
             )
             .context("failed to create session")?;
+        Ok(())
+    }
+
+    /// Update the title of an existing session.
+    pub fn update_session_title(&self, id: &str, title: &str) -> Result<()> {
+        self.conn
+            .execute(
+                "UPDATE sessions SET title = ?1 WHERE id = ?2",
+                (title, id),
+            )
+            .context("failed to update session title")?;
         Ok(())
     }
 
@@ -251,6 +271,39 @@ impl Brain {
             [session_id],
         );
         Ok(())
+    }
+
+    // ── Projects ──────────────────────────────────────────────────────────────
+    
+    pub fn save_project(&self, root_path: &str, metadata: &ProjectMetadata) -> Result<()> {
+        let json = serde_json::to_string(metadata)
+            .context("failed to serialize project metadata")?;
+        self.conn
+            .execute(
+                "INSERT INTO projects (root_path, metadata_json, last_scan) 
+                 VALUES (?1, ?2, CURRENT_TIMESTAMP)
+                 ON CONFLICT(root_path) DO UPDATE SET 
+                 metadata_json = excluded.metadata_json, 
+                 last_scan = CURRENT_TIMESTAMP",
+                (root_path, json),
+            )
+            .context("failed to save project metadata")?;
+        Ok(())
+    }
+
+    pub fn get_project(&self, root_path: &str) -> Result<Option<ProjectMetadata>> {
+        let mut stmt = self.conn.prepare("SELECT metadata_json FROM projects WHERE root_path = ?1")
+            .context("failed to prepare project query")?;
+        
+        let mut rows = stmt.query([root_path]).context("failed to query projects")?;
+        if let Some(row) = rows.next().context("failed to read project row")? {
+            let json: String = row.get(0)?;
+            let meta: ProjectMetadata = serde_json::from_str(&json)
+                .context("failed to deserialize project metadata")?;
+            Ok(Some(meta))
+        } else {
+            Ok(None)
+        }
     }
 
     // ── File indexing ─────────────────────────────────────────────────────────

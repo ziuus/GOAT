@@ -9,6 +9,7 @@ mod llm;
 mod mcp;
 mod models;
 mod paths;
+mod project;
 mod provider;
 mod runtime;
 mod swarm;

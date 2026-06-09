@@ -1,7 +1,7 @@
 # GOAT — Feature Matrix
 
-**Last Updated:** 2026-06-08  
-**Current Phase:** 0 (Audit Complete)
+**Last Updated:** 2026-06-09  
+**Current Phase:** 1.7 (Project Awareness & Profile System)
 
 Status legend:
 - `planned` — Designed, not started
@@ -226,14 +226,16 @@ Status legend:
 
 ---
 
-## Voice Prompting
+## Voice Companion / Jarvis Mode (PLANNED)
+
+> **Note:** Voice features are **strictly optional and fully disableable**. They will not be active without explicit user opt-in and permission. These features are slated for a future development phase (Phase 7) and are not currently implemented.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Push-to-talk | `planned` | Phase 7 |
-| Local STT | `planned` | Phase 7 |
-| Remote STT | `planned` | Phase 7 |
-| Voice history | `planned` | Phase 7 |
+| Push-to-talk / Voice trigger | `planned` | Phase 7 |
+| Local STT (Whisper, etc) | `planned` | Phase 7 |
+| Remote STT (OpenAI, etc) | `planned` | Phase 7 |
+| Voice history / TTS responses | `planned` | Phase 7 |
 
 ---
 

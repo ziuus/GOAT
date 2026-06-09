@@ -117,6 +117,14 @@ pub enum Command {
     /// List configured providers, model profiles, and fallback chains.
     #[command(name = "models")]
     Models,
+
+    /// Show project awareness status or scan the current directory.
+    #[command(name = "project")]
+    Project {
+        /// "status" (default) or "scan"
+        #[arg(default_value = "status")]
+        action: String,
+    },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -181,6 +189,10 @@ pub async fn handle_subcommand(
 
         Command::Models => {
             handle_models_command(config);
+            Ok(true)
+        }
+        Command::Project { action } => {
+            handle_project_command(paths, config, action)?;
             Ok(true)
         }
     }
@@ -424,4 +436,53 @@ fn handle_models_command(config: &crate::config::Config) {
     println!("Legend: ✓ = ready  ✗ = key missing  ~ = planned/not-implemented");
     println!("Config:  {}", "~/.config/goat/goat.toml");
     println!("Usage:   goat --profile <name>  |  TUI: /profile <name>  |  /profiles");
+}
+
+fn handle_project_command(
+    paths: &crate::paths::GoatPaths,
+    _config: &crate::config::Config,
+    action: &str,
+) -> anyhow::Result<()> {
+    use crate::brain::Brain;
+    use crate::project::{ProjectScanner, ProjectMetadata};
+    use std::env;
+
+    let root = env::current_dir().unwrap_or_default();
+    let brain = Brain::new(&paths.db_file)?;
+
+    if action == "scan" {
+        println!("Scanning project at {}...", root.display());
+        let scanner = ProjectScanner::new(root.clone());
+        let meta = scanner.scan()?;
+        brain.save_project(root.to_string_lossy().as_ref(), &meta)?;
+        println!("Scan complete.");
+        print_project_summary(&meta);
+    } else {
+        // Status
+        if let Ok(Some(meta)) = brain.get_project(root.to_string_lossy().as_ref()) {
+            println!("Project context found for {}", root.display());
+            print_project_summary(&meta);
+        } else {
+            println!("No project context found for {}", root.display());
+            println!("Run `goat project scan` to index this directory.");
+        }
+    }
+    Ok(())
+}
+
+fn print_project_summary(meta: &crate::project::ProjectMetadata) {
+    println!("{}", "─".repeat(60));
+    println!("Root: {}", meta.root_path.display());
+    println!("Git Repo: {}", if meta.is_git_repo { "Yes" } else { "No" });
+    if !meta.stack.is_empty() {
+        println!("Stack: {}", meta.stack.join(", "));
+    }
+    if !meta.package_files.is_empty() {
+        println!("Packages: {}", meta.package_files.join(", "));
+    }
+    if !meta.detected_commands.is_empty() {
+        println!("Commands: {}", meta.detected_commands.join(", "));
+    }
+    println!("Ignored directories: {}", meta.ignored_dirs_count);
+    println!("{}", "─".repeat(60));
 }

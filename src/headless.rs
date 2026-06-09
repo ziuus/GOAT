@@ -186,6 +186,20 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             );
             println!("[STATUS] History  : {} messages", rt.history.len());
             println!("[STATUS] MCP      : {} server(s)", rt.mcp_server_count);
+
+            // Project context
+            if let Some(ref brain) = rt.brain {
+                use std::env;
+                let root = env::current_dir().unwrap_or_default();
+                if let Ok(Some(meta)) = brain.get_project(root.to_string_lossy().as_ref()) {
+                    println!("[STATUS] Project  : {}", meta.root_path.display());
+                    if !meta.stack.is_empty() {
+                        println!("[STATUS] Stack    : {}", meta.stack.join(", "));
+                    }
+                } else {
+                    println!("[STATUS] Project  : Not scanned (/project scan)");
+                }
+            }
             true
         }
 
@@ -296,6 +310,47 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             std::process::exit(0);
         }
 
+        cmd if cmd.starts_with("/project") => {
+            let arg = parts.get(1).copied().unwrap_or("").trim();
+            let root = std::env::current_dir().unwrap_or_default();
+            if let Some(ref brain) = rt.brain {
+                if arg == "scan" {
+                    println!("[PROJECT] Scanning {}...", root.display());
+                    let scanner = crate::project::ProjectScanner::new(root.clone());
+                    match scanner.scan() {
+                        Ok(meta) => {
+                            let _ = brain.save_project(root.to_string_lossy().as_ref(), &meta);
+                            println!("[PROJECT] Scan complete.");
+                            println!("[PROJECT] Stack: {}", meta.stack.join(", "));
+                            println!("[PROJECT] Ignored dirs: {}", meta.ignored_dirs_count);
+                        }
+                        Err(e) => {
+                            println!("[PROJECT] Scan failed: {}", e);
+                        }
+                    }
+                } else {
+                    match brain.get_project(root.to_string_lossy().as_ref()) {
+                        Ok(Some(meta)) => {
+                            println!("[PROJECT] Root: {}", meta.root_path.display());
+                            println!("[PROJECT] Git: {}", if meta.is_git_repo { "Yes" } else { "No" });
+                            if !meta.stack.is_empty() {
+                                println!("[PROJECT] Stack: {}", meta.stack.join(", "));
+                            }
+                            if !meta.detected_commands.is_empty() {
+                                println!("[PROJECT] Commands: {}", meta.detected_commands.join(", "));
+                            }
+                        }
+                        _ => {
+                            println!("[PROJECT] No project context. Run /project scan.");
+                        }
+                    }
+                }
+            } else {
+                println!("[PROJECT] Brain disabled. Cannot store project context.");
+            }
+            true
+        }
+
         _ => false,
     }
 }
@@ -305,6 +360,14 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
 /// Run a single user-prompt → agent-response turn.
 async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String) {
     println!("[YOU] {}", user_msg);
+
+    let is_first = rt.history.iter().all(|m| m.role != "user");
+    if is_first {
+        if let Some(ref brain) = rt.brain {
+            let title = crate::app::generate_session_title(&user_msg);
+            let _ = brain.update_session_title(&rt.session_id, &title);
+        }
+    }
 
     // Persist to brain.
     if let Some(ref brain) = rt.brain {

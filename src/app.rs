@@ -352,6 +352,20 @@ impl App {
                     "[STATUS] MCP      : {} server(s)",
                     self.mcp_server_count
                 ));
+
+                // Project context
+                if let Some(ref brain) = self.brain {
+                    use std::env;
+                    let root = env::current_dir().unwrap_or_default();
+                    if let Ok(Some(meta)) = brain.get_project(root.to_string_lossy().as_ref()) {
+                        self.push_log(format!("[STATUS] Project  : {}", meta.root_path.display()));
+                        if !meta.stack.is_empty() {
+                            self.push_log(format!("[STATUS] Stack    : {}", meta.stack.join(", ")));
+                        }
+                    } else {
+                        self.push_log("[STATUS] Project  : Not scanned (/project scan)");
+                    }
+                }
                 true
             }
 
@@ -538,6 +552,53 @@ impl App {
                 true
             }
 
+            cmd if cmd.starts_with("/project") => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                let root = std::env::current_dir().unwrap_or_default();
+                let mut output = Vec::new();
+
+                if let Some(ref brain) = self.brain {
+                    if arg == "scan" {
+                        output.push(format!("[PROJECT] Scanning {}...", root.display()));
+                        let scanner = crate::project::ProjectScanner::new(root.clone());
+                        match scanner.scan() {
+                            Ok(meta) => {
+                                let _ = brain.save_project(root.to_string_lossy().as_ref(), &meta);
+                                output.push("[PROJECT] Scan complete.".to_string());
+                                output.push(format!("[PROJECT] Stack: {}", meta.stack.join(", ")));
+                                output.push(format!("[PROJECT] Ignored dirs: {}", meta.ignored_dirs_count));
+                            }
+                            Err(e) => {
+                                output.push(format!("[PROJECT] Scan failed: {}", e));
+                            }
+                        }
+                    } else {
+                        match brain.get_project(root.to_string_lossy().as_ref()) {
+                            Ok(Some(meta)) => {
+                                output.push(format!("[PROJECT] Root: {}", meta.root_path.display()));
+                                output.push(format!("[PROJECT] Git: {}", if meta.is_git_repo { "Yes" } else { "No" }));
+                                if !meta.stack.is_empty() {
+                                    output.push(format!("[PROJECT] Stack: {}", meta.stack.join(", ")));
+                                }
+                                if !meta.detected_commands.is_empty() {
+                                    output.push(format!("[PROJECT] Commands: {}", meta.detected_commands.join(", ")));
+                                }
+                            }
+                            _ => {
+                                output.push("[PROJECT] No project context. Run /project scan.".to_string());
+                            }
+                        }
+                    }
+                } else {
+                    output.push("[PROJECT] Brain disabled. Cannot store project context.".to_string());
+                }
+
+                for line in output {
+                    self.push_log(line);
+                }
+                true
+            }
+
             _ => false,
         }
     }
@@ -634,6 +695,14 @@ impl App {
         }
 
         self.push_log(format!("[YOU] {}", msg));
+
+        let is_first = self.history.iter().all(|m| m.role != "user");
+        if is_first {
+            if let Some(ref brain) = self.brain {
+                let title = crate::app::generate_session_title(&msg);
+                let _ = brain.update_session_title(&self.session_id, &title);
+            }
+        }
 
         if let Some(ref brain) = self.brain {
             let _ = brain.log_interaction(&self.session_id, "user", &msg);
@@ -870,3 +939,22 @@ fn default_index_paths() -> Vec<PathBuf> {
     }
     paths
 }
+
+pub fn generate_session_title(msg: &str) -> String {
+    let mut title = msg.replace('\n', " ").trim().to_string();
+    if title.is_empty() {
+        return "New Session".to_string();
+    }
+    if title.len() > 50 {
+        // Find a space to truncate at nicely, or hard cut
+        if let Some(idx) = title[..50].rfind(' ') {
+            title.truncate(idx);
+            title.push('…');
+        } else {
+            title.truncate(49);
+            title.push('…');
+        }
+    }
+    title
+}
+

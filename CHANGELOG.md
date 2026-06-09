@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 1: Minimal Working Core
 
+### Added — Phase 1.7: Project Awareness & Deterministic Titles (2026-06-09)
+
+**Version bump: 0.5.0 → 0.6.0**
+
+- **Project Awareness:** Added `src/project.rs` with `ProjectScanner` to safely index repo metadata (git status, stack, package files, commands). Skips ignored dirs like `node_modules` or `target`.
+- **Project Database Schema:** Added `projects` table to the SQLite memory (via `Brain`).
+- **Project CLI & Slash Commands:** Added `goat project scan` / `/project scan` and `goat project status` / `/status` additions to display project context.
+- **Deterministic Session Titles:** Sessions now automatically generate a human-readable title based on the user's first message, updating in the `sessions` database table.
+- **Documentation Updates:** Marked Voice Companion / Jarvis Mode clearly as planned/future-only to prevent false feature claims.
+
 ### Added — Phase 1.6: Profile Selection, OpenRouter/Ollama, Retry Config, Session Control (2026-06-09)
 
 **Version bump: 0.4.0 → 0.5.0**

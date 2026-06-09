@@ -2,24 +2,23 @@
 
 **GOAT** (General Omniscient Agentic Tool) is a Rust-first, terminal-first AI agent platform that combines the best features from leading AI agent systems into a single, modular, secure CLI/TUI experience.
 
-**Version:** 0.2 — Phase 1.2 complete (TUI/UX Overhaul + Agent Feature Research)  
-**Status:** Pre-Alpha — compiles, runs, ApprovalGate + modern TUI active  
-**Last Updated:** 2026-06-08
+**Version:** 0.5.0 — Phase 1.7 (Project Awareness & Profile System)  
+**Status:** Pre-Alpha — compiles, runs, ApprovalGate + modern TUI active, Headless mode active  
 
-> Do not use in production. This is pre-alpha software. Features listed as `planned` are not yet implemented.
+> Do not use in production. This is pre-alpha software. Features listed as `planned` (e.g. Voice Companion/Jarvis Mode, Web Dashboard) are NOT yet implemented and are slated for future development phases.
 
 ---
 
 ## What GOAT Will Be
 
-- **Universal LLM provider support** — OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, and more
+- **Universal LLM provider support** — OpenAI, Anthropic (planned), Gemini (planned), Groq, Ollama, OpenRouter
 - **Powerful ReAct agent loop** — plan → act → observe with tool execution, session persistence, and approval gates
-- **Rich terminal TUI** — built with ratatui; no browser required
+- **Rich terminal TUI & Headless modes** — built with ratatui; headless for piping
 - **Memory / Brain** — SQLite-backed session memory, project indexer, and long-term knowledge store
 - **Project awareness** — learns your tech stack, commands, and architecture
 - **Subagent orchestration** — internal specialized agents + external agent adapters (OpenCode, Claude Code, etc.)
 - **Skills / Plugins** — extensible via TOML skill manifests
-- **Voice prompting** — push-to-talk STT input (planned Phase 7)
+- **Voice Companion/Jarvis Mode** — **PLANNED FOR LATER PHASE**. Fully optional, disableable, no microphone listening without permission.
 - **Security-first** — approval gates, audit log, secret redaction, sandboxing
 
 See [`docs/GOAT_PRODUCT_SPEC.md`](docs/GOAT_PRODUCT_SPEC.md) for the full product specification.
@@ -30,20 +29,21 @@ See [`docs/GOAT_PRODUCT_SPEC.md`](docs/GOAT_PRODUCT_SPEC.md) for the full produc
 
 | Component | Status |
 |-----------|--------|
-| `cargo check` | ❌ Fails — missing `src/ui.rs` |
-| `cargo run` | ❌ Does not compile |
+| `cargo check/test` | ✅ Passing |
+| `cargo run` | ✅ Working (TUI & Headless) |
 | Brain (SQLite memory) | ✅ Working |
 | MCP STDIO client | ✅ Working |
-| OpenAI-compatible LLM client | ✅ Working |
-| Groq LLM client | ✅ Working |
-| ReAct agent loop | ✅ Working (unblocked once TUI is restored) |
-| Config loader | ✅ Working |
-| File indexer | ✅ Working |
-| Swarm router (keyword) | ✅ Working |
-| TUI rendering | ❌ Missing `ui.rs` |
-| Approval gates | ❌ Not implemented |
-| Anthropic provider | ❌ Not implemented |
-| Gemini provider | ❌ Not implemented |
+| Provider: OpenAI | ✅ Working |
+| Provider: Groq | ✅ Working |
+| Provider: OpenRouter | ✅ Working |
+| Provider: Ollama | ✅ Working |
+| Provider: Anthropic | ❌ Planned |
+| Provider: Gemini | ❌ Planned |
+| ReAct agent loop | ✅ Working |
+| TUI & Headless modes | ✅ Working |
+| Approval gates | ✅ Working |
+| Project indexer | ✅ Working |
+| Voice/Jarvis Mode | ❌ Planned (Future Phase) |
 
 See [`docs/GOAT_FEATURE_MATRIX.md`](docs/GOAT_FEATURE_MATRIX.md) for the complete feature status table.
 
@@ -64,8 +64,6 @@ git clone https://github.com/ziuus/GOAT.git
 cd GOAT
 cargo build
 ```
-
-> **Note:** This will fail until `src/ui.rs` is restored in Phase 1.
 
 ---
 
