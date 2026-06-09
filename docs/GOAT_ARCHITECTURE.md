@@ -29,7 +29,7 @@ src/
     └── manager.rs    # ReAct agent loop (plan → act → observe)
 ```
 
-**Missing:** `src/ui.rs` — prevents compilation.
+**Missing:** None. The app compiles and includes all core views.
 
 ### 1.2 Current Data Flow
 
@@ -39,7 +39,7 @@ User Input (keyboard)
        ▼
 main.rs event loop
        │
-       ├─► ui::render(f, app)           [MISSING — blocks compilation]
+       ├─► ui::render(f, app)            
        │
        └─► app.handle_user_input(msg)
                  │

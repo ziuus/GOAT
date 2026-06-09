@@ -1,7 +1,7 @@
 # GOAT — Feature Matrix
 
 **Last Updated:** 2026-06-09  
-**Current Phase:** 2.1 (GOAT Skills System)
+**Current Phase:** 3.0 (Advanced TUI)
 
 Status legend:
 - `planned` — Designed, not started
@@ -32,12 +32,12 @@ Status legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| TUI launches (ratatui + crossterm) | `broken` | Blocked by missing `ui.rs` |
-| Logs panel | `broken` | `ui::render` not defined |
-| Input panel | `broken` | `ui::render` not defined |
-| Status bar / agent indicator | `broken` | `ui::render` not defined |
-| Session list panel | `planned` | Phase 2 |
-| File diff view | `planned` | Phase 2 |
+| TUI launches (ratatui + crossterm) | `working` | Complete with multi-pane support |
+| Logs panel | `working` | Chat view implemented |
+| Input panel | `working` | Input composer implemented |
+| Status bar / agent indicator | `working` | Header implemented |
+| Session list panel | `partial` | Sidebar has sessions placeholder |
+| File diff view | `partial` | Patch view diff placeholder |
 | Task timeline | `planned` | Phase 2 |
 | Approval prompt UI | `planned` | Phase 1 (security priority) |
 | Subagent status panel | `planned` | Phase 5 |
@@ -45,11 +45,9 @@ Status legend:
 | Provider/fallback status | `working` | Handled via /status and profiles |
 | Project context panel | `working` | Handled via /status |
 | Token/cost indicator | `planned` | Phase 3 |
-| Keyboard shortcuts (i=insert, q=quit, Esc=normal) | `partial` | Logic in main.rs, but UI missing |
-| MCP start shortcut (c) | `partial` | Logic in main.rs, but UI missing |
-| Learn-about-me shortcut (l) | `partial` | Logic in main.rs, but UI missing |
-| Swarm route shortcut (r) | `partial` | Logic in main.rs, but UI missing |
-| MCP status shortcut (m) | `partial` | Logic in main.rs, but UI missing |
+| Keyboard shortcuts | `working` | Ctrl+1..9 to switch views |
+| MCP start shortcut (c) | `partial` | Logic in main.rs |
+| Command palette shortcut (Ctrl+P) | `working` | Opens palette view |
 
 ---
 

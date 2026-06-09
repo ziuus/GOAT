@@ -501,18 +501,21 @@
 
 ---
 
-## Phase 3.0: Advanced Ratatui TUI ✅ COMPLETED
+## Phase 3.0: Advanced Ratatui TUI (Planned)
 
-**Goal:** Multi-pane layout, command palette, sidebar, diff pane.
+**Goal:** Multi-pane layout, command palette, sidebar, autocomplete, diff pane.
 
-### Completed:
-- [x] Multi-pane layout: chat + context panel + views sidebar
-- [x] Command palette (/palette)
-- [x] View system with commands (`/view <name>`)
-- [x] Dedicated diff viewer placeholder in Patches view
-- [x] Single-pane fallback for narrow terminals
-- [x] Tasks, Patches, Repo, Skills, Subagents views
-- [x] Global keyboard shortcuts (`Ctrl+1-9`, `Ctrl+P`)
+### Planned:
+- [ ] Multi-pane layout: chat + tool log + session sidebar
+- [ ] Command palette (Ctrl+K)
+- [ ] Slash command autocomplete popup
+- [ ] Session sidebar with list/switch
+- [ ] Dedicated diff viewer pane with accept/reject
+- [ ] Multi-line input composer
+- [ ] Repo map pane (tree view)
+- [ ] Memory/skills panel
+- [ ] Animated streaming indicator
+- [ ] Auto-deny timeout for high-risk approvals
 
 ---
 

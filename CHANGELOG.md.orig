@@ -8,6 +8,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 2: GOAT Brain Foundation
 
+### Added — Phase 2.7: Internal Subagent Framework
+
+- **Subagent Registry:** Defined 10 internal subagents (`planner`, `coder`, `reviewer`, `tester`, `debugger`, `documenter`, `researcher`, `security-auditor`, `ui-designer`, `refactorer`) in `src/subagents.rs` with explicit profiles, risk levels, and allowed tools.
+- **Context Isolation:** Subagents receive a limited context budget (task, active skill, memory snapshot, and truncated repo map) to conserve tokens and prevent hallucination.
+- **Subagent Audit Log:** Added `~/.local/share/goat/subagent-audit.log` to track subagent executions and securely log redacted output.
+- **Commands:**
+  - `goat subagents [list|show|audit]` / `/subagents`
+  - `goat ask-agent <name> "<task>"` / `/ask-agent <name> <task>`
+  - Helper shortcuts: `/review`, `/debug`, `/test-plan`
+- **Doctor/Status Integration:** `goat doctor` now checks the subagent registry and audit log. `/status` reports available subagents.
+- **Documentation:** Added `docs/GOAT_SUBAGENTS.md` detailing the internal subagent architecture.
+
 ### Added — Phase 2.4: UI/UX Architecture Review + TUI Polish (2026-06-09)
 
 **Version bump: 0.6.0 → 0.7.0**

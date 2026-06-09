@@ -1,4 +1,4 @@
-use crate::app::{ActiveView, App, AppStatus};
+use crate::app::{App, AppStatus, ActiveView};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -118,70 +118,23 @@ fn render_sidebar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     };
 
     let mut lines = vec![
-        Line::from(Span::styled(
-            " VIEWS",
-            Style::default()
-                .fg(COLOR_HEADER_ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled(" VIEWS", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
         Line::from(""),
         Line::from(Span::raw(view_str(ActiveView::Chat, "Chat (/view chat)"))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Tasks,
-            "Tasks (/view tasks)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::RepoMap,
-            "Repo Map (/view repo)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Patches,
-            "Patches (/view patches)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Tools,
-            "Tools (/view tools)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Memory,
-            "Memory (/view memory)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Skills,
-            "Skills (/view skills)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::Subagents,
-            "Subagents (/view subagents)",
-        ))),
-        Line::from(Span::raw(view_str(
-            ActiveView::ExternalAgents,
-            "External (/view external)",
-        ))),
+        Line::from(Span::raw(view_str(ActiveView::Tasks, "Tasks (/view tasks)"))),
+        Line::from(Span::raw(view_str(ActiveView::RepoMap, "Repo Map (/view repo)"))),
+        Line::from(Span::raw(view_str(ActiveView::Patches, "Patches (/view patches)"))),
+        Line::from(Span::raw(view_str(ActiveView::Tools, "Tools (/view tools)"))),
+        Line::from(Span::raw(view_str(ActiveView::Memory, "Memory (/view memory)"))),
+        Line::from(Span::raw(view_str(ActiveView::Skills, "Skills (/view skills)"))),
+        Line::from(Span::raw(view_str(ActiveView::Subagents, "Subagents (/view subagents)"))),
+        Line::from(Span::raw(view_str(ActiveView::ExternalAgents, "External (/view external)"))),
         Line::from(Span::raw(view_str(ActiveView::Help, "Help (/help)"))),
         Line::from(""),
-        Line::from(Span::styled(
-            " SHORTCUTS",
-            Style::default()
-                .fg(COLOR_HEADER_ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled(" SHORTCUTS", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
         Line::from(""),
-        Line::from(Span::styled(
-            format!(
-                " Session: {}",
-                if app.session_id.len() > 8 {
-                    &app.session_id[..8]
-                } else {
-                    &app.session_id
-                }
-            ),
-            Style::default().fg(COLOR_DIM),
-        )),
-        Line::from(Span::styled(
-            format!(" Profile: {}", app.active_profile),
-            Style::default().fg(COLOR_DIM),
-        )),
+        Line::from(Span::styled(format!(" Session: {}", if app.session_id.len() > 8 { &app.session_id[..8] } else { &app.session_id }), Style::default().fg(COLOR_DIM))),
+        Line::from(Span::styled(format!(" Profile: {}", app.active_profile), Style::default().fg(COLOR_DIM))),
     ];
 
     let block = Block::default()
@@ -194,43 +147,26 @@ fn render_sidebar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
 
 fn render_context_panel(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let mut lines = vec![
-        Line::from(Span::styled(
-            " WORKFLOW",
-            Style::default()
-                .fg(COLOR_HEADER_ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(format!(
-            " Mode: {}",
-            match app.workflow.mode {
-                crate::task::AgentMode::Plan => "PLAN",
-                crate::task::AgentMode::Act => "ACT",
-            }
-        )),
+        Line::from(Span::styled(" WORKFLOW", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
+        Line::from(format!(" Mode: {}", match app.workflow.mode {
+            crate::task::AgentMode::Plan => "PLAN",
+            crate::task::AgentMode::Act => "ACT",
+        })),
     ];
 
     if let Some(task) = &app.workflow.active_task {
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " ACTIVE TASK",
-            Style::default()
-                .fg(COLOR_HEADER_ACCENT)
-                .add_modifier(Modifier::BOLD),
-        )));
+        lines.push(Line::from(Span::styled(" ACTIVE TASK", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))));
         lines.push(Line::from(format!(" Status: {:?}", task.status)));
-        lines.push(Line::from(format!(
-            " Patches: {}",
-            app.workflow.patches.len()
-        )));
+        lines.push(Line::from(format!(" Patches: {}", task.patches.len())));
     } else {
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " No Active Task",
-            Style::default().fg(COLOR_DIM),
-        )));
+        lines.push(Line::from(Span::styled(" No Active Task", Style::default().fg(COLOR_DIM))));
     }
 
     lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(" SECURITY", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(format!(" Mode: {}", app.config.security.approval_mode)));
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -244,7 +180,7 @@ fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     let (title, content) = match app.active_view {
         ActiveView::Tasks => {
             let text = if let Some(t) = &app.workflow.active_task {
-                format!("Task ID: {}\nStatus: {:?}\nDescription:\n{}\n\nPatches: {}", t.id, t.status, t.request, app.workflow.patches.len())
+                format!("Task ID: {}\nStatus: {:?}\nDescription:\n{}\n\nPatches: {}", t.id, t.status, t.description, t.patches.len())
             } else {
                 "No active task. Use /task to start one.".to_string()
             };
@@ -256,11 +192,11 @@ fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         }
         ActiveView::Patches => {
             let text = if let Some(t) = &app.workflow.active_task {
-                if app.workflow.patches.is_empty() {
+                if t.patches.is_empty() {
                     "No patches for current task.".to_string()
                 } else {
                     let mut list = String::new();
-                    for p in &app.workflow.patches {
+                    for p in &t.patches {
                         list.push_str(&format!("- Patch: {}\n  Status: {:?}\n\n", p.id, p.status));
                     }
                     list
@@ -271,7 +207,7 @@ fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             (" Patches ", text)
         }
         ActiveView::Tools => {
-            (" Tools ", format!("Tool Registry Configured\nEnabled: {}\nDefault Timeout: {}s", app.config.tools.enabled, 60))
+            (" Tools ", format!("Tool Registry Configured\nAllow Execution: {}\nDefault Timeout: {}s", app.config.tools.allow_execution, app.config.tools.default_timeout_secs))
         }
         ActiveView::Memory => {
             (" Memory ", "Memory & Context:\n\nUser Profile: USER.md\nProject Memory: MEMORY.md\n(Run /memory to load details into chat)".to_string())
@@ -280,7 +216,7 @@ fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
             (" Skills ", format!("Active Skill: {}\n\n(Run /skills to list all installed skills)", app.active_skill.as_deref().unwrap_or("None")))
         }
         ActiveView::Subagents => {
-            let list = app.subagent_manager.registry.list_all().iter().map(|p| p.name.clone()).collect::<Vec<String>>().join(", ");
+            let list = app.subagent_manager.registry.list_all().join(", ");
             (" Subagents ", format!("Registered Subagents:\n\n{}", list))
         }
         ActiveView::ExternalAgents => {
@@ -305,12 +241,7 @@ fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         .border_style(Style::default().fg(COLOR_BORDER))
         .title(title);
 
-    f.render_widget(
-        Paragraph::new(content)
-            .block(block)
-            .wrap(Wrap { trim: false }),
-        area,
-    );
+    f.render_widget(Paragraph::new(content).block(block).wrap(Wrap { trim: false }), area);
 }
 
 // ── Header bar ────────────────────────────────────────────────────────────────

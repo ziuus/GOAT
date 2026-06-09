@@ -50,21 +50,6 @@ impl AppStatus {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub enum ActiveView {
-    Chat,
-    Tasks,
-    RepoMap,
-    Patches,
-    Tools,
-    Memory,
-    Skills,
-    Subagents,
-    ExternalAgents,
-    Help,
-    CommandPalette,
-}
-
 pub struct App {
     pub running: bool,
     /// Chat and tool log lines, colour-coded in the TUI.
@@ -115,8 +100,6 @@ pub struct App {
     pub subagent_manager: crate::subagents::SubagentManager,
     /// External Agent Manager
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
-    /// Active view for Phase 3.0 UI
-    pub active_view: ActiveView,
 }
 
 impl App {
@@ -199,7 +182,6 @@ impl App {
             tool_registry: rt.tool_registry,
             subagent_manager: rt.subagent_manager,
             external_agent_manager: rt.external_agent_manager,
-            active_view: ActiveView::Chat,
         }
     }
 
@@ -422,35 +404,7 @@ impl App {
         let _args = parts.get(1).copied().unwrap_or("").trim();
 
         match name.as_str() {
-            "/view" => {
-                let view_name = parts.get(1).copied().unwrap_or("").trim().to_lowercase();
-                match view_name.as_str() {
-                    "chat" => self.active_view = ActiveView::Chat,
-                    "tasks" => self.active_view = ActiveView::Tasks,
-                    "repo" => self.active_view = ActiveView::RepoMap,
-                    "patches" => self.active_view = ActiveView::Patches,
-                    "tools" => self.active_view = ActiveView::Tools,
-                    "memory" => self.active_view = ActiveView::Memory,
-                    "skills" => self.active_view = ActiveView::Skills,
-                    "subagents" => self.active_view = ActiveView::Subagents,
-                    "external" => self.active_view = ActiveView::ExternalAgents,
-                    "help" => self.active_view = ActiveView::Help,
-                    _ => {
-                        self.push_log(format!("[SYSTEM] Unknown view '{}'. Valid views: chat, tasks, repo, patches, tools, memory, skills, subagents, external, help", view_name));
-                    }
-                }
-                if self.active_view != ActiveView::Chat {
-                    self.push_log(format!("[SYSTEM] Switched to view: {}", view_name));
-                }
-                true
-            }
-            "/command" | "/palette" => {
-                self.active_view = ActiveView::CommandPalette;
-                self.push_log("[SYSTEM] Opened Command Palette. Use /view chat to return.");
-                true
-            }
             "/help" => {
-                self.active_view = ActiveView::Help;
                 let ver = env!("CARGO_PKG_VERSION");
                 self.push_log(format!("[HELP] 🐐 GOAT v{} — Available Commands", ver));
                 self.push_log("[HELP] ─────────────────────────────────────────────────────────");
@@ -587,13 +541,7 @@ impl App {
                     "[STATUS] Subagents: {} available",
                     self.subagent_manager.registry.list_all().len()
                 ));
-                let ext_count = self
-                    .external_agent_manager
-                    .registry
-                    .adapters
-                    .values()
-                    .filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected)
-                    .count();
+                let ext_count = self.external_agent_manager.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
                 self.push_log(format!(
                     "[STATUS] Ext Agents: {} detected (Enabled: {})",
                     ext_count, self.config.external_agents.enabled
@@ -841,25 +789,16 @@ impl App {
                 let task = parts.get(1).copied().unwrap_or("");
                 self.push_log("[COMPARE] Comparing internal vs external agent approaches...");
                 self.push_log("[COMPARE] Internal agent (coder): working...");
-
+                
                 let task_clone = task.to_string();
                 // Since ask_agent is async, we'd need to spawn a background task for it, similar to other agent calls.
                 // For now, in TUI, let's keep it simple or queue it.
                 // I will omit the full async block to avoid complexity, but output a stub.
                 self.push_log("[COMPARE] Feature /compare-agents requires async dispatch in TUI. Use headless mode for now.");
                 self.push_log("[COMPARE] Checking external agent (aider) synchronously...");
-                match self
-                    .external_agent_manager
-                    .delegate("aider", &task_clone, &self.config)
-                {
-                    Ok(res) => self.push_log(format!(
-                        "[COMPARE] External Response (aider):\n{}",
-                        res.stdout
-                    )),
-                    Err(e) => self.push_log(format!(
-                        "[COMPARE] External agent execution disabled or failed: {}",
-                        e
-                    )),
+                match self.external_agent_manager.delegate("aider", &task_clone, &self.config) {
+                    Ok(res) => self.push_log(format!("[COMPARE] External Response (aider):\n{}", res.stdout)),
+                    Err(e) => self.push_log(format!("[COMPARE] External agent execution disabled or failed: {}", e)),
                 }
                 true
             }
@@ -966,9 +905,7 @@ impl App {
                 match subcommand {
                     "audit" => {
                         if self.paths.external_agent_audit_log_file.exists() {
-                            if let Ok(content) =
-                                std::fs::read_to_string(&self.paths.external_agent_audit_log_file)
-                            {
+                            if let Ok(content) = std::fs::read_to_string(&self.paths.external_agent_audit_log_file) {
                                 for line in content.lines() {
                                     self.push_log(line.to_string());
                                 }
@@ -980,13 +917,7 @@ impl App {
                     "detect" => {
                         self.push_log("[EXTERNAL] Detecting external agents...");
                         self.external_agent_manager.detect_all(&self.config);
-                        let messages: Vec<_> = self
-                            .external_agent_manager
-                            .registry
-                            .list_all()
-                            .into_iter()
-                            .map(|a| format!("[EXTERNAL]   {:<15} - {}", a.name, a.status))
-                            .collect();
+                        let messages: Vec<_> = self.external_agent_manager.registry.list_all().into_iter().map(|a| format!("[EXTERNAL]   {:<15} - {}", a.name, a.status)).collect();
                         for msg in messages {
                             self.push_log(msg);
                         }
@@ -997,10 +928,7 @@ impl App {
                             if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                                 self.push_log("[EXTERNAL] External Agent Runs:");
                                 for line in content.lines() {
-                                    if let Ok(run) = serde_json::from_str::<
-                                        crate::external_agents::ExternalAgentRun,
-                                    >(line)
-                                    {
+                                    if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
                                         self.push_log(format!("[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" }));
                                     }
                                 }
@@ -1010,22 +938,8 @@ impl App {
                         }
                     }
                     _ => {
-                        let messages: Vec<_> = self
-                            .external_agent_manager
-                            .registry
-                            .list_all()
-                            .into_iter()
-                            .map(|a| {
-                                format!(
-                                    "[EXTERNAL]   {:<15} [{}] - {}",
-                                    a.name, a.command_name, a.status
-                                )
-                            })
-                            .collect();
-                        self.push_log(format!(
-                            "[EXTERNAL] GOAT External Agent Registry ({} adapters)",
-                            messages.len()
-                        ));
+                        let messages: Vec<_> = self.external_agent_manager.registry.list_all().into_iter().map(|a| format!("[EXTERNAL]   {:<15} [{}] - {}", a.name, a.command_name, a.status)).collect();
+                        self.push_log(format!("[EXTERNAL] GOAT External Agent Registry ({} adapters)", messages.len()));
                         for msg in messages {
                             self.push_log(msg);
                         }
@@ -1041,18 +955,12 @@ impl App {
                 if jsonl_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                         for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<
-                                crate::external_agents::ExternalAgentRun,
-                            >(line)
-                            {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
                                 if run.id == run_id {
                                     self.push_log(format!("[EXTERNAL] Run ID: {}", run.id));
                                     self.push_log(format!("[EXTERNAL] Agent: {}", run.agent_name));
                                     self.push_log(format!("[EXTERNAL] Mode: {}", run.mode));
-                                    self.push_log(format!(
-                                        "[EXTERNAL] Workspace: {}",
-                                        run.workspace_path.display()
-                                    ));
+                                    self.push_log(format!("[EXTERNAL] Workspace: {}", run.workspace_path.display()));
                                     self.push_log(format!("[EXTERNAL] Task: {}", run.task));
                                     self.push_log(format!("[EXTERNAL] Success: {}", run.success));
                                     found = true;
@@ -1073,17 +981,8 @@ impl App {
                     if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                         self.push_log("[EXTERNAL] External Agent Runs:");
                         for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<
-                                crate::external_agents::ExternalAgentRun,
-                            >(line)
-                            {
-                                self.push_log(format!(
-                                    "[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}",
-                                    run.id,
-                                    run.agent_name,
-                                    run.mode,
-                                    if run.success { "Success" } else { "Failed" }
-                                ));
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                self.push_log(format!("[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" }));
                             }
                         }
                     }
@@ -1100,10 +999,7 @@ impl App {
                     self.push_log(format!("[EXTERNAL] Command: {}", agent.command_name));
                     self.push_log(format!("[EXTERNAL] Status: {}", agent.status));
                     self.push_log(format!("[EXTERNAL] Risk: {}", agent.risk_level));
-                    self.push_log(format!(
-                        "[EXTERNAL] Workspace Behavior: {}",
-                        agent.workspace_behavior
-                    ));
+                    self.push_log(format!("[EXTERNAL] Workspace Behavior: {}", agent.workspace_behavior));
                     if let Some(ref path) = agent.detected_path {
                         self.push_log(format!("[EXTERNAL] Detected Path: {}", path.display()));
                     }
@@ -1122,15 +1018,10 @@ impl App {
                     let name = subparts[0];
                     let task = subparts[1];
                     self.push_log(format!("[EXTERNAL] Delegating to '{}'...", name));
-
-                    let action = self
-                        .tool_registry
-                        .evaluate_action("delegate_external_agent", &self.config.tools);
+                    
+                    let action = self.tool_registry.evaluate_action("delegate_external_agent", &self.config.tools);
                     if let crate::tool_registry::ToolAction::Deny(reason) = action {
-                        self.push_log(format!(
-                            "[EXTERNAL] Delegation denied by tool registry: {}",
-                            reason
-                        ));
+                        self.push_log(format!("[EXTERNAL] Delegation denied by tool registry: {}", reason));
                         return true;
                     }
 
@@ -1141,23 +1032,15 @@ impl App {
                         explanation: None,
                         working_directory: None,
                     };
-
-                    if let Some(crate::approval::ApprovalDecision::Denied(msg)) =
-                        self.approval_gate.check_policy(&req)
-                    {
+                    
+                    if let Some(crate::approval::ApprovalDecision::Denied(msg)) = self.approval_gate.check_policy(&req) {
                         self.push_log(format!("[EXTERNAL] Delegation denied via policy: {}", msg));
                         return true;
                     }
-
-                    match self
-                        .external_agent_manager
-                        .delegate(name, task, &self.config)
-                    {
+                    
+                    match self.external_agent_manager.delegate(name, task, &self.config) {
                         Ok(res) => {
-                            self.push_log(format!(
-                                "[EXTERNAL] Execution finished. Success: {}",
-                                res.success
-                            ));
+                            self.push_log(format!("[EXTERNAL] Execution finished. Success: {}", res.success));
                             for line in res.stdout.lines() {
                                 self.push_log(format!("[EXTERNAL] Stdout: {}", line));
                             }

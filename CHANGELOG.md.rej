@@ -1,0 +1,18 @@
+--- CHANGELOG.md
++++ CHANGELOG.md
+@@ -2,6 +2,15 @@
+ 
+ All notable changes to this project will be documented in this file.
+ 
++## [0.7.0] - Phase 3.0 UI Polish
++- Added advanced multi-pane layout to Ratatui TUI.
++- Added view system with `/view <chat|tasks|repo|patches|tools|memory|skills|subagents|external|help>`.
++- Added command palette foundation with `/palette` and `/command`.
++- Improved task, workflow, subagent, and external agent display panels.
++- Keyboard shortcuts added (`Ctrl+1` through `Ctrl+9` for views, `Ctrl+P` for palette).
++- Graceful fallback to single-pane layout on narrow terminals.
++- Retained ApprovalGate, tools, headless mode, and all backend workflows intact.
++
+ ## [0.6.0] - Phase 2 Framework Complete
+ - Added `ExternalAgentManager` with secure workspace isolation (`isolated-copy`).
+ - Added jsonl audit logging for remote execution.

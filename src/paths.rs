@@ -717,15 +717,35 @@ pub fn run_doctor(
     }
 
     // ── External Agents ────────────────────────────────────────────────────────
-    let mut ext_mgr = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone(), paths.data_dir.clone());
+    let mut ext_mgr = crate::external_agents::ExternalAgentManager::new(
+        paths.external_agent_audit_log_file.clone(),
+        paths.data_dir.clone(),
+    );
     ext_mgr.detect_all(config);
 
-    let detected_count = ext_mgr.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
-    
+    let detected_count = ext_mgr
+        .registry
+        .adapters
+        .values()
+        .filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected)
+        .count();
+
     checks.push(DoctorCheck {
-        status: if config.external_agents.enabled { DoctorStatus::Ok } else { DoctorStatus::Info },
+        status: if config.external_agents.enabled {
+            DoctorStatus::Ok
+        } else {
+            DoctorStatus::Info
+        },
         label: "External Agent Framework".to_string(),
-        detail: format!("{} ({} agents detected)", if config.external_agents.enabled { "Enabled" } else { "Disabled" }, detected_count),
+        detail: format!(
+            "{} ({} agents detected)",
+            if config.external_agents.enabled {
+                "Enabled"
+            } else {
+                "Disabled"
+            },
+            detected_count
+        ),
     });
 
     if paths.external_agent_audit_log_file.exists() {

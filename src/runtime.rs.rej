@@ -1,0 +1,11 @@
+--- runtime.rs
++++ runtime.rs
+@@ -235,7 +235,7 @@
+         }
+ 
+         // External Agents Manager
+-        let mut external_agent_manager = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone());
++        let mut external_agent_manager = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone(), paths.data_dir.clone());
+         external_agent_manager.detect_all(&config);
+ 
+         let run = GoatRuntime {

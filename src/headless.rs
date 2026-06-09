@@ -266,8 +266,14 @@ async fn handle_slash_command(
                 "[STATUS] Subagents: {} available",
                 rt.subagent_manager.registry.list_all().len()
             );
-            
-            let ext_count = rt.external_agent_manager.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
+
+            let ext_count = rt
+                .external_agent_manager
+                .registry
+                .adapters
+                .values()
+                .filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected)
+                .count();
             println!(
                 "[STATUS] Ext Agents: {} detected (Enabled: {})",
                 ext_count, rt.config.external_agents.enabled
@@ -367,9 +373,7 @@ async fn handle_slash_command(
                     let tools = rt.tool_registry.list_all();
                     println!("[TOOLS] GOAT Tool Registry ({} tools)", tools.len());
                     for t in &tools {
-                        let perm = rt
-                            .tool_registry
-                            .get_permission(&t.name, &rt.config.tools);
+                        let perm = rt.tool_registry.get_permission(&t.name, &rt.config.tools);
                         println!("[TOOLS]   {:<15} [{:?}] - {}", t.name, perm, t.description);
                     }
 
@@ -521,7 +525,7 @@ async fn handle_slash_command(
             } else {
                 let name = subparts[0];
                 let task = subparts[1];
-                
+
                 println!("[SUBAGENTS] Asking '{}'...", name);
                 let summary = "Headless context summary... (limited repo map)";
                 match rt
@@ -552,13 +556,15 @@ async fn handle_slash_command(
             } else {
                 let name = subparts[0];
                 let task = subparts[1];
-                
-                let action = rt.tool_registry.evaluate_action("delegate_external_agent", &rt.config.tools);
+
+                let action = rt
+                    .tool_registry
+                    .evaluate_action("delegate_external_agent", &rt.config.tools);
                 if let crate::tool_registry::ToolAction::Deny(reason) = action {
                     println!("[EXTERNAL] Delegation denied by tool registry: {}", reason);
                     return true;
                 }
-                
+
                 let req = crate::approval::ApprovalRequest {
                     tool_name: "delegate_external_agent".to_string(),
                     action_summary: format!("agent: {}, task: {}", name, task),
@@ -566,12 +572,14 @@ async fn handle_slash_command(
                     explanation: None,
                     working_directory: None,
                 };
-                
-                if let Some(crate::approval::ApprovalDecision::Denied(msg)) = rt.approval_gate.check_policy(&req) {
+
+                if let Some(crate::approval::ApprovalDecision::Denied(msg)) =
+                    rt.approval_gate.check_policy(&req)
+                {
                     println!("[EXTERNAL] Delegation denied via policy: {}", msg);
                     return true;
                 }
-                
+
                 println!("[EXTERNAL] Delegating to '{}'...", name);
                 match rt.external_agent_manager.delegate(name, task, &rt.config) {
                     Ok(res) => {
@@ -583,7 +591,9 @@ async fn handle_slash_command(
                     }
                     Err(e) => {
                         println!("[EXTERNAL] Execution failed: {}", e);
-                        println!("[EXTERNAL] (To enable, check your config: allow_execution = true, workspace_mode = \"isolated-copy\")");
+                        println!(
+                            "[EXTERNAL] (To enable, check your config: allow_execution = true, workspace_mode = \"isolated-copy\")"
+                        );
                     }
                 }
             }
@@ -595,18 +605,38 @@ async fn handle_slash_command(
             println!("[COMPARE] Comparing internal vs external agent approaches...");
             println!("[COMPARE] Internal agent (coder): working...");
             let summary = "Headless context summary... (limited repo map)";
-            match rt.subagent_manager.ask_agent("coder", task, summary, active_skill.clone(), None, &rt.llm_router, &rt.model_chain).await {
+            match rt
+                .subagent_manager
+                .ask_agent(
+                    "coder",
+                    task,
+                    summary,
+                    active_skill.clone(),
+                    None,
+                    &rt.llm_router,
+                    &rt.model_chain,
+                )
+                .await
+            {
                 Ok(res) => println!("[COMPARE] Internal Response:\n{}", res),
                 Err(e) => println!("[COMPARE] Internal Error: {}", e),
             }
             println!("[COMPARE] Checking external agent (aider)...");
             if rt.config.external_agents.allow_execution {
-                match rt.external_agent_manager.delegate("aider", task, &rt.config) {
+                match rt
+                    .external_agent_manager
+                    .delegate("aider", task, &rt.config)
+                {
                     Ok(res) => println!("[COMPARE] External Response (aider):\n{}", res.stdout),
-                    Err(e) => println!("[COMPARE] External agent execution disabled or failed: {}", e),
+                    Err(e) => println!(
+                        "[COMPARE] External agent execution disabled or failed: {}",
+                        e
+                    ),
                 }
             } else {
-                println!("[COMPARE] External agent execution is disabled in config. Cannot compare.");
+                println!(
+                    "[COMPARE] External agent execution is disabled in config. Cannot compare."
+                );
             }
             true
         }
@@ -626,7 +656,10 @@ async fn handle_slash_command(
                     if jsonl_path.exists() {
                         if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                             for line in content.lines() {
-                                if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                if let Ok(run) = serde_json::from_str::<
+                                    crate::external_agents::ExternalAgentRun,
+                                >(line)
+                                {
                                     println!("{} | {} | {}", run.id, run.agent_name, run.mode);
                                 }
                             }
@@ -649,7 +682,9 @@ async fn handle_slash_command(
             if jsonl_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                     for line in content.lines() {
-                        if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                        if let Ok(run) =
+                            serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line)
+                        {
                             println!("{} | {} | {}", run.id, run.agent_name, run.mode);
                         }
                     }
@@ -666,9 +701,17 @@ async fn handle_slash_command(
             if jsonl_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                     for line in content.lines() {
-                        if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                        if let Ok(run) =
+                            serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line)
+                        {
                             if run.id == run_id {
-                                println!("Run ID: {}\nAgent: {}\nWorkspace: {}\nTask: {}", run.id, run.agent_name, run.workspace_path.display(), run.task);
+                                println!(
+                                    "Run ID: {}\nAgent: {}\nWorkspace: {}\nTask: {}",
+                                    run.id,
+                                    run.agent_name,
+                                    run.workspace_path.display(),
+                                    run.task
+                                );
                             }
                         }
                     }

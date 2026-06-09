@@ -2,8 +2,8 @@
 
 **GOAT** (General Omniscient Agentic Tool) is a Rust-first, terminal-first AI agent platform that combines the best features from leading AI agent systems into a single, modular, secure CLI/TUI experience.
 
-**Version:** 0.7.0 — Phase 3.0 (Advanced TUI)  
-**Status:** Pre-Alpha — compiles, runs, memory/skills/project context active, multi-pane TUI, headless mode, multi-frontend architecture planned  
+**Version:** 0.7.0 — Phase 2.4 (UI/UX Architecture Review + TUI Polish)  
+**Status:** Pre-Alpha — compiles, runs, memory/skills/project context active, ApprovalGate + polished TUI, headless mode, multi-frontend architecture planned  
 
 > Do not use in production. This is pre-alpha software. Features listed as `planned` (e.g. Voice Companion/Jarvis Mode, Web Dashboard) are NOT yet implemented and are slated for future development phases.
 
@@ -165,8 +165,8 @@ Rolling daily log files are written to `./logs/goat.log.YYYY-MM-DD`.
 | 0 | Audit + documentation | ✅ Complete |
 | 1 | Minimal working core (TUI + approval gates) | ✅ Complete |
 | 2 | GOAT Brain Foundation (Memory) | ✅ Complete |
-| 3 | Advanced Ratatui TUI | ✅ Complete |
-| 4 | Project awareness / Daemon | 📋 Planned |
+| 3 | Model router + fallback | ✅ Complete |
+| 4 | Project awareness | ✅ Complete |
 | 5 | Subagent system | 📋 Planned |
 | 6 | Skills/plugins + MCP | 📋 Planned |
 | 7 | Voice prompting | 📋 Planned |

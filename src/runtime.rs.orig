@@ -235,10 +235,7 @@ impl GoatRuntime {
                 .to_string(),
         );
 
-        let mut external_agent_manager = crate::external_agents::ExternalAgentManager::new(
-            paths.external_agent_audit_log_file.clone(),
-            paths.data_dir.clone(),
-        );
+        let mut external_agent_manager = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone());
         external_agent_manager.detect_all(&config);
 
         let runtime = GoatRuntime {

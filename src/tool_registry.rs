@@ -15,6 +15,7 @@ pub enum ToolCategory {
     Mcp,
     Browser,
     Subagent,
+    ExternalAgent,
     System,
 }
 
@@ -50,6 +51,7 @@ impl std::fmt::Display for ToolCategory {
             ToolCategory::Mcp => "mcp",
             ToolCategory::Browser => "browser",
             ToolCategory::Subagent => "subagent",
+            ToolCategory::ExternalAgent => "external-agent",
             ToolCategory::System => "system",
         };
         write!(f, "{}", s)
@@ -124,6 +126,7 @@ impl ToolRegistry {
             "memory" => &config.permissions.memory,
             "skills" => &config.permissions.skills,
             "subagent" => &config.permissions.subagent,
+            "external_agent" => "ask", // Hardcoded ask for external agents in Phase 2.8
             _ => "ask",
         };
 
@@ -252,15 +255,30 @@ impl ToolRegistry {
 
         self.register(ToolMetadata {
             name: "call_subagent".to_string(),
-            description: "Spawn an external CLI agent and delegate a task. Requires user approval before execution.".to_string(),
+            description: "Invoke an internal subagent (e.g., coder, reviewer) for a specific task."
+                .to_string(),
             category: ToolCategory::Subagent,
-            risk_level: crate::approval::RiskLevel::High,
+            risk_level: crate::approval::RiskLevel::Medium,
             requires_approval: true,
             read_only: false,
             available_in_tui: true,
             available_in_headless: true,
             available_in_agent: true,
             permission_group: "subagent".to_string(),
+        });
+
+        self.register(ToolMetadata {
+            name: "delegate_external_agent".to_string(),
+            description: "Delegate a task to an external agent like OpenCode or Claude Code."
+                .to_string(),
+            category: ToolCategory::ExternalAgent,
+            risk_level: crate::approval::RiskLevel::High,
+            requires_approval: true,
+            read_only: false,
+            available_in_tui: true,
+            available_in_headless: true,
+            available_in_agent: false, // Disabled for internal agents in Phase 2.8
+            permission_group: "external_agent".to_string(),
         });
 
         self.register(ToolMetadata {

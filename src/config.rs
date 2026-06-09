@@ -77,6 +77,9 @@ pub struct Config {
     /// Tools and permissions config.
     #[serde(default)]
     pub tools: ToolsConfig,
+    /// External agent adapters config.
+    #[serde(default)]
+    pub external_agents: ExternalAgentsConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -611,6 +614,57 @@ fn maybe_apply_fallback_key(mut config: Config) -> Config {
         }
     }
     config
+}
+
+// ── External Agents Config ───────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExternalWorkspaceMode {
+    DetectOnly,
+    Readonly,
+    IsolatedCopy,
+    RealWorkspace,
+}
+
+impl std::fmt::Display for ExternalWorkspaceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DetectOnly => write!(f, "detect-only"),
+            Self::Readonly => write!(f, "readonly"),
+            Self::IsolatedCopy => write!(f, "isolated-copy"),
+            Self::RealWorkspace => write!(f, "real-workspace"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ExternalAgentsConfig {
+    pub enabled: bool,
+    pub allow_execution: bool,
+    pub default_timeout_secs: u64,
+    pub workspace_mode: ExternalWorkspaceMode,
+    #[serde(default)]
+    pub agents: HashMap<String, ExternalAgentAdapterConfig>,
+}
+
+impl Default for ExternalAgentsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_execution: false,
+            default_timeout_secs: 120,
+            workspace_mode: ExternalWorkspaceMode::DetectOnly,
+            agents: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ExternalAgentAdapterConfig {
+    pub enabled: bool,
+    pub command: String,
+    pub allow_execution: bool,
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

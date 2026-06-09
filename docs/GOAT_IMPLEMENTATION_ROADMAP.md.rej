@@ -1,0 +1,11 @@
+--- docs/GOAT_IMPLEMENTATION_ROADMAP.md
++++ docs/GOAT_IMPLEMENTATION_ROADMAP.md
+@@ -48,7 +48,7 @@
+ 
+ ### Phase 3: Interface Polish & Ecosystem (v0.8.0) - ACTIVE
+ 
+-- [ ] **Phase 3.0:** Advanced Ratatui TUI (Multi-pane, tree views, OpenCode-like UX) - *Current Target*
++- [x] **Phase 3.0:** Advanced Ratatui TUI (Multi-pane, tree views, OpenCode-like UX)
+ - [ ] **Phase 3.1:** Local Web Dashboard UI (Vue/React over local HTTP API)
+ - [ ] **Phase 3.2:** System Tray / Daemon Background Mode
+ - [ ] **Phase 3.3:** Extension/Plugin API Stabilization

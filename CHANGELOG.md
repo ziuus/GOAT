@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — Phase 3.0: Advanced Ratatui TUI
+## [0.8.0] — Phase 3.0: Advanced Ratatui TUI (2026-06-09)
 
 ### Added — Phase 3.0: Advanced Ratatui TUI
 

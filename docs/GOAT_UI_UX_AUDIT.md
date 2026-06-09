@@ -246,16 +246,13 @@ Approval overlay renders centered on top of the log panel.
 - Session title in header (instead of raw UUID)
 - /help includes all Phase 2.3 commands
 
-### Fix in Phase 3.0 — Advanced Ratatui TUI
-- Multi-pane layout (chat | tool log | sidebar)
-- Command palette (Ctrl+K)
-- Slash command autocomplete popup
-- Session sidebar
-- Diff viewer pane with accept/reject
-- Multi-line input composer
-- Repo map pane (tree view)
-- Memory/skills panel
-- Animated streaming indicator
+### Fix in Phase 3.0 — Advanced Ratatui TUI (COMPLETED)
+- Multi-pane layout (chat | right context | sidebar)
+- Command palette (/palette, /command)
+- View system with `/view <name>` commands (Tasks, Patches, Repo, Skills, Subagents)
+- Diff viewer pane inside Patches view
+- Memory/skills panel views
+- Shortcut keys for navigation (`Ctrl+1-9`, `Ctrl+P`)
 
 ### Fix in Phase 4.0 — Daemon + API
 - WebSocket event streaming

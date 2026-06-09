@@ -231,7 +231,7 @@ LOW risk:       Green border + "🟢 LOW" in green
 
 ---
 
-## 8. Command Palette Design (Phase 3.0 — Planned)
+## 8. Command Palette Design (Phase 3.0 — Completed)
 
 ```
 ┌──── Command Palette  ───────────────────────────────────────┐
@@ -353,7 +353,7 @@ box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.15), 0 4px 32px rgba(0,0,0,0.5);
             └─────────────────────────────────┘
 ```
 
-### Phase 3.0 Multi-Pane TUI (Planned)
+### Phase 3.0 Multi-Pane TUI (Completed)
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║ 🐐 GOAT v0.7.0   profile:coding   openai:gpt-4o   ● READY  ║
@@ -424,7 +424,7 @@ box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.15), 0 4px 32px rgba(0,0,0,0.5);
 | Diff colors | ❌ No +/- colors | ✅ Green/red | Full syntax hl |
 | Approval overlay | ✅ Functional | Improved styling | Full modal |
 | Input | 1 line | + history nav | Multi-line |
-| Session sidebar | ❌ None | ❌ Deferred | ✅ Planned |
-| Command palette | ❌ None | ❌ Deferred | ✅ Planned |
+| Session sidebar | ❌ None | ❌ Deferred | ✅ Sidebar implemented |
+| Command palette | ❌ None | ❌ Deferred | ✅ /palette view |
 | Web dashboard | ❌ None | ❌ Deferred | ❌ Phase 4.1 |
 | Voice UI | ❌ None | ❌ Deferred | ❌ Phase 6.0 |

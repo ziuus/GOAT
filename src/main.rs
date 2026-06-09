@@ -4,6 +4,7 @@ mod brain;
 mod cli;
 pub mod config;
 pub mod error;
+pub mod external_agents;
 pub mod headless;
 pub mod llm;
 pub mod mcp;
@@ -16,7 +17,6 @@ pub mod repo_map;
 pub mod runtime;
 mod skills;
 pub mod subagents;
-pub mod external_agents;
 pub mod swarm;
 pub mod task;
 pub mod tool_registry;
@@ -264,20 +264,40 @@ async fn run_app(
                         KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             let _ = app.handle_slash_command("/clear").await;
                         }
-                        
+
                         // View shortcuts
-                        KeyCode::Char('1') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view chat").await; }
-                        KeyCode::Char('2') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view tasks").await; }
-                        KeyCode::Char('3') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view repo").await; }
-                        KeyCode::Char('4') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view patches").await; }
-                        KeyCode::Char('5') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view tools").await; }
-                        KeyCode::Char('6') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view memory").await; }
-                        KeyCode::Char('7') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view skills").await; }
-                        KeyCode::Char('8') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view subagents").await; }
-                        KeyCode::Char('9') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/view external").await; }
-                        
+                        KeyCode::Char('1') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view chat").await;
+                        }
+                        KeyCode::Char('2') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view tasks").await;
+                        }
+                        KeyCode::Char('3') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view repo").await;
+                        }
+                        KeyCode::Char('4') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view patches").await;
+                        }
+                        KeyCode::Char('5') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view tools").await;
+                        }
+                        KeyCode::Char('6') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view memory").await;
+                        }
+                        KeyCode::Char('7') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view skills").await;
+                        }
+                        KeyCode::Char('8') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view subagents").await;
+                        }
+                        KeyCode::Char('9') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/view external").await;
+                        }
+
                         // Command Palette
-                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => { let _ = app.handle_slash_command("/palette").await; }
+                        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/palette").await;
+                        }
 
                         KeyCode::Char(c) => {
                             app.input.push(c);
