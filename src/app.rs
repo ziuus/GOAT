@@ -50,6 +50,21 @@ impl AppStatus {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum ActiveView {
+    Chat,
+    Tasks,
+    RepoMap,
+    Patches,
+    Tools,
+    Memory,
+    Skills,
+    Subagents,
+    ExternalAgents,
+    Help,
+    CommandPalette,
+}
+
 pub struct App {
     pub running: bool,
     /// Chat and tool log lines, colour-coded in the TUI.
@@ -100,6 +115,8 @@ pub struct App {
     pub subagent_manager: crate::subagents::SubagentManager,
     /// External Agent Manager
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
+    /// Active view for Phase 3.0 UI
+    pub active_view: ActiveView,
 }
 
 impl App {
@@ -182,6 +199,7 @@ impl App {
             tool_registry: rt.tool_registry,
             subagent_manager: rt.subagent_manager,
             external_agent_manager: rt.external_agent_manager,
+            active_view: ActiveView::Chat,
         }
     }
 
@@ -404,7 +422,35 @@ impl App {
         let _args = parts.get(1).copied().unwrap_or("").trim();
 
         match name.as_str() {
+            "/view" => {
+                let view_name = parts.get(1).copied().unwrap_or("").trim().to_lowercase();
+                match view_name.as_str() {
+                    "chat" => self.active_view = ActiveView::Chat,
+                    "tasks" => self.active_view = ActiveView::Tasks,
+                    "repo" => self.active_view = ActiveView::RepoMap,
+                    "patches" => self.active_view = ActiveView::Patches,
+                    "tools" => self.active_view = ActiveView::Tools,
+                    "memory" => self.active_view = ActiveView::Memory,
+                    "skills" => self.active_view = ActiveView::Skills,
+                    "subagents" => self.active_view = ActiveView::Subagents,
+                    "external" => self.active_view = ActiveView::ExternalAgents,
+                    "help" => self.active_view = ActiveView::Help,
+                    _ => {
+                        self.push_log(format!("[SYSTEM] Unknown view '{}'. Valid views: chat, tasks, repo, patches, tools, memory, skills, subagents, external, help", view_name));
+                    }
+                }
+                if self.active_view != ActiveView::Chat {
+                    self.push_log(format!("[SYSTEM] Switched to view: {}", view_name));
+                }
+                true
+            }
+            "/command" | "/palette" => {
+                self.active_view = ActiveView::CommandPalette;
+                self.push_log("[SYSTEM] Opened Command Palette. Use /view chat to return.");
+                true
+            }
             "/help" => {
+                self.active_view = ActiveView::Help;
                 let ver = env!("CARGO_PKG_VERSION");
                 self.push_log(format!("[HELP] 🐐 GOAT v{} — Available Commands", ver));
                 self.push_log("[HELP] ─────────────────────────────────────────────────────────");

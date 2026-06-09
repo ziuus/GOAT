@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 3.0: Advanced Ratatui TUI
+
+### Added — Phase 3.0: Advanced Ratatui TUI
+
+- **Multi-pane Layout:** Refactored TUI to support left sidebar (views/shortcuts), center pane (chat/workspace), and right context panel (workflow/tasks).
+- **View System:** Added `/view <tab>` commands (`chat`, `tasks`, `repo`, `patches`, `tools`, `memory`, `skills`, `subagents`, `external`, `help`).
+- **Command Palette:** Added `/command` and `/palette` commands that display a categorized shortcut list.
+- **Improved Context Displays:** Refactored displays for patches, tasks, and agents in their respective views instead of spamming chat history.
+- **Keyboard Shortcuts:** Added `Ctrl+1` through `Ctrl+9` for view switching and `Ctrl+P` for Command Palette.
+- **Graceful Degradation:** Automatic single-pane fallback for narrow terminals.
+- **Approval Overlay UX:** High/Critical risk commands are now clearly highlighted with red borders inside the approval overlay.
+
 ## [Unreleased] — Phase 2: GOAT Brain Foundation
 
 ### Added — Phase 2.7: Internal Subagent Framework

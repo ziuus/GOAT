@@ -501,7 +501,7 @@
 
 ---
 
-## Phase 3.0: Advanced Ratatui TUI (Planned)
+## Phase 3.0: Advanced Ratatui TUI (Completed)
 
 **Goal:** Multi-pane layout, command palette, sidebar, autocomplete, diff pane.
 

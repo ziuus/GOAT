@@ -1,4 +1,4 @@
-use crate::app::{App, AppStatus};
+use crate::app::{App, AppStatus, ActiveView};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -62,24 +62,184 @@ const COLOR_INPUT_BORDER: Color = Color::Rgb(65, 100, 175);
 // ── Main render entry ─────────────────────────────────────────────────────────
 
 pub fn render(f: &mut Frame, app: &App) {
-    // ── Layout: header (1 line) + log (fill) + input (3 lines) ───────────────
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1), // header bar
-            Constraint::Min(5),    // chat / log panel
+            Constraint::Min(5),    // workspace panel
             Constraint::Length(3), // input composer
         ])
         .split(f.area());
 
     render_header(f, app, rows[0]);
-    render_log(f, app, rows[1]);
+    render_workspace(f, app, rows[1]);
     render_input(f, app, rows[2]);
 
     // Approval overlay floats on top of the log panel when active.
     if let Some(approval_lines) = app.pending_approval_lines() {
         render_approval_overlay(f, &approval_lines, rows[1]);
     }
+}
+
+fn render_workspace(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    // If terminal is narrow, collapse sidebars gracefully
+    if area.width < 100 {
+        match app.active_view {
+            ActiveView::Chat => render_log(f, app, area),
+            _ => render_view(f, app, area),
+        }
+        return;
+    }
+
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(25), // sidebar
+            Constraint::Min(40),    // center panel (chat/view)
+            Constraint::Length(30), // right context panel
+        ])
+        .split(area);
+
+    render_sidebar(f, app, cols[0]);
+    match app.active_view {
+        ActiveView::Chat => render_log(f, app, cols[1]),
+        _ => render_view(f, app, cols[1]),
+    }
+    render_context_panel(f, app, cols[2]);
+}
+
+fn render_sidebar(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    let view_str = |v: ActiveView, label: &str| -> String {
+        if app.active_view == v {
+            format!("> {}", label)
+        } else {
+            format!("  {}", label)
+        }
+    };
+
+    let mut lines = vec![
+        Line::from(Span::styled(" VIEWS", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(Span::raw(view_str(ActiveView::Chat, "Chat (/view chat)"))),
+        Line::from(Span::raw(view_str(ActiveView::Tasks, "Tasks (/view tasks)"))),
+        Line::from(Span::raw(view_str(ActiveView::RepoMap, "Repo Map (/view repo)"))),
+        Line::from(Span::raw(view_str(ActiveView::Patches, "Patches (/view patches)"))),
+        Line::from(Span::raw(view_str(ActiveView::Tools, "Tools (/view tools)"))),
+        Line::from(Span::raw(view_str(ActiveView::Memory, "Memory (/view memory)"))),
+        Line::from(Span::raw(view_str(ActiveView::Skills, "Skills (/view skills)"))),
+        Line::from(Span::raw(view_str(ActiveView::Subagents, "Subagents (/view subagents)"))),
+        Line::from(Span::raw(view_str(ActiveView::ExternalAgents, "External (/view external)"))),
+        Line::from(Span::raw(view_str(ActiveView::Help, "Help (/help)"))),
+        Line::from(""),
+        Line::from(Span::styled(" SHORTCUTS", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(Span::styled(format!(" Session: {}", if app.session_id.len() > 8 { &app.session_id[..8] } else { &app.session_id }), Style::default().fg(COLOR_DIM))),
+        Line::from(Span::styled(format!(" Profile: {}", app.active_profile), Style::default().fg(COLOR_DIM))),
+    ];
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(COLOR_BORDER))
+        .title(" Menu ");
+
+    f.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn render_context_panel(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    let mut lines = vec![
+        Line::from(Span::styled(" WORKFLOW", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))),
+        Line::from(format!(" Mode: {}", match app.workflow.mode {
+            crate::task::AgentMode::Plan => "PLAN",
+            crate::task::AgentMode::Act => "ACT",
+        })),
+    ];
+
+    if let Some(task) = &app.workflow.active_task {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(" ACTIVE TASK", Style::default().fg(COLOR_HEADER_ACCENT).add_modifier(Modifier::BOLD))));
+        lines.push(Line::from(format!(" Status: {:?}", task.status)));
+        lines.push(Line::from(format!(" Patches: {}", app.workflow.patches.len())));
+    } else {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(" No Active Task", Style::default().fg(COLOR_DIM))));
+    }
+
+    lines.push(Line::from(""));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(COLOR_BORDER))
+        .title(" Context ");
+
+    f.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn render_view(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
+    let (title, content) = match app.active_view {
+        ActiveView::Tasks => {
+            let text = if let Some(t) = &app.workflow.active_task {
+                format!("Task ID: {}\nStatus: {:?}\nDescription:\n{}\n\nPatches: {}", t.id, t.status, t.request, app.workflow.patches.len())
+            } else {
+                "No active task. Use /task to start one.".to_string()
+            };
+            (" Tasks ", text)
+        }
+        ActiveView::RepoMap => {
+            let text = "Repository Map Overview:\n(Run /repo-map to update log view)\n\nIn Phase 3.0, full interactive map will be here.\nSee Chat logs for recent maps.".to_string();
+            (" Repo Map ", text)
+        }
+        ActiveView::Patches => {
+            let text = if let Some(t) = &app.workflow.active_task {
+                if app.workflow.patches.is_empty() {
+                    "No patches for current task.".to_string()
+                } else {
+                    let mut list = String::new();
+                    for p in &app.workflow.patches {
+                        list.push_str(&format!("- Patch: {}\n  Status: {:?}\n\n", p.id, p.status));
+                    }
+                    list
+                }
+            } else {
+                "No active task.".to_string()
+            };
+            (" Patches ", text)
+        }
+        ActiveView::Tools => {
+            (" Tools ", format!("Tool Registry Configured\nEnabled: {}\nDefault Timeout: {}s", app.config.tools.enabled, 60))
+        }
+        ActiveView::Memory => {
+            (" Memory ", "Memory & Context:\n\nUser Profile: USER.md\nProject Memory: MEMORY.md\n(Run /memory to load details into chat)".to_string())
+        }
+        ActiveView::Skills => {
+            (" Skills ", format!("Active Skill: {}\n\n(Run /skills to list all installed skills)", app.active_skill.as_deref().unwrap_or("None")))
+        }
+        ActiveView::Subagents => {
+            let list = app.subagent_manager.registry.list_all().iter().map(|p| p.name.clone()).collect::<Vec<String>>().join(", ");
+            (" Subagents ", format!("Registered Subagents:\n\n{}", list))
+        }
+        ActiveView::ExternalAgents => {
+            let agents = app.external_agent_manager.registry.list_all();
+            let mut list = String::new();
+            for a in agents {
+                list.push_str(&format!("- {} [{}] ({})\n", a.name, a.command_name, a.status));
+            }
+            (" External Agents ", format!("Configured Mode: {}\nAllow Execution: {}\n\nDetected:\n{}", app.config.external_agents.workspace_mode.to_string(), app.config.external_agents.allow_execution, list))
+        }
+        ActiveView::Help => {
+            (" Help & Commands ", "Welcome to GOAT AI.\n\nUse /command or /palette to see all available commands.\nUse /view <name> to switch panes.\n\nPress Ctrl+1 (or /view chat) to return to Chat.".to_string())
+        }
+        ActiveView::CommandPalette => {
+            (" Command Palette ", "Categories:\n\n- General: /help, /status, /clear\n- Project: /repo-map\n- Coding: /code, /task, /patch, /verify\n- Memory: /memory, /recall\n- Tools/Agents: /tools, /subagents, /external-agents\n- System: /view, /palette\n\n(Type command in the input composer below to execute)".to_string())
+        }
+        _ => (" View ", "Not implemented.".to_string()),
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(COLOR_BORDER))
+        .title(title);
+
+    f.render_widget(Paragraph::new(content).block(block).wrap(Wrap { trim: false }), area);
 }
 
 // ── Header bar ────────────────────────────────────────────────────────────────
