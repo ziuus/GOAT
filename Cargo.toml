@@ -24,6 +24,8 @@ tracing-appender = "0.2.5"
 tracing-subscriber = "0.3.23"
 uuid = { version = "1.23.2", features = ["v4", "std"] }
 walkdir = "2.5.0"
+chrono = "0.4.45"
+which = "8.0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

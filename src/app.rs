@@ -98,6 +98,8 @@ pub struct App {
     pub tool_registry: crate::tool_registry::ToolRegistry,
     /// Subagent Manager
     pub subagent_manager: crate::subagents::SubagentManager,
+    /// External Agent Manager
+    pub external_agent_manager: crate::external_agents::ExternalAgentManager,
 }
 
 impl App {
@@ -179,6 +181,7 @@ impl App {
             workflow: rt.workflow,
             tool_registry: rt.tool_registry,
             subagent_manager: rt.subagent_manager,
+            external_agent_manager: rt.external_agent_manager,
         }
     }
 
@@ -538,6 +541,11 @@ impl App {
                     "[STATUS] Subagents: {} available",
                     self.subagent_manager.registry.list_all().len()
                 ));
+                let ext_count = self.external_agent_manager.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
+                self.push_log(format!(
+                    "[STATUS] Ext Agents: {} detected (Enabled: {})",
+                    ext_count, self.config.external_agents.enabled
+                ));
                 true
             }
 
@@ -870,6 +878,103 @@ impl App {
                     self.push_log(
                         "[SKILLS] Use /skill <name> to activate a skill for this session.",
                     );
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/external-agents") => {
+                let subcommand = parts.get(1).copied().unwrap_or("list");
+                match subcommand {
+                    "audit" => {
+                        if self.paths.external_agent_audit_log_file.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&self.paths.external_agent_audit_log_file) {
+                                for line in content.lines() {
+                                    self.push_log(line.to_string());
+                                }
+                            }
+                        } else {
+                            self.push_log("[EXTERNAL] No audit log found.");
+                        }
+                    }
+                    "detect" => {
+                        self.push_log("[EXTERNAL] Detecting external agents...");
+                        self.external_agent_manager.detect_all(&self.config);
+                        let messages: Vec<_> = self.external_agent_manager.registry.list_all().into_iter().map(|a| format!("[EXTERNAL]   {:<15} - {}", a.name, a.status)).collect();
+                        for msg in messages {
+                            self.push_log(msg);
+                        }
+                    }
+                    _ => {
+                        let messages: Vec<_> = self.external_agent_manager.registry.list_all().into_iter().map(|a| format!("[EXTERNAL]   {:<15} [{}] - {}", a.name, a.command_name, a.status)).collect();
+                        self.push_log(format!("[EXTERNAL] GOAT External Agent Registry ({} adapters)", messages.len()));
+                        for msg in messages {
+                            self.push_log(msg);
+                        }
+                    }
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/external-agent ") => {
+                let name = parts.get(1).copied().unwrap_or("").trim();
+                if let Some(agent) = self.external_agent_manager.registry.get(name).cloned() {
+                    self.push_log(format!("[EXTERNAL] Name: {}", agent.name));
+                    self.push_log(format!("[EXTERNAL] Command: {}", agent.command_name));
+                    self.push_log(format!("[EXTERNAL] Status: {}", agent.status));
+                    self.push_log(format!("[EXTERNAL] Risk: {}", agent.risk_level));
+                    self.push_log(format!("[EXTERNAL] Workspace Behavior: {}", agent.workspace_behavior));
+                    if let Some(ref path) = agent.detected_path {
+                        self.push_log(format!("[EXTERNAL] Detected Path: {}", path.display()));
+                    }
+                } else {
+                    self.push_log(format!("[EXTERNAL] External agent '{}' not found.", name));
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/delegate-external ") => {
+                let args_str = parts.get(1).copied().unwrap_or("");
+                let subparts: Vec<&str> = args_str.splitn(2, ' ').collect();
+                if subparts.len() < 2 {
+                    self.push_log("[EXTERNAL] Usage: /delegate-external <name> <task>");
+                } else {
+                    let name = subparts[0];
+                    let task = subparts[1];
+                    self.push_log(format!("[EXTERNAL] Delegating to '{}'...", name));
+                    
+                    let action = self.tool_registry.evaluate_action("delegate_external_agent", &self.config.tools);
+                    if let crate::tool_registry::ToolAction::Deny(reason) = action {
+                        self.push_log(format!("[EXTERNAL] Delegation denied by tool registry: {}", reason));
+                        return true;
+                    }
+
+                    let req = crate::approval::ApprovalRequest {
+                        tool_name: "delegate_external_agent".to_string(),
+                        action_summary: format!("agent: {}, task: {}", name, task),
+                        risk_level: crate::approval::RiskLevel::High,
+                        explanation: None,
+                        working_directory: None,
+                    };
+                    
+                    if let Some(crate::approval::ApprovalDecision::Denied(msg)) = self.approval_gate.check_policy(&req) {
+                        self.push_log(format!("[EXTERNAL] Delegation denied via policy: {}", msg));
+                        return true;
+                    }
+                    
+                    match self.external_agent_manager.delegate(name, task, &self.config) {
+                        Ok(res) => {
+                            self.push_log(format!("[EXTERNAL] Execution finished. Success: {}", res.success));
+                            for line in res.stdout.lines() {
+                                self.push_log(format!("[EXTERNAL] Stdout: {}", line));
+                            }
+                            if !res.stderr.is_empty() {
+                                for line in res.stderr.lines() {
+                                    self.push_log(format!("[EXTERNAL] Stderr: {}", line));
+                                }
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[EXTERNAL] Error: {}", e)),
+                    }
                 }
                 true
             }

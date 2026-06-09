@@ -266,6 +266,13 @@ async fn handle_slash_command(
                 "[STATUS] Subagents: {} available",
                 rt.subagent_manager.registry.list_all().len()
             );
+            
+            let ext_count = rt.external_agent_manager.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
+            println!(
+                "[STATUS] Ext Agents: {} detected (Enabled: {})",
+                ext_count, rt.config.external_agents.enabled
+            );
+
             true
         }
 
@@ -514,6 +521,27 @@ async fn handle_slash_command(
             } else {
                 let name = subparts[0];
                 let task = subparts[1];
+                
+                let action = rt.tool_registry.evaluate_action("delegate_external_agent", &rt.config.tools);
+                if let crate::tool_registry::ToolAction::Deny(reason) = action {
+                    println!("[EXTERNAL] Delegation denied by tool registry: {}", reason);
+                    return true;
+                }
+                
+                let req = crate::approval::ApprovalRequest {
+                    tool_name: "delegate_external_agent".to_string(),
+                    action_summary: format!("agent: {}, task: {}", name, task),
+                    risk_level: crate::approval::RiskLevel::High,
+                    explanation: None,
+                    working_directory: None,
+                };
+                
+                // For headless, we could prompt, but slash command implies intent.
+                if let Some(crate::approval::ApprovalDecision::Denied(msg)) = rt.approval_gate.check_policy(&req) {
+                    println!("[EXTERNAL] Delegation denied via policy: {}", msg);
+                    return true;
+                }
+                
                 println!("[SUBAGENTS] Asking '{}'...", name);
                 let summary = "Headless context summary... (limited repo map)";
                 match rt

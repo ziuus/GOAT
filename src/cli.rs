@@ -144,7 +144,26 @@ pub enum Command {
     AskAgent {
         /// The name of the subagent to run.
         name: String,
-        /// The task for the subagent.
+        /// Task for the agent.
+        task: String,
+    },
+
+    /// Manage External Agent Adapters (Phase 2.8).
+    #[command(name = "external-agents")]
+    ExternalAgents {
+        /// Action: list, detect, doctor, audit, show.
+        #[arg(default_value = "list")]
+        action: String,
+        /// Target agent name for 'show'.
+        arg: Option<String>,
+    },
+
+    /// Delegate a task to an external agent.
+    #[command(name = "delegate-external")]
+    DelegateExternal {
+        /// External agent name.
+        agent: String,
+        /// Task summary/prompt.
         task: String,
     },
 
@@ -363,15 +382,37 @@ pub async fn handle_subcommand(
             Ok(true)
         }
         Command::AskAgent { name, task } => {
-            let rt = crate::runtime::GoatRuntime::bootstrap(
+            let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
                 config.clone(),
                 paths.clone(),
                 vec![],
                 false,
                 None,
-            )
-            .0;
+            );
             handle_ask_agent_command(&name, &task, &rt).await?;
+            Ok(true)
+        }
+        Command::ExternalAgents { action, arg } => {
+            let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
+                config.clone(),
+                paths.clone(),
+                vec![],
+                false,
+                None,
+            );
+            handle_external_agents_command(rt, &action, arg.as_deref());
+            Ok(true)
+        }
+
+        Command::DelegateExternal { agent, task } => {
+            let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
+                config.clone(),
+                paths.clone(),
+                vec![],
+                false,
+                None,
+            );
+            handle_delegate_external_command(rt, &agent, &task).await;
             Ok(true)
         }
         Command::Mcp { action } => {
@@ -1320,4 +1361,106 @@ async fn handle_ask_agent_command(
         .await?;
     println!("\nResponse:\n{}\n", result);
     Ok(())
+}
+
+// ── External Agent Commands ───────────────────────────────────────────────────
+
+fn handle_external_agents_command(mut rt: crate::runtime::GoatRuntime, action: &str, arg: Option<&str>) {
+    let mut ext_mgr = rt.external_agent_manager;
+    ext_mgr.detect_all(&rt.config);
+
+    match action {
+        "list" => {
+            let agents = ext_mgr.registry.list_all();
+            println!("GOAT External Agent Registry ({} adapters)", agents.len());
+            for agent in agents {
+                println!(
+                    "  {:<15} [{}] - {}",
+                    agent.name, agent.command_name, agent.status
+                );
+            }
+        }
+        "detect" => {
+            println!("Detecting external agents...");
+            for agent in ext_mgr.registry.list_all() {
+                println!("  {:<15} - {}", agent.name, agent.status);
+            }
+        }
+        "show" => {
+            let name = arg.unwrap_or("");
+            if let Some(agent) = ext_mgr.registry.get(name) {
+                println!("Name: {}", agent.name);
+                println!("Command: {}", agent.command_name);
+                println!("Status: {}", agent.status);
+                println!("Risk: {}", agent.risk_level);
+                println!("Workspace Behavior: {}", agent.workspace_behavior);
+                if let Some(ref path) = agent.detected_path {
+                    println!("Detected Path: {}", path.display());
+                }
+            } else {
+                println!("External agent '{}' not found.", name);
+            }
+        }
+        "audit" => {
+            if rt.paths.external_agent_audit_log_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&rt.paths.external_agent_audit_log_file) {
+                    println!("{}", content);
+                }
+            } else {
+                println!("No external agent audit log found.");
+            }
+        }
+        "doctor" => {
+            let checks = crate::paths::run_doctor(&rt.paths, &rt.config, false);
+            crate::paths::print_doctor_results(&checks);
+        }
+        _ => {
+            println!("Unknown external-agents action: {}", action);
+            println!("Valid actions: list, detect, show <name>, audit, doctor");
+        }
+    }
+}
+
+async fn handle_delegate_external_command(mut rt: crate::runtime::GoatRuntime, name: &str, task: &str) {
+    println!("Delegating task to external agent '{}'...", name);
+    rt.external_agent_manager.detect_all(&rt.config);
+
+    let action = rt.tool_registry.evaluate_action("delegate_external_agent", &rt.config.tools);
+    if let crate::tool_registry::ToolAction::Deny(reason) = action {
+        println!("Delegation denied by tool registry: {}", reason);
+        return;
+    }
+
+    let req = crate::approval::ApprovalRequest {
+        tool_name: "delegate_external_agent".to_string(),
+        action_summary: format!("agent: {}, task: {}", name, task),
+        risk_level: crate::approval::RiskLevel::High,
+        explanation: None,
+        working_directory: None,
+    };
+
+    if let Some(crate::approval::ApprovalDecision::Denied(msg)) = rt.approval_gate.check_policy(&req) {
+
+    match rt.external_agent_manager.delegate(name, task, &rt.config) {
+        Ok(res) => {
+            println!("Execution finished. Success: {}", res.success);
+            println!("Stdout:\n{}", res.stdout);
+            if !res.stderr.is_empty() {
+                println!("Stderr:\n{}", res.stderr);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
+}
+
+    match rt.external_agent_manager.delegate(name, task, &rt.config) {
+        Ok(res) => {
+            println!("Execution finished. Success: {}", res.success);
+            println!("Stdout:\n{}", res.stdout);
+            if !res.stderr.is_empty() {
+                println!("Stderr:\n{}", res.stderr);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
+    }
 }
