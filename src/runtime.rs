@@ -31,6 +31,7 @@ use crate::mcp::McpManager;
 use crate::models::{ModelChain, ProfileRegistry};
 use crate::paths::GoatPaths;
 use crate::swarm::SwarmRouter;
+use crate::task::WorkflowState;
 use tracing::info;
 use uuid::Uuid;
 
@@ -80,6 +81,10 @@ pub struct GoatRuntime {
     pub model_chain: ModelChain,
     /// Number of running MCP servers.
     pub mcp_server_count: usize,
+
+    // ── Workflow state ────────────────────────────────────────────────────────
+    /// Phase 2.5 Agentic Coding workflow state.
+    pub workflow: WorkflowState,
 }
 
 impl GoatRuntime {
@@ -243,6 +248,7 @@ impl GoatRuntime {
             active_profile,
             model_chain,
             mcp_server_count: 0,
+            workflow: WorkflowState::default(),
         };
 
         (runtime, boot_log)

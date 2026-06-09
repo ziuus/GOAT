@@ -120,6 +120,26 @@ fn render_header(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         String::new()
     };
 
+    let mode_str = match app.workflow.mode {
+        crate::task::AgentMode::Plan => " │ 📝 PLAN",
+        crate::task::AgentMode::Act => " │ ⚡ ACT",
+    };
+
+    let task_tag = if let Some(task) = &app.workflow.active_task {
+        let status = match task.status {
+            crate::task::TaskStatus::Planning => "Planning",
+            crate::task::TaskStatus::AwaitingApproval => "Awaiting",
+            crate::task::TaskStatus::PatchProposed => "Patch?",
+            crate::task::TaskStatus::PatchApplied => "Patched",
+            crate::task::TaskStatus::Testing => "Testing",
+            crate::task::TaskStatus::Failed => "Failed",
+            crate::task::TaskStatus::Completed => "Done",
+        };
+        format!(" │ T: {}", status)
+    } else {
+        String::new()
+    };
+
     // Build header spans with distinct styling.
     let spans = vec![
         // Brand mark + version
@@ -138,8 +158,8 @@ fn render_header(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
         ),
         Span::styled(
             format!(
-                " │ {} │ {}{}{} │ ",
-                app.active_profile, app.provider_label, mcp_tag, skill_tag
+                " │ {} │ {}{}{}{}{} │ ",
+                app.active_profile, app.provider_label, mcp_tag, skill_tag, mode_str, task_tag
             ),
             Style::default().fg(COLOR_HEADER_FG).bg(COLOR_HEADER_BG),
         ),

@@ -817,29 +817,51 @@ async fn handle_slash_command(
 
         // ── Patch ────────────────────────────────────────────────────────────
         cmd if cmd.starts_with("/patch") => {
-            let sub = name.split_whitespace().nth(1).unwrap_or("show");
-            match sub {
-                "show" => {
-                    println!("[PATCH] No pending patch in this session.");
-                    println!(
-                        "[PATCH] Diff-before-write is shown automatically when the agent proposes a file write."
-                    );
-                    println!("[PATCH] Full patch queue is planned for Phase 2.4.");
+            let logs = crate::task::handle_patch_command(&mut rt.workflow, &parts);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/task") => {
+            let logs = crate::task::handle_task_command(&mut rt.workflow, &parts[1..]);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/mode") => {
+            let logs = crate::task::handle_mode_command(&mut rt.workflow, &parts[1..]);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/plan") => {
+            let logs = crate::task::handle_plan_command(&mut rt.workflow, &parts[1..]);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/act") => {
+            let logs = crate::task::handle_act_command(&mut rt.workflow, &parts[1..]);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/code") => {
+            let logs = crate::task::handle_code_command(&mut rt.workflow, &parts[1..]);
+            for l in logs { println!("{}", l); }
+            true
+        }
+        cmd if cmd.starts_with("/verify") => {
+            let root = std::env::current_dir().unwrap_or_default();
+            let cmds = crate::repo_map::ProjectCommands::detect(&root);
+            println!("[VERIFY] Verification checks available:");
+            let mut found = false;
+            if let Some(cmd) = &cmds.check { println!("  - check: {}", cmd); found = true; }
+            if let Some(cmd) = &cmds.test { println!("  - test: {}", cmd); found = true; }
+            if let Some(cmd) = &cmds.lint { println!("  - lint: {}", cmd); found = true; }
+            if let Some(cmd) = &cmds.format { println!("  - format: {}", cmd); found = true; }
+            if found {
+                println!("[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate.");
+                if let Some(task) = &mut rt.workflow.active_task {
+                    task.status = crate::task::TaskStatus::Testing;
                 }
-                "apply" => {
-                    println!(
-                        "[PATCH] No pending patch to apply. Propose a file write via the agent first."
-                    );
-                }
-                "discard" => {
-                    println!("[PATCH] No pending patch to discard.");
-                }
-                _ => {
-                    println!(
-                        "[PATCH] Unknown: {}. Use /patch, /patch apply, /patch discard.",
-                        sub
-                    );
-                }
+            } else {
+                println!("[VERIFY] No verification commands detected for this project.");
             }
             true
         }
@@ -912,6 +934,23 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
 
         let memory_manager = crate::memory::MemoryManager::new(&rt.paths, rt.config.memory.clone());
         let mut sys_prompt = route.profile.system_prompt.to_string();
+
+        match rt.workflow.mode {
+            crate::task::AgentMode::Plan => {
+                sys_prompt.push_str("\n\n<workflow_mode>\nCURRENT MODE: PLAN\nYou are in PLAN mode. You MUST NOT execute file writes, run shell commands, or make edits. Your only goal is to produce a structured plan for the user's task. Outline goals, steps, relevant files, risks, and required commands. Then ask the user to switch to ACT mode (/act) to execute.\n</workflow_mode>");
+            }
+            crate::task::AgentMode::Act => {
+                sys_prompt.push_str("\n\n<workflow_mode>\nCURRENT MODE: ACT\nYou are in ACT mode. You may propose file patches (write_file) and run safe commands (run_command). Remember to use ApprovalGate.\n</workflow_mode>");
+            }
+        }
+        if let Some(task) = &rt.workflow.active_task {
+            sys_prompt.push_str(&format!("\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n", task.request, task.status));
+            if let Some(plan) = &task.plan_text {
+                sys_prompt.push_str(&format!("PLAN:\n{}\n", plan));
+            }
+            sys_prompt.push_str("</active_task>");
+        }
+
         let memory_context = memory_manager.build_context(rt.brain.as_ref());
         if !memory_context.is_empty() {
             sys_prompt.push_str("\n\n");
@@ -972,6 +1011,18 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                             let args: Value = serde_json::from_str(&tc.function.arguments)
                                 .unwrap_or(serde_json::json!({}));
 
+                            let mut patch_id = None;
+                            if tc.function.name == "write_file" {
+                                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                                let preview = crate::repo_map::generate_diff_preview(path, content);
+                                let diff_lines = crate::repo_map::format_diff_preview(&preview).join("\n");
+                                patch_id = Some(rt.workflow.add_patch(path.to_string(), content.to_string(), diff_lines));
+                                if let Some(task) = &mut rt.workflow.active_task {
+                                    task.status = crate::task::TaskStatus::PatchProposed;
+                                }
+                            }
+
                             let approval_req = build_approval_request(&tc.function.name, &args);
 
                             if let Some(req) = approval_req {
@@ -984,6 +1035,14 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                         );
                                         let result =
                                             execute_native_tool(&tc.function.name, args).await;
+                                        if let Some(id) = &patch_id {
+                                            if let Some(p) = rt.workflow.get_patch_mut(id) {
+                                                p.status = crate::task::PatchStatus::Applied;
+                                            }
+                                            if let Some(task) = &mut rt.workflow.active_task {
+                                                task.status = crate::task::TaskStatus::PatchApplied;
+                                            }
+                                        }
                                         println!("[TOOL] {}", result);
                                         rt.history.push(Message {
                                             role: "tool".to_string(),
@@ -998,6 +1057,11 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             "[APPROVAL] Auto-denied (session policy): {} — {}",
                                             tc.function.name, reason
                                         );
+                                        if let Some(id) = &patch_id {
+                                            if let Some(p) = rt.workflow.get_patch_mut(id) {
+                                                p.status = crate::task::PatchStatus::Discarded;
+                                            }
+                                        }
                                         rt.history.push(Message {
                                             role: "tool".to_string(),
                                             content: Some(format!(
@@ -1023,6 +1087,14 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                 let result =
                                                     execute_native_tool(&tc.function.name, args)
                                                         .await;
+                                                if let Some(id) = &patch_id {
+                                                    if let Some(p) = rt.workflow.get_patch_mut(id) {
+                                                        p.status = crate::task::PatchStatus::Applied;
+                                                    }
+                                                    if let Some(task) = &mut rt.workflow.active_task {
+                                                        task.status = crate::task::TaskStatus::PatchApplied;
+                                                    }
+                                                }
                                                 println!("[TOOL] {}", result);
                                                 rt.history.push(Message {
                                                     role: "tool".to_string(),
@@ -1037,6 +1109,11 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                     "[APPROVAL] ✗ Denied: {} — {}",
                                                     tc.function.name, reason
                                                 );
+                                                if let Some(id) = &patch_id {
+                                                    if let Some(p) = rt.workflow.get_patch_mut(id) {
+                                                        p.status = crate::task::PatchStatus::Discarded;
+                                                    }
+                                                }
                                                 rt.history.push(Message {
                                                     role: "tool".to_string(),
                                                     content: Some(format!(

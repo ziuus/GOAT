@@ -25,6 +25,7 @@ struct DeferredToolCall {
     name: String,
     args: Value,
     request: ApprovalRequest,
+    patch_id: Option<String>,
 }
 
 /// Application status — shown in the header bar.
@@ -91,6 +92,8 @@ pub struct App {
     /// Current index into input_history when navigating with ↑/↓.
     /// `None` means we are at the live input (not browsing history).
     pub history_idx: Option<usize>,
+    /// Workflow state for Phase 2.5
+    pub workflow: crate::task::WorkflowState,
 }
 
 impl App {
@@ -169,6 +172,7 @@ impl App {
             active_skill: None,
             input_history: Vec::new(),
             history_idx: None,
+            workflow: rt.workflow,
         }
     }
 
@@ -326,6 +330,16 @@ impl App {
                 self.status = AppStatus::ToolRunning(deferred.name.clone());
 
                 let tool_result = execute_native_tool(&deferred.name, deferred.args.clone()).await;
+                
+                if let Some(id) = &deferred.patch_id {
+                    if let Some(p) = self.workflow.get_patch_mut(id) {
+                        p.status = crate::task::PatchStatus::Applied;
+                    }
+                    if let Some(task) = &mut self.workflow.active_task {
+                        task.status = crate::task::TaskStatus::PatchApplied;
+                    }
+                }
+
                 self.push_log(format!("[TOOL] {}", tool_result));
 
                 self.history.push(Message {
@@ -343,6 +357,12 @@ impl App {
                     "[APPROVAL] ✗ Denied: {} — {}",
                     deferred.name, reason
                 ));
+
+                if let Some(id) = &deferred.patch_id {
+                    if let Some(p) = self.workflow.get_patch_mut(id) {
+                        p.status = crate::task::PatchStatus::Discarded;
+                    }
+                }
 
                 self.history.push(Message {
                     role: "tool".to_string(),
@@ -1135,28 +1155,73 @@ impl App {
             }
 
             "/patch" => {
-                let sub = parts.get(1).copied().unwrap_or("").trim();
-                match sub {
-                    "apply" => {
-                        self.push_log("[PATCH] No pending patch to apply.");
-                        self.push_log(
-                            "[PATCH] Patches are created when GOAT proposes a file write.",
-                        );
-                        self.push_log(
-                            "[PATCH] Full patch queue with apply/rollback planned for Phase 2.5.",
-                        );
+                let logs = crate::task::handle_patch_command(&mut self.workflow, &parts);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/task" => {
+                let logs = crate::task::handle_task_command(&mut self.workflow, &parts[1..]);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/mode" => {
+                let logs = crate::task::handle_mode_command(&mut self.workflow, &parts[1..]);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/plan" => {
+                let logs = crate::task::handle_plan_command(&mut self.workflow, &parts[1..]);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/act" => {
+                let logs = crate::task::handle_act_command(&mut self.workflow, &parts[1..]);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/code" => {
+                let logs = crate::task::handle_code_command(&mut self.workflow, &parts[1..]);
+                for l in logs {
+                    self.push_log(l);
+                }
+                true
+            }
+
+            "/verify" => {
+                // To implement verify, we need the runtime. Since App contains runtime components but not the struct itself, 
+                // wait, handle_verify_command requires &mut GoatRuntime, but we are inside App.
+                // I need to adapt the handle_verify_command to not need GoatRuntime if possible.
+                // I'll inline the verify logic here for App, or change handle_verify_command to take active_task.
+                let root = std::env::current_dir().unwrap_or_default();
+                let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                self.push_log("[VERIFY] Verification checks available:".to_string());
+                let mut found = false;
+                if let Some(cmd) = &cmds.check { self.push_log(format!("  - check: {}", cmd)); found = true; }
+                if let Some(cmd) = &cmds.test { self.push_log(format!("  - test: {}", cmd)); found = true; }
+                if let Some(cmd) = &cmds.lint { self.push_log(format!("  - lint: {}", cmd)); found = true; }
+                if let Some(cmd) = &cmds.format { self.push_log(format!("  - format: {}", cmd)); found = true; }
+                if found {
+                    self.push_log("[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate.".to_string());
+                    if let Some(task) = &mut self.workflow.active_task {
+                        task.status = crate::task::TaskStatus::Testing;
                     }
-                    "discard" => {
-                        self.push_log("[PATCH] No pending patch to discard.");
-                    }
-                    _ => {
-                        self.push_log("[PATCH] No pending patch in current session.");
-                        self.push_log("[PATCH] Patches appear when GOAT proposes to write a file.");
-                        self.push_log("[PATCH] Commands: /patch apply · /patch discard");
-                        self.push_log(
-                            "[PATCH] Full patch queue (Phase 2.5) will support multi-file diffs.",
-                        );
-                    }
+                } else {
+                    self.push_log("[VERIFY] No verification commands detected for this project.".to_string());
                 }
                 true
             }
@@ -1322,6 +1387,24 @@ impl App {
             self.status = AppStatus::Thinking;
 
             let mut sys_prompt = route.profile.system_prompt.to_string();
+
+            // Inject Phase 2.5 Workflow state
+            match self.workflow.mode {
+                crate::task::AgentMode::Plan => {
+                    sys_prompt.push_str("\n\n<workflow_mode>\nCURRENT MODE: PLAN\nYou are in PLAN mode. You MUST NOT execute file writes, run shell commands, or make edits. Your only goal is to produce a structured plan for the user's task. Outline goals, steps, relevant files, risks, and required commands. Then ask the user to switch to ACT mode (/act) to execute.\n</workflow_mode>");
+                }
+                crate::task::AgentMode::Act => {
+                    sys_prompt.push_str("\n\n<workflow_mode>\nCURRENT MODE: ACT\nYou are in ACT mode. You may propose file patches (write_file) and run safe commands (run_command). Remember to use ApprovalGate.\n</workflow_mode>");
+                }
+            }
+            if let Some(task) = &self.workflow.active_task {
+                sys_prompt.push_str(&format!("\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n", task.request, task.status));
+                if let Some(plan) = &task.plan_text {
+                    sys_prompt.push_str(&format!("PLAN:\n{}\n", plan));
+                }
+                sys_prompt.push_str("</active_task>");
+            }
+
             let memory_manager =
                 crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
             let memory_context = memory_manager.build_context(self.brain.as_ref());
@@ -1379,6 +1462,18 @@ impl App {
                                 let args: Value = serde_json::from_str(&tc.function.arguments)
                                     .unwrap_or(serde_json::json!({}));
 
+                                let mut patch_id = None;
+                                if tc.function.name == "write_file" {
+                                    let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                                    let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                                    let preview = crate::repo_map::generate_diff_preview(path, content);
+                                    let diff_lines = crate::repo_map::format_diff_preview(&preview).join("\n");
+                                    patch_id = Some(self.workflow.add_patch(path.to_string(), content.to_string(), diff_lines));
+                                    if let Some(task) = &mut self.workflow.active_task {
+                                        task.status = crate::task::TaskStatus::PatchProposed;
+                                    }
+                                }
+
                                 let approval_request =
                                     build_approval_request(&tc.function.name, &args);
 
@@ -1391,6 +1486,14 @@ impl App {
                                             ));
                                             let result =
                                                 execute_native_tool(&tc.function.name, args).await;
+                                            if let Some(id) = &patch_id {
+                                                if let Some(p) = self.workflow.get_patch_mut(id) {
+                                                    p.status = crate::task::PatchStatus::Applied;
+                                                }
+                                                if let Some(task) = &mut self.workflow.active_task {
+                                                    task.status = crate::task::TaskStatus::PatchApplied;
+                                                }
+                                            }
                                             self.push_log(format!("[TOOL] {}", result));
                                             self.history.push(Message {
                                                 role: "tool".to_string(),
@@ -1405,6 +1508,11 @@ impl App {
                                                 "[APPROVAL] Auto-denied (session policy): {} — {}",
                                                 tc.function.name, reason
                                             ));
+                                            if let Some(id) = &patch_id {
+                                                if let Some(p) = self.workflow.get_patch_mut(id) {
+                                                    p.status = crate::task::PatchStatus::Discarded;
+                                                }
+                                            }
                                             self.history.push(Message {
                                                 role: "tool".to_string(),
                                                 content: Some(format!(
@@ -1430,6 +1538,7 @@ impl App {
                                                 name: tc.function.name,
                                                 args,
                                                 request: req,
+                                                patch_id,
                                             });
                                             // Return early — resume after resolve_approval().
                                             return;

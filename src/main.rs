@@ -16,6 +16,7 @@ pub mod repo_map;
 pub mod runtime;
 mod skills;
 pub mod swarm;
+pub mod task;
 mod tools;
 mod ui;
 
