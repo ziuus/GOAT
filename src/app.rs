@@ -1,6 +1,6 @@
 use crate::approval::{
     ApprovalDecision, ApprovalGate, ApprovalRequest, bash_approval_request,
-    call_subagent_approval_request, write_file_approval_request,
+    call_subagent_approval_request,
 };
 use crate::brain::Brain;
 use crate::config::Config;
