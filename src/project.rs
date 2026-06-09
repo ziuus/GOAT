@@ -1,8 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +27,7 @@ impl ProjectScanner {
 
     pub fn scan(&self) -> Result<ProjectMetadata> {
         let is_git_repo = self.root.join(".git").exists();
-        
+
         let mut stack = Vec::new();
         let mut package_files = Vec::new();
         let mut detected_commands = Vec::new();
@@ -58,7 +57,7 @@ impl ProjectScanner {
                 if !stack.contains(&tech.to_string()) {
                     stack.push(tech.to_string());
                 }
-                
+
                 if filename == "Cargo.toml" {
                     detected_commands.push("cargo run".to_string());
                     detected_commands.push("cargo test".to_string());
@@ -79,7 +78,8 @@ impl ProjectScanner {
                     if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
                         for script in scripts.keys() {
                             // Common dev commands
-                            if ["dev", "build", "start", "test", "lint"].contains(&script.as_str()) {
+                            if ["dev", "build", "start", "test", "lint"].contains(&script.as_str())
+                            {
                                 detected_commands.push(format!("npm run {}", script));
                             }
                         }
@@ -100,10 +100,18 @@ impl ProjectScanner {
 
         // 2. Source directories
         let known_src_dirs = vec![
-            "src", "app", "pages", "components", "lib", "crates", "packages", "tests", "docs"
+            "src",
+            "app",
+            "pages",
+            "components",
+            "lib",
+            "crates",
+            "packages",
+            "tests",
+            "docs",
         ];
         let mut source_dirs = Vec::new();
-        
+
         for dir in known_src_dirs {
             let dir_path = self.root.join(dir);
             if dir_path.is_dir() {
@@ -113,10 +121,19 @@ impl ProjectScanner {
 
         // 3. Ignored directories count
         let known_ignore_dirs = vec![
-            "node_modules", "target", "dist", "build", ".next", ".turbo", ".cache", "venv", ".venv", "__pycache__"
+            "node_modules",
+            "target",
+            "dist",
+            "build",
+            ".next",
+            ".turbo",
+            ".cache",
+            "venv",
+            ".venv",
+            "__pycache__",
         ];
         let mut ignored_dirs_count = 0;
-        
+
         for dir in known_ignore_dirs {
             let dir_path = self.root.join(dir);
             if dir_path.is_dir() {

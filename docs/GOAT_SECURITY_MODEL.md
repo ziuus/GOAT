@@ -123,19 +123,20 @@ Planned improvements:
 - Phase 3: Support system keyring via `secret-service` or `keychain` crate
 - Phase 3: Support env-var references in config (`key = "${OPENAI_API_KEY}"`)
 
-### 3.2 Secret Detection (MISSING — Phase 2)
+### 3.2 Secret Detection (✅ IMPLEMENTED FOR MEMORY — Phase 2.0)
 
 Before any of the following, GOAT will scan for patterns resembling API keys, passwords, or tokens:
-- Tool arguments sent to LLM
-- Tool results sent to LLM
-- Memory indexed from files
+- **Memory writes:** `USER.md` and `MEMORY.md` additions are scanned and rejected if secrets are detected.
+- Tool arguments sent to LLM (Planned)
+- Tool results sent to LLM (Planned)
+- Memory indexed from files (Planned)
 
-Patterns to detect:
+Patterns detected (Memory Manager):
 - `sk-` prefixed strings (OpenAI)
-- `Bearer ` tokens
-- `Authorization:` headers
-- `.env` file contents
-- Common password patterns
+- `gsk_` prefixed strings (Groq)
+- `AKIA` prefixed strings (AWS)
+- `-----BEGIN` blocks (RSA/SSH keys)
+- `password=`, `api_key=`, `secret=` patterns
 
 ### 3.3 Log Redaction (MISSING — Phase 2)
 

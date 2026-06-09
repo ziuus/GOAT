@@ -1,7 +1,7 @@
 # GOAT — Feature Matrix
 
 **Last Updated:** 2026-06-09  
-**Current Phase:** 1.7 (Project Awareness & Profile System)
+**Current Phase:** 2.0 (Curated Memory & Safe Context Injection)
 
 Status legend:
 - `planned` — Designed, not started
@@ -17,10 +17,10 @@ Status legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Single-crate Rust binary | `working` | Compiles once `ui.rs` is restored |
+| Single-crate Rust binary | `working` | Compiles cleanly |
 | Cargo workspace (multi-crate) | `planned` | Phase 2+ |
-| `cargo check` passes | `broken` | Missing `src/ui.rs` |
-| `cargo test` passes | `planned` | No tests exist |
+| `cargo check` passes | `working` |  |
+| `cargo test` passes | `working` | 63/63 tests passing |
 | XDG-compliant config path (`~/.config/goat/goat.toml`) | `working` | Auto-creates default |
 | XDG-compliant data path for brain DB | `partial` | DB currently in project root (wrong) |
 | Rolling daily log file | `working` | `logs/goat.log.YYYY-MM-DD` |
@@ -41,9 +41,9 @@ Status legend:
 | Task timeline | `planned` | Phase 2 |
 | Approval prompt UI | `planned` | Phase 1 (security priority) |
 | Subagent status panel | `planned` | Phase 5 |
-| Memory panel | `planned` | Phase 4 |
-| Provider/fallback status | `planned` | Phase 3 |
-| Project context panel | `planned` | Phase 4 |
+| Memory panel | `working` | Memory commands & context injection |
+| Provider/fallback status | `working` | Handled via /status and profiles |
+| Project context panel | `working` | Handled via /status |
 | Token/cost indicator | `planned` | Phase 3 |
 | Keyboard shortcuts (i=insert, q=quit, Esc=normal) | `partial` | Logic in main.rs, but UI missing |
 | MCP start shortcut (c) | `partial` | Logic in main.rs, but UI missing |

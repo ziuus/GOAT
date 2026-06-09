@@ -232,22 +232,19 @@
 ---
 
 
-## Phase 2: TUI Foundation
+## Phase 2: GOAT Brain Foundation (Memory) ✅ COMPLETE
 
-**Goal:** A genuinely useful multi-panel TUI with sessions, diff view, and proper task flow.
+**Goal:** Curated memory, recall, and safe context injection.
 
 ### Tasks:
 
-#### 2.1 TUI Layout System
-- [ ] Implement proper multi-pane layout with resizable panels
-- [ ] Panel switching (Tab key or mouse)
-- [ ] Scrollable log panel
-- [ ] Scrollable chat history panel
-- [ ] Sessions list panel (sidebar)
-
-#### 2.2 Session Management UI
-- [ ] Sessions list: shows all sessions from brain DB
-- [ ] Session switching: select a session and load its history
+#### 2.0 Curated Memory & Safe Context Injection ✅ COMPLETE
+- [x] Memory manager implemented (`src/memory.rs`) for `USER.md` and `MEMORY.md`
+- [x] Context injection into LLM system prompt respecting character budgets
+- [x] Secret protection heuristics to reject API keys and passwords
+- [x] CLI commands (`goat memory ...`, `goat recall`)
+- [x] Slash commands (`/memory`, `/recall`)
+- [x] Doctor checks for memory subsystem status and budgets
 - [ ] New session command
 - [ ] Session rename command
 - [ ] Session delete command

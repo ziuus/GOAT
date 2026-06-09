@@ -59,6 +59,7 @@ pub struct App {
     pub input: String,
     /// Scroll offset for the log panel (lines from bottom).
     pub log_scroll: usize,
+    pub paths: GoatPaths,
     pub brain: Option<Brain>,
     pub llm_router: LlmRouter,
     pub mcp_manager: McpManager,
@@ -83,6 +84,8 @@ pub struct App {
     pub brain_disabled: bool,
     /// Pending approval (Some ↔ approval overlay visible).
     pending_approval: Option<DeferredToolCall>,
+    /// Explicitly activated skill for the session
+    pub active_skill: Option<String>,
 }
 
 impl App {
@@ -127,6 +130,7 @@ impl App {
             status: AppStatus::Ready,
             input: String::new(),
             log_scroll: 0,
+            paths: rt.paths,
             brain: rt.brain,
             llm_router: rt.llm_router,
             mcp_manager: rt.mcp_manager,
@@ -143,6 +147,7 @@ impl App {
             approval_gate: rt.approval_gate,
             brain_disabled,
             pending_approval: None,
+            active_skill: None,
         }
     }
 
@@ -305,6 +310,9 @@ impl App {
                 self.push_log("[HELP]   /clear           — clear the log display");
                 self.push_log("[HELP]   /tools           — list available tools");
                 self.push_log("[HELP]   /sessions        — show session info");
+                self.push_log("[HELP]   /project         — manage project context");
+                self.push_log("[HELP]   /memory          — view or manage curated memory");
+                self.push_log("[HELP]   /recall <query>  — search conversation history");
                 self.push_log("[HELP]");
                 self.push_log("[HELP] Keys:");
                 self.push_log("[HELP]   Enter         — send message");
@@ -353,7 +361,16 @@ impl App {
                     self.mcp_server_count
                 ));
 
-                // Project context
+                // Project & Memory context
+                let memory_manager =
+                    crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                let (u_count, u_max, _) = memory_manager.user_budget_status();
+                let (m_count, m_max, _) = memory_manager.memory_budget_status();
+                self.push_log(format!(
+                    "[STATUS] Memory   : Enabled={}, USER={}/{}, MEMORY={}/{}",
+                    self.config.memory.enabled, u_count, u_max, m_count, m_max
+                ));
+
                 if let Some(ref brain) = self.brain {
                     use std::env;
                     let root = env::current_dir().unwrap_or_default();
@@ -385,6 +402,94 @@ impl App {
             "/route" => {
                 info!("swarm route requested via slash command");
                 self.route_current_input();
+                true
+            }
+
+            "/skills" => {
+                let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                let skills = skill_manager.list_skills();
+                if skills.is_empty() {
+                    self.push_log("[SKILLS] No skills found. Use /skill create <name> to make one.");
+                } else {
+                    self.push_log(format!("[SKILLS] {} available skills:", skills.len()));
+                    for s in skills {
+                        let status = if s.is_suspicious { " [SUSPICIOUS]" } else { "" };
+                        self.push_log(format!("[SKILLS]   - {}{}: {}", s.name, status, s.description));
+                    }
+                    self.push_log("[SKILLS] Use /skill <name> to activate a skill for this session.");
+                }
+                true
+            }
+
+            "/skill" => {
+                let arg = parts.get(1).copied().unwrap_or("").trim();
+                let rest = parts.get(2..).unwrap_or(&[]).join(" ");
+                let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                
+                if arg.is_empty() {
+                    self.push_log("[SKILLS] Active skill:");
+                    if let Some(ref skill) = self.active_skill {
+                        self.push_log(format!("[SKILLS]   {}", skill));
+                        self.push_log("[SKILLS] Use /skill clear to deactivate.");
+                    } else {
+                        self.push_log("[SKILLS]   None");
+                    }
+                } else if arg == "clear" {
+                    self.active_skill = None;
+                    self.push_log("[SKILLS] Active skill cleared.");
+                } else if arg == "path" {
+                    self.push_log(format!("[SKILLS] Directory: {}", skill_manager.skills_dir().display()));
+                } else if arg == "create" {
+                    if rest.is_empty() {
+                        self.push_log("[SKILLS] Usage: /skill create <name>");
+                    } else {
+                        match skill_manager.create_template(&rest) {
+                            Ok(path) => self.push_log(format!("[SKILLS] Created template at {}", path.display())),
+                            Err(e) => self.push_log(format!("[SKILLS] Error creating template: {}", e)),
+                        }
+                    }
+                } else if arg == "search" {
+                    if rest.is_empty() {
+                        self.push_log("[SKILLS] Usage: /skill search <query>");
+                    } else {
+                        let results = skill_manager.search_skills(&rest);
+                        if results.is_empty() {
+                            self.push_log(format!("[SKILLS] No skills match '{}'", rest));
+                        } else {
+                            self.push_log(format!("[SKILLS] {} matches:", results.len()));
+                            for s in results {
+                                self.push_log(format!("[SKILLS]   - {}: {}", s.name, s.description));
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(skill) = skill_manager.get_skill(arg) {
+                        self.active_skill = Some(skill.name.clone());
+                        self.push_log(format!("[SKILLS] Activated skill: {}", skill.name));
+                        if skill.is_suspicious {
+                            self.push_log("[SKILLS] WARNING: This skill contains suspicious patterns!");
+                        }
+                    } else {
+                        self.push_log(format!("[SKILLS] Skill '{}' not found.", arg));
+                    }
+                }
+                true
+            }
+
+            "/save-skill" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                if arg.is_empty() {
+                    self.push_log("[SKILLS] Usage: /save-skill <name>");
+                } else {
+                    let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                    match skill_manager.create_template(&arg) {
+                        Ok(path) => {
+                            self.push_log(format!("[SKILLS] Saved placeholder skill template at {}", path.display()));
+                            self.push_log("[SKILLS] (Auto-summarization from session history is planned for Phase 2.2)");
+                        }
+                        Err(e) => self.push_log(format!("[SKILLS] Error saving skill: {}", e)),
+                    }
+                }
                 true
             }
 
@@ -566,7 +671,10 @@ impl App {
                                 let _ = brain.save_project(root.to_string_lossy().as_ref(), &meta);
                                 output.push("[PROJECT] Scan complete.".to_string());
                                 output.push(format!("[PROJECT] Stack: {}", meta.stack.join(", ")));
-                                output.push(format!("[PROJECT] Ignored dirs: {}", meta.ignored_dirs_count));
+                                output.push(format!(
+                                    "[PROJECT] Ignored dirs: {}",
+                                    meta.ignored_dirs_count
+                                ));
                             }
                             Err(e) => {
                                 output.push(format!("[PROJECT] Scan failed: {}", e));
@@ -575,26 +683,141 @@ impl App {
                     } else {
                         match brain.get_project(root.to_string_lossy().as_ref()) {
                             Ok(Some(meta)) => {
-                                output.push(format!("[PROJECT] Root: {}", meta.root_path.display()));
-                                output.push(format!("[PROJECT] Git: {}", if meta.is_git_repo { "Yes" } else { "No" }));
+                                output
+                                    .push(format!("[PROJECT] Root: {}", meta.root_path.display()));
+                                output.push(format!(
+                                    "[PROJECT] Git: {}",
+                                    if meta.is_git_repo { "Yes" } else { "No" }
+                                ));
                                 if !meta.stack.is_empty() {
-                                    output.push(format!("[PROJECT] Stack: {}", meta.stack.join(", ")));
+                                    output.push(format!(
+                                        "[PROJECT] Stack: {}",
+                                        meta.stack.join(", ")
+                                    ));
                                 }
                                 if !meta.detected_commands.is_empty() {
-                                    output.push(format!("[PROJECT] Commands: {}", meta.detected_commands.join(", ")));
+                                    output.push(format!(
+                                        "[PROJECT] Commands: {}",
+                                        meta.detected_commands.join(", ")
+                                    ));
                                 }
                             }
                             _ => {
-                                output.push("[PROJECT] No project context. Run /project scan.".to_string());
+                                output.push(
+                                    "[PROJECT] No project context. Run /project scan.".to_string(),
+                                );
                             }
                         }
                     }
                 } else {
-                    output.push("[PROJECT] Brain disabled. Cannot store project context.".to_string());
+                    output.push(
+                        "[PROJECT] Brain disabled. Cannot store project context.".to_string(),
+                    );
                 }
 
                 for line in output {
                     self.push_log(line);
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/memory") => {
+                let memory_manager =
+                    crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                let subcommand = parts.get(1).copied().unwrap_or("status");
+                match subcommand {
+                    "status" => {
+                        let (u_count, u_max, u_warn) = memory_manager.user_budget_status();
+                        let (m_count, m_max, m_warn) = memory_manager.memory_budget_status();
+                        self.push_log(format!(
+                            "[MEMORY] USER.md   : {}/{} chars {}",
+                            u_count,
+                            u_max,
+                            if u_warn { "(OVER BUDGET)" } else { "" }
+                        ));
+                        self.push_log(format!(
+                            "[MEMORY] MEMORY.md : {}/{} chars {}",
+                            m_count,
+                            m_max,
+                            if m_warn { "(OVER BUDGET)" } else { "" }
+                        ));
+                        self.push_log(format!(
+                            "[MEMORY] Enabled   : {}",
+                            self.config.memory.enabled
+                        ));
+                    }
+                    "show" => {
+                        self.push_log("--- USER.md ---");
+                        self.push_log(memory_manager.get_user_content().unwrap_or_default());
+                        self.push_log("--- MEMORY.md ---");
+                        self.push_log(memory_manager.get_memory_content().unwrap_or_default());
+                    }
+                    "path" => {
+                        self.push_log(format!("USER.md:   {}", memory_manager.user_file.display()));
+                        self.push_log(format!(
+                            "MEMORY.md: {}",
+                            memory_manager.memory_file.display()
+                        ));
+                    }
+                    "add-user" => {
+                        let text = parts[2..].join(" ");
+                        if text.is_empty() {
+                            self.push_log("[MEMORY] Please provide text: /memory add-user <text>");
+                        } else if let Err(e) = memory_manager.add_user(&text) {
+                            self.push_log(format!("[MEMORY] Error: {}", e));
+                        } else {
+                            self.push_log("[MEMORY] Added to USER.md");
+                        }
+                    }
+                    "add-note" => {
+                        let text = parts[2..].join(" ");
+                        if text.is_empty() {
+                            self.push_log("[MEMORY] Please provide text: /memory add-note <text>");
+                        } else if let Err(e) = memory_manager.add_note(&text) {
+                            self.push_log(format!("[MEMORY] Error: {}", e));
+                        } else {
+                            self.push_log("[MEMORY] Added to MEMORY.md");
+                        }
+                    }
+                    _ => {
+                        self.push_log(format!("[MEMORY] Unknown action: {}. Use status, show, path, add-user, add-note.", subcommand));
+                    }
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/recall") => {
+                let query = parts.get(1..).map(|p| p.join(" ")).unwrap_or_default();
+                if query.is_empty() {
+                    self.push_log("[RECALL] Please provide a query: /recall <text>");
+                    return true;
+                }
+                if let Some(ref brain) = self.brain {
+                    match brain.recall_search(&query) {
+                        Ok(results) if results.is_empty() => {
+                            self.push_log("[RECALL] No results found.")
+                        }
+                        Ok(results) => {
+                            self.push_log(format!("[RECALL] Found {} result(s):", results.len()));
+                            for (idx, (session_id, role, content)) in results.iter().enumerate() {
+                                let snippet = if content.len() > 80 {
+                                    format!("{}...", &content[..77].replace('\n', " "))
+                                } else {
+                                    content.replace('\n', " ")
+                                };
+                                self.push_log(format!(
+                                    "  {}. [{}] {}: {}",
+                                    idx + 1,
+                                    &session_id[..8],
+                                    role,
+                                    snippet
+                                ));
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[RECALL] Error searching brain: {}", e)),
+                    }
+                } else {
+                    self.push_log("[RECALL] Brain is disabled (--no-brain).");
                 }
                 true
             }
@@ -752,9 +975,23 @@ impl App {
             self.active_route = Some(route.clone());
             self.status = AppStatus::Thinking;
 
+            let mut sys_prompt = route.profile.system_prompt.to_string();
+            let memory_manager = crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+            let memory_context = memory_manager.build_context(self.brain.as_ref());
+            if !memory_context.is_empty() {
+                sys_prompt.push_str("\n\n");
+                sys_prompt.push_str(&memory_context);
+            }
+            let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+            let skill_context = skill_manager.build_context(self.active_skill.as_deref());
+            if !skill_context.is_empty() {
+                sys_prompt.push_str("\n\n");
+                sys_prompt.push_str(&skill_context);
+            }
+
             let mut routed_history = vec![Message {
                 role: "system".to_string(),
-                content: Some(route.profile.system_prompt.to_string()),
+                content: Some(sys_prompt),
                 tool_calls: None,
                 tool_call_id: None,
             }];
@@ -957,4 +1194,3 @@ pub fn generate_session_title(msg: &str) -> String {
     }
     title
 }
-

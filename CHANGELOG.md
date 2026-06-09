@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — Phase 2: GOAT Brain Foundation
+
+### Added — Phase 2.0: Curated Memory & Safe Context Injection (2026-06-09)
+
+**Version bump: 0.6.0 → 0.7.0**
+
+- **Curated Memory System:** Introduced `src/memory.rs` and `MemoryManager` to handle local `USER.md` (preferences) and `MEMORY.md` (notes).
+- **Safe Context Injection:** Automatically injects memory notes and user preferences into the LLM system prompt. Configurable via `[memory]` section in `goat.toml` (limits, enabled status).
+- **Secret Protection Heuristics:** Memory files have built-in blocklists for detecting and rejecting common secrets (API keys, passwords, AWS keys) before saving.
+- **Budgeting System:** Soft character limits (configurable, defaults: user 1500, memory 4000 chars) ensure context length stays manageable.
+- **Memory CLI Commands:** Added `goat memory [status|show|path|add-user|add-note]` and `goat recall "<query>"`.
+- **Slash Commands:** Added `/memory` and `/recall` to both TUI and headless modes.
+- **Doctor Check:** `goat doctor` now displays the status and budget warnings for the memory subsystem.
+
+---
+
 ## [Unreleased] — Phase 1: Minimal Working Core
 
 ### Added — Phase 1.7: Project Awareness & Deterministic Titles (2026-06-09)

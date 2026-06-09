@@ -2,8 +2,8 @@
 
 **GOAT** (General Omniscient Agentic Tool) is a Rust-first, terminal-first AI agent platform that combines the best features from leading AI agent systems into a single, modular, secure CLI/TUI experience.
 
-**Version:** 0.5.0 — Phase 1.7 (Project Awareness & Profile System)  
-**Status:** Pre-Alpha — compiles, runs, ApprovalGate + modern TUI active, Headless mode active  
+**Version:** 0.7.0 — Phase 2.0 (Curated Memory & Safe Context Injection)  
+**Status:** Pre-Alpha — compiles, runs, memory injection active, Project Awareness active, ApprovalGate + modern TUI active, Headless mode active  
 
 > Do not use in production. This is pre-alpha software. Features listed as `planned` (e.g. Voice Companion/Jarvis Mode, Web Dashboard) are NOT yet implemented and are slated for future development phases.
 
@@ -43,6 +43,7 @@ See [`docs/GOAT_PRODUCT_SPEC.md`](docs/GOAT_PRODUCT_SPEC.md) for the full produc
 | TUI & Headless modes | ✅ Working |
 | Approval gates | ✅ Working |
 | Project indexer | ✅ Working |
+| Curated Memory System | ✅ Working (USER.md / MEMORY.md) |
 | Voice/Jarvis Mode | ❌ Planned (Future Phase) |
 
 See [`docs/GOAT_FEATURE_MATRIX.md`](docs/GOAT_FEATURE_MATRIX.md) for the complete feature status table.
@@ -119,12 +120,21 @@ cargo run
 
 ---
 
-## Brain Database
+## Brain Database & Memory
 
 GOAT stores sessions, interactions, and indexed file content in a SQLite database.
+Additionally, GOAT uses a curated memory system to safely inject context into the LLM system prompt.
 
-**Target location:** `~/.local/share/goat/goat_brain.db`  
-**Current location:** `./goat_brain.db` in project root (will be fixed in Phase 1)
+**Target Database location:** `~/.local/share/goat/goat_brain.db`  
+**User Preferences:** `~/.local/share/goat/USER.md`  
+**Memory Notes:** `~/.local/share/goat/MEMORY.md`  
+
+### Memory Usage Guide
+- Use `/memory add-user <text>` to add your preferences (e.g. "I prefer Rust code to be heavily documented").
+- Use `/memory add-note <text>` to add project-specific notes or long-term facts.
+- Use `/memory status` to check your current memory budget.
+- Memory files are automatically injected into the agent's context. GOAT respects soft character limits (1500 for USER.md, 4000 for MEMORY.md) to keep contexts manageable.
+- **Privacy & Security:** GOAT uses basic secret protection heuristics to prevent API keys or passwords from being accidentally saved to `USER.md` or `MEMORY.md`. 
 
 ---
 
@@ -153,10 +163,10 @@ Rolling daily log files are written to `./logs/goat.log.YYYY-MM-DD`.
 | Phase | Goal | Status |
 |-------|------|--------|
 | 0 | Audit + documentation | ✅ Complete |
-| 1 | Minimal working core (TUI + approval gates) | 🔄 In progress |
-| 2 | Full TUI foundation | 📋 Planned |
-| 3 | Model router + fallback | 📋 Planned |
-| 4 | Memory + project awareness | 📋 Planned |
+| 1 | Minimal working core (TUI + approval gates) | ✅ Complete |
+| 2 | GOAT Brain Foundation (Memory) | ✅ Complete |
+| 3 | Model router + fallback | ✅ Complete |
+| 4 | Project awareness | ✅ Complete |
 | 5 | Subagent system | 📋 Planned |
 | 6 | Skills/plugins + MCP | 📋 Planned |
 | 7 | Voice prompting | 📋 Planned |

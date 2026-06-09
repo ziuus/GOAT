@@ -44,10 +44,14 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
 
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
+    let mut active_skill: Option<String> = None;
 
     loop {
         // Show the prompt.
         print!("> ");
+        if let Some(ref skill) = active_skill {
+            print!("[{}] ", skill);
+        }
         io::stdout().flush().ok();
 
         // Read a line from stdin.
@@ -58,31 +62,31 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
                 break;
             }
             None => {
-                // EOF (Ctrl+D)
-                println!("\n[GOAT] EOF received — goodbye!");
-                break;
-            }
-        };
+        // EOF (Ctrl+D)
+        println!("\n[GOAT] EOF received — goodbye!");
+        break;
+    }
+};
 
-        let input = line.trim().to_string();
-        if input.is_empty() {
-            continue;
-        }
+let input = line.trim().to_string();
+if input.is_empty() {
+    continue;
+}
 
-        // Handle built-in headless commands (subset of slash commands).
-        if input.starts_with('/') {
-            if handle_slash_command(&input, &mut rt).await {
-                continue;
-            }
-            println!(
-                "[GOAT] Unknown command '{}'. Type /help for available commands.",
-                input
-            );
-            continue;
-        }
+// Handle built-in headless commands (subset of slash commands).
+if input.starts_with('/') {
+    if handle_slash_command(&input, &mut rt, &mut active_skill).await {
+        continue;
+    }
+    println!(
+        "[GOAT] Unknown command '{}'. Type /help for available commands.",
+        input
+    );
+    continue;
+}
 
-        // Run the agent loop for this prompt.
-        run_agent_turn(&mut rt, input).await;
+// Run the agent loop for this prompt.
+run_agent_turn(&mut rt, input, active_skill.as_deref()).await;
     }
 
     // Shutdown MCP servers on exit.
@@ -138,7 +142,7 @@ fn print_banner(rt: &GoatRuntime) {
 // ── Slash command handling (headless subset) ──────────────────────────────────
 
 /// Handle headless slash commands.  Returns `true` if the command was handled.
-async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
+async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mut Option<String>) -> bool {
     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
     let name = parts[0].to_lowercase();
 
@@ -154,6 +158,9 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             println!("[HELP]   /clear           — clear screen and reset");
             println!("[HELP]   /sessions        — list recent sessions");
             println!("[HELP]   /tools           — list available tools");
+            println!("[HELP]   /project         — manage project context");
+            println!("[HELP]   /memory          — view or manage curated memory");
+            println!("[HELP]   /recall <query>  — search conversation history");
             println!("[HELP]   /exit            — exit GOAT headless");
             println!("[HELP]");
             println!("[HELP] Approval (when prompted):");
@@ -187,7 +194,16 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             println!("[STATUS] History  : {} messages", rt.history.len());
             println!("[STATUS] MCP      : {} server(s)", rt.mcp_server_count);
 
-            // Project context
+            // Project & Memory context
+            let memory_manager =
+                crate::memory::MemoryManager::new(&rt.paths, rt.config.memory.clone());
+            let (u_count, u_max, _) = memory_manager.user_budget_status();
+            let (m_count, m_max, _) = memory_manager.memory_budget_status();
+            println!(
+                "[STATUS] Memory   : Enabled={}, USER={}/{}, MEMORY={}/{}",
+                rt.config.memory.enabled, u_count, u_max, m_count, m_max
+            );
+
             if let Some(ref brain) = rt.brain {
                 use std::env;
                 let root = env::current_dir().unwrap_or_default();
@@ -332,12 +348,18 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
                     match brain.get_project(root.to_string_lossy().as_ref()) {
                         Ok(Some(meta)) => {
                             println!("[PROJECT] Root: {}", meta.root_path.display());
-                            println!("[PROJECT] Git: {}", if meta.is_git_repo { "Yes" } else { "No" });
+                            println!(
+                                "[PROJECT] Git: {}",
+                                if meta.is_git_repo { "Yes" } else { "No" }
+                            );
                             if !meta.stack.is_empty() {
                                 println!("[PROJECT] Stack: {}", meta.stack.join(", "));
                             }
                             if !meta.detected_commands.is_empty() {
-                                println!("[PROJECT] Commands: {}", meta.detected_commands.join(", "));
+                                println!(
+                                    "[PROJECT] Commands: {}",
+                                    meta.detected_commands.join(", ")
+                                );
                             }
                         }
                         _ => {
@@ -351,6 +373,193 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
             true
         }
 
+        "/memory" => {
+            let memory_manager =
+                crate::memory::MemoryManager::new(&rt.paths, rt.config.memory.clone());
+            let subcommand = parts.get(1).copied().unwrap_or("status");
+            match subcommand {
+                "status" => {
+                    let (u_count, u_max, u_warn) = memory_manager.user_budget_status();
+                    let (m_count, m_max, m_warn) = memory_manager.memory_budget_status();
+                    println!(
+                        "[MEMORY] USER.md   : {}/{} chars {}",
+                        u_count,
+                        u_max,
+                        if u_warn { "(OVER BUDGET)" } else { "" }
+                    );
+                    println!(
+                        "[MEMORY] MEMORY.md : {}/{} chars {}",
+                        m_count,
+                        m_max,
+                        if m_warn { "(OVER BUDGET)" } else { "" }
+                    );
+                    println!("[MEMORY] Enabled   : {}", rt.config.memory.enabled);
+                }
+                "show" => {
+                    println!("--- USER.md ---");
+                    println!("{}", memory_manager.get_user_content().unwrap_or_default());
+                    println!("--- MEMORY.md ---");
+                    println!(
+                        "{}",
+                        memory_manager.get_memory_content().unwrap_or_default()
+                    );
+                }
+                "path" => {
+                    println!("USER.md:   {}", memory_manager.user_file.display());
+                    println!("MEMORY.md: {}", memory_manager.memory_file.display());
+                }
+                "add-user" => {
+                    let text = parts[2..].join(" ");
+                    if text.is_empty() {
+                        println!("[MEMORY] Please provide text: /memory add-user <text>");
+                    } else if let Err(e) = memory_manager.add_user(&text) {
+                        println!("[MEMORY] Error: {}", e);
+                    } else {
+                        println!("[MEMORY] Added to USER.md");
+                    }
+                }
+                "add-note" => {
+                    let text = parts[2..].join(" ");
+                    if text.is_empty() {
+                        println!("[MEMORY] Please provide text: /memory add-note <text>");
+                    } else if let Err(e) = memory_manager.add_note(&text) {
+                        println!("[MEMORY] Error: {}", e);
+                    } else {
+                        println!("[MEMORY] Added to MEMORY.md");
+                    }
+                }
+                _ => {
+                    println!(
+                        "[MEMORY] Unknown action: {}. Use status, show, path, add-user, add-note.",
+                        subcommand
+                    );
+                }
+            }
+            true
+        }
+
+        "/skills" => {
+            let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+            let skills = skill_manager.list_skills();
+            if skills.is_empty() {
+                println!("[SKILLS] No skills found. Use /skill create <name> to make one.");
+            } else {
+                println!("[SKILLS] {} available skills:", skills.len());
+                for s in skills {
+                    let status = if s.is_suspicious { " [SUSPICIOUS]" } else { "" };
+                    println!("[SKILLS]   - {}{}: {}", s.name, status, s.description);
+                }
+                println!("[SKILLS] Use /skill <name> to activate a skill for this session.");
+            }
+            true
+        }
+
+        "/skill" => {
+            let arg = parts.get(1).copied().unwrap_or("").trim();
+            let rest = parts.get(2..).unwrap_or(&[]).join(" ");
+            let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+            
+            if arg.is_empty() {
+                println!("[SKILLS] Active skill:");
+                if let Some(skill) = active_skill {
+                    println!("[SKILLS]   {}", skill);
+                    println!("[SKILLS] Use /skill clear to deactivate.");
+                } else {
+                    println!("[SKILLS]   None");
+                }
+            } else if arg == "clear" {
+                *active_skill = None;
+                println!("[SKILLS] Active skill cleared.");
+            } else if arg == "path" {
+                println!("[SKILLS] Directory: {}", skill_manager.skills_dir().display());
+            } else if arg == "create" {
+                if rest.is_empty() {
+                    println!("[SKILLS] Usage: /skill create <name>");
+                } else {
+                    match skill_manager.create_template(&rest) {
+                        Ok(path) => println!("[SKILLS] Created template at {}", path.display()),
+                        Err(e) => println!("[SKILLS] Error creating template: {}", e),
+                    }
+                }
+            } else if arg == "search" {
+                if rest.is_empty() {
+                    println!("[SKILLS] Usage: /skill search <query>");
+                } else {
+                    let results = skill_manager.search_skills(&rest);
+                    if results.is_empty() {
+                        println!("[SKILLS] No skills match '{}'", rest);
+                    } else {
+                        println!("[SKILLS] {} matches:", results.len());
+                        for s in results {
+                            println!("[SKILLS]   - {}: {}", s.name, s.description);
+                        }
+                    }
+                }
+            } else {
+                if let Some(skill) = skill_manager.get_skill(arg) {
+                    *active_skill = Some(skill.name.clone());
+                    println!("[SKILLS] Activated skill: {}", skill.name);
+                    if skill.is_suspicious {
+                        println!("[SKILLS] WARNING: This skill contains suspicious patterns!");
+                    }
+                } else {
+                    println!("[SKILLS] Skill '{}' not found.", arg);
+                }
+            }
+            true
+        }
+
+        "/save-skill" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg.is_empty() {
+                println!("[SKILLS] Usage: /save-skill <name>");
+            } else {
+                let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+                match skill_manager.create_template(&arg) {
+                    Ok(path) => {
+                        println!("[SKILLS] Saved placeholder skill template at {}", path.display());
+                        println!("[SKILLS] (Auto-summarization from session history is planned for Phase 2.2)");
+                    }
+                    Err(e) => println!("[SKILLS] Error saving skill: {}", e),
+                }
+            }
+            true
+        }
+
+        "/recall" => {
+            let query = parts.get(1..).map(|p| p.join(" ")).unwrap_or_default();
+            if query.is_empty() {
+                println!("[RECALL] Please provide a query: /recall <text>");
+                return true;
+            }
+            if let Some(ref brain) = rt.brain {
+                match brain.recall_search(&query) {
+                    Ok(results) if results.is_empty() => println!("[RECALL] No results found."),
+                    Ok(results) => {
+                        println!("[RECALL] Found {} result(s):", results.len());
+                        for (idx, (session_id, role, content)) in results.iter().enumerate() {
+                            let snippet = if content.len() > 80 {
+                                format!("{}...", &content[..77].replace('\n', " "))
+                            } else {
+                                content.replace('\n', " ")
+                            };
+                            println!(
+                                "  {}. [{}] {}: {}",
+                                idx + 1,
+                                &session_id[..8],
+                                role,
+                                snippet
+                            );
+                        }
+                    }
+                    Err(e) => println!("[RECALL] Error searching brain: {}", e),
+                }
+            } else {
+                println!("[RECALL] Brain is disabled (--no-brain).");
+            }
+            true
+        }
+
         _ => false,
     }
 }
@@ -358,7 +567,7 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
 // ── Main agent turn ───────────────────────────────────────────────────────────
 
 /// Run a single user-prompt → agent-response turn.
-async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String) {
+async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Option<&str>) {
     println!("[YOU] {}", user_msg);
 
     let is_first = rt.history.iter().all(|m| m.role != "user");
@@ -417,9 +626,23 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String) {
                 .unwrap_or_default(),
         );
 
+        let memory_manager = crate::memory::MemoryManager::new(&rt.paths, rt.config.memory.clone());
+        let mut sys_prompt = route.profile.system_prompt.to_string();
+        let memory_context = memory_manager.build_context(rt.brain.as_ref());
+        if !memory_context.is_empty() {
+            sys_prompt.push_str("\n\n");
+            sys_prompt.push_str(&memory_context);
+        }
+        let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+        let skill_context = skill_manager.build_context(active_skill);
+        if !skill_context.is_empty() {
+            sys_prompt.push_str("\n\n");
+            sys_prompt.push_str(&skill_context);
+        }
+
         let mut routed_history = vec![Message {
             role: "system".to_string(),
-            content: Some(route.profile.system_prompt.to_string()),
+            content: Some(sys_prompt),
             tool_calls: None,
             tool_call_id: None,
         }];

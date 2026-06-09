@@ -22,6 +22,12 @@ pub struct GoatPaths {
     pub db_file: PathBuf,
     /// Directory for rolling log files.
     pub log_dir: PathBuf,
+    /// `~/.config/goat/USER.md`
+    pub user_file: PathBuf,
+    /// `~/.config/goat/MEMORY.md`
+    pub memory_file: PathBuf,
+    /// `~/.config/goat/skills/`
+    pub skills_dir: PathBuf,
 }
 
 impl GoatPaths {
@@ -53,11 +59,19 @@ impl GoatPaths {
         // Logs go next to the data dir so they are not in the project root.
         let log_dir = data_dir.join("logs");
 
+        let config_dir = config_file.parent().unwrap_or(Path::new("")).to_path_buf();
+        let user_file = config_dir.join("USER.md");
+        let memory_file = config_dir.join("MEMORY.md");
+        let skills_dir = config_dir.join("skills");
+
         Ok(Self {
             config_file,
             data_dir,
             db_file,
             log_dir,
+            user_file,
+            memory_file,
+            skills_dir,
         })
     }
 
@@ -99,6 +113,19 @@ impl GoatPaths {
                 format!(
                     "failed to create GOAT log directory: {}",
                     self.log_dir.display()
+                )
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Ensure the skills directory exists.
+    pub fn ensure_skills_dir(&self) -> Result<()> {
+        if !self.skills_dir.exists() {
+            fs::create_dir_all(&self.skills_dir).with_context(|| {
+                format!(
+                    "failed to create GOAT skills directory: {}",
+                    self.skills_dir.display()
                 )
             })?;
         }
@@ -182,14 +209,16 @@ impl DoctorStatus {
 /// `llm_config`: LLM retry/timeout settings to display.
 pub fn run_doctor(
     paths: &GoatPaths,
-    has_openai_key: bool,
-    has_groq_key: bool,
-    has_openrouter_key: bool,
-    ollama_enabled: bool,
-    headless_ready: bool,
-    llm_config: Option<&crate::config::LlmConfig>,
+    config: &crate::config::Config,
+    headless: bool,
 ) -> Vec<DoctorCheck> {
     let mut checks = Vec::new();
+
+    let has_openai = config.provider_api_key("openai").is_some();
+    let has_groq = config.provider_api_key("groq").is_some();
+    let has_openrouter = config.provider_api_key("openrouter").is_some();
+    let ollama_enabled = config.providers.contains_key("ollama");
+    let llm_config = Some(&config.llm);
 
     // ── OS / Platform ─────────────────────────────────────────────────────────
     checks.push(DoctorCheck {
@@ -316,22 +345,22 @@ pub fn run_doctor(
         });
     }
 
-    // ── Provider keys ─────────────────────────────────────────────────────────
-    if has_openai_key {
+    // ── API Keys ──────────────────────────────────────────────────────────────
+    if has_openai {
         checks.push(DoctorCheck {
             status: DoctorStatus::Ok,
             label: "OpenAI key".to_string(),
-            detail: "Configured (key hidden)".to_string(),
+            detail: "Configured".to_string(),
         });
     } else {
         checks.push(DoctorCheck {
             status: DoctorStatus::Warn,
             label: "OpenAI key".to_string(),
-            detail: "Not configured. Add `openai_api_key` to goat.toml [keys]".to_string(),
+            detail: "Missing (required for default profile)".to_string(),
         });
     }
 
-    if has_groq_key {
+    if has_groq {
         checks.push(DoctorCheck {
             status: DoctorStatus::Ok,
             label: "Groq key".to_string(),
@@ -345,7 +374,7 @@ pub fn run_doctor(
         });
     }
 
-    if !has_openai_key && !has_groq_key {
+    if !has_openai && !has_groq {
         checks.push(DoctorCheck {
             status: DoctorStatus::Fail,
             label: "Provider".to_string(),
@@ -360,10 +389,7 @@ pub fn run_doctor(
     }
 
     // ── Provider count ────────────────────────────────────────────────────────
-    let provider_count = [has_openai_key, has_groq_key]
-        .iter()
-        .filter(|&&v| v)
-        .count();
+    let provider_count = [has_openai, has_groq].iter().filter(|&&v| v).count();
     checks.push(DoctorCheck {
         status: if provider_count > 0 {
             DoctorStatus::Ok
@@ -384,18 +410,29 @@ pub fn run_doctor(
         let registry = ProfileRegistry::with_defaults();
         let default_name = &registry.default_profile;
         let (_, chain) = registry.resolve(default_name);
-        let primary_ok = chain
-            .entries
-            .first()
-            .map(|e| match e.provider.as_str() {
-                "openai" => has_openai_key,
-                "groq" => has_groq_key,
+
+        // Evaluate the default chain readiness.
+        let default_chain =
+            crate::models::ProfileRegistry::with_defaults().profiles["balanced"].clone();
+        let mut chain_healthy = false;
+        let mut reasons = Vec::new();
+
+        for entry in &default_chain.entries {
+            let available = match entry.provider.as_str() {
+                "openai" => has_openai,
+                "groq" => has_groq,
                 _ => false,
-            })
-            .unwrap_or(false);
+            };
+            if available {
+                chain_healthy = true;
+                break;
+            } else {
+                reasons.push(format!("missing {} key", entry.provider));
+            }
+        }
 
         checks.push(DoctorCheck {
-            status: if primary_ok {
+            status: if chain_healthy {
                 DoctorStatus::Ok
             } else {
                 DoctorStatus::Warn
@@ -421,7 +458,7 @@ pub fn run_doctor(
     }
 
     // ── Provider: OpenRouter ───────────────────────────────────────────────────
-    if has_openrouter_key {
+    if has_openrouter {
         checks.push(DoctorCheck {
             status: DoctorStatus::Ok,
             label: "OpenRouter key".to_string(),
@@ -526,14 +563,117 @@ pub fn run_doctor(
 
     // ── Headless mode ─────────────────────────────────────────────────────────
     checks.push(DoctorCheck {
-        status: DoctorStatus::Ok,
-        label: "Headless mode".to_string(),
-        detail: if headless_ready {
-            "Running in headless mode".to_string()
+        status: if headless {
+            DoctorStatus::Ok
         } else {
-            "Available — run: goat --headless".to_string()
+            DoctorStatus::Info
+        },
+        label: "Headless mode".to_string(),
+        detail: if headless {
+            "Active (reading from stdin)".to_string()
+        } else {
+            "Inactive (use --headless to pipe input)".to_string()
         },
     });
+
+    // ── Memory ────────────────────────────────────────────────────────────────
+    let memory_manager = crate::memory::MemoryManager::new(paths, config.memory.clone());
+    let (u_count, u_max, u_warn) = memory_manager.user_budget_status();
+    let (m_count, m_max, m_warn) = memory_manager.memory_budget_status();
+
+    checks.push(DoctorCheck {
+        status: if config.memory.enabled {
+            DoctorStatus::Ok
+        } else {
+            DoctorStatus::Info
+        },
+        label: "Memory System".to_string(),
+        detail: if config.memory.enabled {
+            "Enabled".to_string()
+        } else {
+            "Disabled".to_string()
+        },
+    });
+
+    if memory_manager.user_file.exists() {
+        checks.push(DoctorCheck {
+            status: if u_warn {
+                DoctorStatus::Warn
+            } else {
+                DoctorStatus::Ok
+            },
+            label: "USER.md".to_string(),
+            detail: format!(
+                "{}/{} chars{}",
+                u_count,
+                u_max,
+                if u_warn { " (OVER BUDGET)" } else { "" }
+            ),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "USER.md".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    if memory_manager.memory_file.exists() {
+        checks.push(DoctorCheck {
+            status: if m_warn {
+                DoctorStatus::Warn
+            } else {
+                DoctorStatus::Ok
+            },
+            label: "MEMORY.md".to_string(),
+            detail: format!(
+                "{}/{} chars{}",
+                m_count,
+                m_max,
+                if m_warn { " (OVER BUDGET)" } else { "" }
+            ),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "MEMORY.md".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Skills System ─────────────────────────────────────────────────────────
+    checks.push(DoctorCheck {
+        status: if config.skills.enabled {
+            DoctorStatus::Ok
+        } else {
+            DoctorStatus::Info
+        },
+        label: "Skills System".to_string(),
+        detail: if config.skills.enabled {
+            "Enabled".to_string()
+        } else {
+            "Disabled".to_string()
+        },
+    });
+
+    if paths.skills_dir.exists() {
+        // Just checking basic existence and count
+        let count = std::fs::read_dir(&paths.skills_dir)
+            .map(|mut i| i.filter_map(|e| e.ok()).count())
+            .unwrap_or(0);
+            
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Skills Directory".to_string(),
+            detail: format!("Exists ({} entries)", count),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Skills Directory".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
 
     checks
 }
@@ -659,15 +799,16 @@ mod tests {
     #[test]
     fn test_doctor_runs_without_panic() {
         let paths = GoatPaths::resolve().unwrap();
-        // Doctor should never panic, even with missing files.
-        let checks = run_doctor(&paths, false, false, false, false, false, None);
+        let config = crate::config::Config::default();
+        let checks = run_doctor(&paths, &config, false);
         assert!(!checks.is_empty());
     }
 
     #[test]
     fn test_doctor_no_provider_shows_fail() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, false, false, false, false, false, None);
+        let config = crate::config::Config::default();
+        let checks = run_doctor(&paths, &config, false);
         let has_fail = checks
             .iter()
             .any(|c| c.status == DoctorStatus::Fail && c.label == "Provider");
@@ -677,10 +818,12 @@ mod tests {
     #[test]
     fn test_doctor_with_provider_shows_ok() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, true, false, false, false, false, None);
+        let mut config = crate::config::Config::default();
+        config.keys.openai_api_key = Some("dummy".to_string());
+        let checks = run_doctor(&paths, &config, false);
         let has_ok = checks
             .iter()
-            .any(|c| c.status == DoctorStatus::Ok && c.label == "Provider");
+            .any(|c| c.status == DoctorStatus::Ok && c.label == "OpenAI key");
         assert!(has_ok, "should be ok when a provider is configured");
     }
 
@@ -688,12 +831,13 @@ mod tests {
     fn test_doctor_with_llm_config_shows_retry() {
         use crate::config::LlmConfig;
         let paths = GoatPaths::resolve().unwrap();
-        let llm = LlmConfig {
+        let mut config = crate::config::Config::default();
+        config.llm = LlmConfig {
             max_retries: 3,
             timeout_secs: 30,
             ..LlmConfig::default()
         };
-        let checks = run_doctor(&paths, true, false, false, false, false, Some(&llm));
+        let checks = run_doctor(&paths, &config, false);
         let has_retry = checks
             .iter()
             .any(|c| c.label == "LLM retry config" && c.detail.contains("max_retries=3"));
@@ -703,7 +847,9 @@ mod tests {
     #[test]
     fn test_doctor_with_openrouter_key_shows_ok() {
         let paths = GoatPaths::resolve().unwrap();
-        let checks = run_doctor(&paths, false, false, true, false, false, None);
+        let mut config = crate::config::Config::default();
+        config.keys.openrouter_api_key = Some("dummy".to_string());
+        let checks = run_doctor(&paths, &config, false);
         let or_check = checks.iter().find(|c| c.label == "OpenRouter key");
         assert!(or_check.is_some());
         assert_eq!(or_check.unwrap().status, DoctorStatus::Ok);

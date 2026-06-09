@@ -65,6 +65,12 @@ pub struct Config {
     /// Model profile configuration.  Optional — built-in defaults used if absent.
     #[serde(default)]
     pub profiles: ProfilesConfig,
+    /// Memory injection config.
+    #[serde(default)]
+    pub memory: MemoryConfig,
+    /// Skills system config.
+    #[serde(default)]
+    pub skills: SkillsConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -164,7 +170,83 @@ fn default_true() -> bool {
     true
 }
 
-// ── Per-provider custom config ────────────────────────────────────────────────
+// ── Memory settings ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct MemoryConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub inject_user: bool,
+    #[serde(default = "default_true")]
+    pub inject_memory: bool,
+    #[serde(default = "default_true")]
+    pub inject_project: bool,
+    #[serde(default = "default_max_user_chars")]
+    pub max_user_chars: usize,
+    #[serde(default = "default_max_memory_chars")]
+    pub max_memory_chars: usize,
+    #[serde(default = "default_max_project_chars")]
+    pub max_project_chars: usize,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            inject_user: true,
+            inject_memory: true,
+            inject_project: true,
+            max_user_chars: 1500,
+            max_memory_chars: 2500,
+            max_project_chars: 1500,
+        }
+    }
+}
+
+fn default_max_user_chars() -> usize {
+    1500
+}
+fn default_max_memory_chars() -> usize {
+    2500
+}
+fn default_max_project_chars() -> usize {
+    1500
+}
+
+// ── Skills settings ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SkillsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub inject_index: bool,
+    #[serde(default = "default_max_index_chars")]
+    pub max_index_chars: usize,
+    #[serde(default = "default_max_skill_chars")]
+    pub max_skill_chars: usize,
+}
+
+impl Default for SkillsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            inject_index: true,
+            max_index_chars: 2000,
+            max_skill_chars: 4000,
+        }
+    }
+}
+
+fn default_max_index_chars() -> usize {
+    2000
+}
+fn default_max_skill_chars() -> usize {
+    4000
+}
+
+// ── Custom Providers ──────────────────────────────────────────────────────────
 
 /// Custom settings for a specific provider (e.g. OpenRouter, Ollama).
 ///

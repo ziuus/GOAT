@@ -125,6 +125,29 @@ pub enum Command {
         #[arg(default_value = "status")]
         action: String,
     },
+
+    /// Manage GOAT curated memory files.
+    #[command(name = "memory")]
+    Memory {
+        /// "status", "show", "path", "edit", "add-user", or "add-note"
+        action: String,
+        /// The text to add (for add-user and add-note)
+        text: Option<String>,
+    },
+
+    /// Search past conversation interactions.
+    #[command(name = "recall")]
+    Recall { query: String },
+
+    /// Manage GOAT reusable skills.
+    #[command(name = "skills")]
+    Skills {
+        /// "list", "show", "path", "create", "validate", "search"
+        #[arg(default_value = "list")]
+        action: String,
+        /// The name or query
+        arg: Option<String>,
+    },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -157,17 +180,7 @@ pub async fn handle_subcommand(
         }
 
         Command::Doctor => {
-            let has_openrouter = config.provider_api_key("openrouter").is_some();
-            let ollama_enabled = config.providers.contains_key("ollama");
-            let checks = crate::paths::run_doctor(
-                paths,
-                config.provider_api_key("openai").is_some(),
-                config.provider_api_key("groq").is_some(),
-                has_openrouter,
-                ollama_enabled,
-                cli.headless,
-                Some(&config.llm),
-            );
+            let checks = crate::paths::run_doctor(paths, config, cli.headless);
             crate::paths::print_doctor_results(&checks);
             Ok(true)
         }
@@ -193,6 +206,19 @@ pub async fn handle_subcommand(
         }
         Command::Project { action } => {
             handle_project_command(paths, config, action)?;
+            Ok(true)
+        }
+        Command::Memory { action, text } => {
+            handle_memory_command(paths, config, action, text.as_deref())?;
+            Ok(true)
+        }
+        Command::Recall { query } => {
+            handle_recall_command(paths, query)?;
+            Ok(true)
+        }
+
+        Command::Skills { action, arg } => {
+            handle_skills_command(paths, config, action, arg.as_deref())?;
             Ok(true)
         }
     }
@@ -444,7 +470,7 @@ fn handle_project_command(
     action: &str,
 ) -> anyhow::Result<()> {
     use crate::brain::Brain;
-    use crate::project::{ProjectScanner, ProjectMetadata};
+    use crate::project::ProjectScanner;
     use std::env;
 
     let root = env::current_dir().unwrap_or_default();
@@ -486,3 +512,185 @@ fn print_project_summary(meta: &crate::project::ProjectMetadata) {
     println!("Ignored directories: {}", meta.ignored_dirs_count);
     println!("{}", "─".repeat(60));
 }
+
+fn handle_memory_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    text: Option<&str>,
+) -> anyhow::Result<()> {
+    use crate::memory::MemoryManager;
+    let manager = MemoryManager::new(paths, config.memory.clone());
+
+    match action {
+        "status" => {
+            let (u_count, u_max, u_warn) = manager.user_budget_status();
+            let (m_count, m_max, m_warn) = manager.memory_budget_status();
+            println!("[MEMORY] Status:");
+            println!(
+                "  USER.md   : {}/{} chars {}",
+                u_count,
+                u_max,
+                if u_warn { "(OVER BUDGET)" } else { "" }
+            );
+            println!(
+                "  MEMORY.md : {}/{} chars {}",
+                m_count,
+                m_max,
+                if m_warn { "(OVER BUDGET)" } else { "" }
+            );
+            println!("  Enabled   : {}", config.memory.enabled);
+        }
+        "show" => {
+            println!("--- USER.md ---");
+            println!("{}", manager.get_user_content().unwrap_or_default());
+            println!("--- MEMORY.md ---");
+            println!("{}", manager.get_memory_content().unwrap_or_default());
+        }
+        "path" => {
+            println!("USER.md:   {}", manager.user_file.display());
+            println!("MEMORY.md: {}", manager.memory_file.display());
+        }
+        "edit" => {
+            println!("To edit memory files, open these in your editor:");
+            println!("  {}", manager.user_file.display());
+            println!("  {}", manager.memory_file.display());
+        }
+        "add-user" => {
+            if let Some(t) = text {
+                manager.add_user(t)?;
+                println!("Added to USER.md");
+            } else {
+                println!("Please provide text to add.");
+            }
+        }
+        "add-note" => {
+            if let Some(t) = text {
+                manager.add_note(t)?;
+                println!("Added to MEMORY.md");
+            } else {
+                println!("Please provide text to add.");
+            }
+        }
+        _ => {
+            println!("Unknown memory action: {}", action);
+        }
+    }
+    Ok(())
+}
+
+fn handle_recall_command(paths: &crate::paths::GoatPaths, query: &str) -> anyhow::Result<()> {
+    use crate::brain::Brain;
+    let brain = Brain::new(&paths.db_file)?;
+    let results = brain.recall_search(query)?;
+
+    if results.is_empty() {
+        println!("No recall results found for: {}", query);
+    } else {
+        println!("Found {} result(s) for '{}':", results.len(), query);
+        for (idx, (session_id, role, content)) in results.iter().enumerate() {
+            let snippet = if content.len() > 80 {
+                format!("{}...", &content[..77].replace('\n', " "))
+            } else {
+                content.replace('\n', " ")
+            };
+            println!(
+                "  {}. [{}] {}: {}",
+                idx + 1,
+                &session_id[..8],
+                role,
+                snippet
+            );
+        }
+    }
+    Ok(())
+}
+
+// ── skills command ────────────────────────────────────────────────────────────
+
+fn handle_skills_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
+    let skill_manager = crate::skills::SkillManager::new(paths.clone(), config.skills.clone());
+
+    match action {
+        "path" => {
+            println!("{}", skill_manager.skills_dir().display());
+        }
+        "list" => {
+            let skills = skill_manager.list_skills();
+            if skills.is_empty() {
+                println!("No skills found in {}", skill_manager.skills_dir().display());
+                return Ok(());
+            }
+            println!("Skills ({}):", skills.len());
+            for s in skills {
+                let name = if s.is_suspicious {
+                    format!("{} [SUSPICIOUS]", s.name)
+                } else {
+                    s.name
+                };
+                println!("  - {name:<20} {}", s.description);
+            }
+        }
+        "show" => {
+            let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            if let Some(skill) = skill_manager.get_skill(name) {
+                if skill.is_suspicious {
+                    println!("WARNING: This skill contains suspicious patterns:");
+                    for w in &skill.warnings {
+                        println!("  - {}", w);
+                    }
+                    println!();
+                }
+                println!("{}", skill.content);
+            } else {
+                println!("Skill '{}' not found.", name);
+            }
+        }
+        "create" => {
+            let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let path = skill_manager.create_template(name)?;
+            println!("Created skill template at: {}", path.display());
+            println!("Edit this file to implement your skill.");
+        }
+        "validate" => {
+            let skills = skill_manager.list_skills();
+            let mut invalid = 0;
+            for s in skills {
+                if s.is_suspicious {
+                    invalid += 1;
+                    println!("WARNING: Skill '{}' is suspicious:", s.name);
+                    for w in s.warnings {
+                        println!("  - {}", w);
+                    }
+                }
+            }
+            if invalid == 0 {
+                println!("All skills passed validation.");
+            } else {
+                println!("{} skills failed validation.", invalid);
+            }
+        }
+        "search" => {
+            let query = arg.ok_or_else(|| anyhow::anyhow!("Expected search query"))?;
+            let results = skill_manager.search_skills(query);
+            if results.is_empty() {
+                println!("No skills found matching '{}'", query);
+                return Ok(());
+            }
+            println!("Found {} matching skills:", results.len());
+            for s in results {
+                println!("  - {name:<20} {desc}", name=s.name, desc=s.description);
+            }
+        }
+        _ => {
+            println!("Unknown action '{}'. Expected: list, show, path, create, validate, search.", action);
+        }
+    }
+    Ok(())
+}
+
