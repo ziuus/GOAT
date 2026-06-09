@@ -2031,42 +2031,84 @@ impl App {
             "/rollback" => {
                 let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
                 let root = std::env::current_dir().unwrap_or_default();
-                if let Some(id) = args.get(1) {
+                let (action, id) = if args.len() >= 3 {
+                    (args[1], Some(args[2]))
+                } else if args.len() == 2 {
+                    ("plan", Some(args[1]))
+                } else {
+                    ("plan", None)
+                };
+
+                if let Some(id) = id {
                     if let Ok(Some(cp)) = self.checkpoint_manager.get_checkpoint(id) {
-                        self.push_log(format!(
-                            "[ROLLBACK] Initiating rollback to checkpoint {} ({})",
-                            cp.id, cp.label
-                        ));
-                        use crate::approval::{ApprovalRequest, RiskLevel};
-                        let req = ApprovalRequest {
-                            tool_name: "bash".to_string(),
-                            action_summary: format!(
-                                "git reset --hard && git clean -fd # rollback to {}",
-                                cp.id
-                            ),
-                            risk_level: RiskLevel::High,
-                            explanation: Some(format!(
-                                "This will overwrite your current working tree to match checkpoint {}.",
-                                cp.id
-                            )),
-                            working_directory: Some(root.to_string_lossy().to_string()),
-                        };
-                        let cmd_str = req.action_summary.clone();
-                        self.pending_approval = Some(DeferredToolCall {
-                            id: "manual".to_string(),
-                            name: "bash".to_string(),
-                            args: serde_json::json!({"command": cmd_str}),
-                            request: req,
-                            patch_id: None,
-                        });
-                        self.push_log(
-                            "[ROLLBACK] Requires approval. Please (A)pprove or (D)eny.".to_string(),
-                        );
+                        match action {
+                            "plan" => {
+                                self.push_log(format!("[ROLLBACK PLAN] ID: {}", cp.id));
+                                self.push_log(format!("  Timestamp: {}", cp.timestamp));
+                                self.push_log(format!("  Branch: {}", cp.branch));
+                                self.push_log(format!("  Label: {}", cp.label));
+                                self.push_log(format!(
+                                    "  Changed files: {}",
+                                    cp.changed_files.len()
+                                ));
+                                self.push_log("  Safe restore: Partial (only tracked file reverse patch may be possible)".to_string());
+                                self.push_log(
+                                    "  To securely revert your working directory, run:".to_string(),
+                                );
+                                self.push_log(format!("    /rollback destructive {}", cp.id));
+                            }
+                            "restore" => {
+                                self.push_log(format!(
+                                    "[ROLLBACK RESTORE] Attempting safe restore for {}",
+                                    cp.id
+                                ));
+                                self.push_log(
+                                    "Not implemented yet. Falling back to plan.".to_string(),
+                                );
+                            }
+                            "destructive" => {
+                                self.push_log(format!(
+                                    "[ROLLBACK] Initiating DESTRUCTIVE rollback to checkpoint {} ({})",
+                                    cp.id, cp.label
+                                ));
+                                use crate::approval::{ApprovalRequest, RiskLevel};
+                                let req = ApprovalRequest {
+                                    tool_name: "bash".to_string(),
+                                    action_summary: format!(
+                                        "git reset --hard && git clean -fd # rollback to {}",
+                                        cp.id
+                                    ),
+                                    risk_level: RiskLevel::Critical,
+                                    explanation: Some(format!(
+                                        "DESTRUCTIVE: This will overwrite your current working tree to match checkpoint {}.",
+                                        cp.id
+                                    )),
+                                    working_directory: Some(root.to_string_lossy().to_string()),
+                                };
+                                let cmd_str = req.action_summary.clone();
+                                self.pending_approval = Some(DeferredToolCall {
+                                    id: "manual".to_string(),
+                                    name: "bash".to_string(),
+                                    args: serde_json::json!({"command": cmd_str}),
+                                    request: req,
+                                    patch_id: None,
+                                });
+                                self.push_log(
+                                    "[ROLLBACK] Requires approval. Please (A)pprove or (D)eny."
+                                        .to_string(),
+                                );
+                            }
+                            _ => {
+                                self.push_log(format!("[ROLLBACK] Unknown action: {}", action));
+                            }
+                        }
                     } else {
                         self.push_log(format!("[ROLLBACK] Checkpoint {} not found.", id));
                     }
                 } else {
-                    self.push_log("[ROLLBACK] Usage: /rollback <id>".to_string());
+                    self.push_log(
+                        "[ROLLBACK] Usage: /rollback [plan|restore|destructive] <id>".to_string(),
+                    );
                 }
                 true
             }
@@ -2122,37 +2164,100 @@ impl App {
             "/commit" => {
                 let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
                 let action = args.get(1).copied().unwrap_or("message");
+                let root = std::env::current_dir().unwrap_or_default();
                 match action {
                     "message" => {
-                        self.push_log(
-                            "[COMMIT] Proposed message: \"Update files based on recent changes.\""
-                                .to_string(),
-                        );
-                        self.push_log(
-                            "[COMMIT] (LLM-based generation is planned for Phase 3.5)".to_string(),
-                        );
+                        let is_ai = args.get(2).copied() == Some("ai")
+                            || args.get(2).copied() == Some("--ai");
+
+                        let status_out = std::process::Command::new("git")
+                            .args(["-C", &root.to_string_lossy(), "status", "--short"])
+                            .output()
+                            .ok()
+                            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                            .unwrap_or_default();
+
+                        let diff_out = std::process::Command::new("git")
+                            .args(["-C", &root.to_string_lossy(), "diff", "--cached", "--stat"])
+                            .output()
+                            .ok()
+                            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                            .unwrap_or_default();
+
+                        if status_out.trim().is_empty() {
+                            self.push_log(
+                                "[COMMIT] No changes detected. Working tree clean.".to_string(),
+                            );
+                        } else {
+                            if is_ai {
+                                self.push_log("[COMMIT] AI commit generation is planned. For now, here is a deterministic summary:".to_string());
+                            } else {
+                                self.push_log(
+                                    "[COMMIT] Proposed deterministic commit message:".to_string(),
+                                );
+                            }
+                            self.push_log("".to_string());
+                            self.push_log("feat: Update project files".to_string());
+                            self.push_log("".to_string());
+                            for line in status_out.lines().filter(|l| !l.trim().is_empty()) {
+                                self.push_log(format!("- {}", line.trim()));
+                            }
+                            if !diff_out.trim().is_empty() {
+                                self.push_log("".to_string());
+                                self.push_log(format!("Diff stat:\n{}", diff_out.trim()));
+                            }
+                        }
                     }
                     "create" => {
-                        use crate::approval::{ApprovalRequest, RiskLevel};
-                        let root = std::env::current_dir().unwrap_or_default();
-                        let req = ApprovalRequest {
-                            tool_name: "bash".to_string(),
-                            action_summary: "git add . && git commit -m 'Update files'".to_string(),
-                            risk_level: RiskLevel::Medium,
-                            explanation: Some("Stage and commit all changes. (Planned: auto-generate message and only stage required files.)".to_string()),
-                            working_directory: Some(root.to_string_lossy().to_string()),
-                        };
-                        let cmd_str = req.action_summary.clone();
-                        self.pending_approval = Some(DeferredToolCall {
-                            id: "manual".to_string(),
-                            name: "bash".to_string(),
-                            args: serde_json::json!({"command": cmd_str}),
-                            request: req,
-                            patch_id: None,
+                        let status_out = std::process::Command::new("git")
+                            .args(["-C", &root.to_string_lossy(), "status", "--short"])
+                            .output()
+                            .ok()
+                            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                            .unwrap_or_default();
+
+                        let has_secrets = status_out.lines().any(|l| {
+                            let lower = l.to_lowercase();
+                            lower.contains(".env")
+                                || lower.contains("id_rsa")
+                                || lower.contains("credentials")
+                                || lower.contains("key")
                         });
-                        self.push_log("[COMMIT] Committing changes requires approval.".to_string());
+
+                        if has_secrets {
+                            self.push_log(
+                                "[COMMIT] WARNING: Secret-like files detected in git status!"
+                                    .to_string(),
+                            );
+                            self.push_log(
+                                "[COMMIT] Refusing to stage and commit to protect secrets."
+                                    .to_string(),
+                            );
+                        } else {
+                            use crate::approval::{ApprovalRequest, RiskLevel};
+                            let req = ApprovalRequest {
+                                tool_name: "bash".to_string(),
+                                action_summary:
+                                    "git add . && git commit -m 'feat: Update project files'"
+                                        .to_string(),
+                                risk_level: RiskLevel::Medium,
+                                explanation: Some("Stage and commit all changes.".to_string()),
+                                working_directory: Some(root.to_string_lossy().to_string()),
+                            };
+                            let cmd_str = req.action_summary.clone();
+                            self.pending_approval = Some(DeferredToolCall {
+                                id: "manual".to_string(),
+                                name: "bash".to_string(),
+                                args: serde_json::json!({"command": cmd_str}),
+                                request: req,
+                                patch_id: None,
+                            });
+                            self.push_log(
+                                "[COMMIT] Committing changes requires approval.".to_string(),
+                            );
+                        }
                     }
-                    _ => self.push_log("[COMMIT] Usage: /commit [message|create]".to_string()),
+                    _ => self.push_log("[COMMIT] Usage: /commit [message [ai]|create]".to_string()),
                 }
                 true
             }

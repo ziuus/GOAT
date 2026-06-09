@@ -462,11 +462,13 @@ pub async fn handle_subcommand(
         }
 
         Command::Rollback { id } => {
-            println!("Rollback via CLI requires ApprovalGate, which is interactive.");
+            println!("Rollback via CLI defaults to 'plan' mode to prevent accidental data loss.");
             println!(
-                "To rollback to {}, please launch GOAT (cargo run) and type /rollback {}",
-                id, id
+                "To safely restore or perform a destructive rollback, launch GOAT (cargo run) and type:"
             );
+            println!("  /rollback plan {}", id);
+            println!("  /rollback restore {}", id);
+            println!("  /rollback destructive {}", id);
             Ok(true)
         }
 
@@ -498,7 +500,33 @@ pub async fn handle_subcommand(
         Command::Commit { action } => {
             match action.as_str() {
                 "message" => {
-                    println!("Proposed commit message:\n\"Update files based on recent changes.\"");
+                    let root = std::env::current_dir().unwrap_or_default();
+                    let status_out = std::process::Command::new("git")
+                        .args(["-C", &root.to_string_lossy(), "status", "--short"])
+                        .output()
+                        .ok()
+                        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                        .unwrap_or_default();
+
+                    let diff_out = std::process::Command::new("git")
+                        .args(["-C", &root.to_string_lossy(), "diff", "--cached", "--stat"])
+                        .output()
+                        .ok()
+                        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+                        .unwrap_or_default();
+
+                    if status_out.trim().is_empty() {
+                        println!("No changes detected. Working tree clean.");
+                    } else {
+                        println!("Proposed deterministic commit message:\n");
+                        println!("feat: Update project files\n");
+                        for line in status_out.lines().filter(|l| !l.trim().is_empty()) {
+                            println!("- {}", line.trim());
+                        }
+                        if !diff_out.trim().is_empty() {
+                            println!("\nDiff stat:\n{}", diff_out.trim());
+                        }
+                    }
                 }
                 "create" => {
                     println!(

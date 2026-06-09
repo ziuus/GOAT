@@ -6,15 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.12.0] — Phase 3.4: Checkpoint / Rollback + Git Branch / Commit Workflow (2026-06-09)
+## [0.12.0] — Phase 3.4 & 3.5: Checkpoints, Git Branch/Commit, and Safety Hardening (2026-06-09)
 
 ### Added
-- **Checkpoint System**: `/checkpoint create`, `/checkpoint list`, `/checkpoint show`, `/checkpoint diff`
+- **Checkpoint System**: `/checkpoint create`, `/checkpoint list`, `/checkpoint show`, `/checkpoint diff`.
 - **Auto-checkpoints**: Automatically create a safety checkpoint before applying patches or using write_file (if enabled in config).
-- **Rollback System**: `/rollback <id>` securely restores the workspace to a previous checkpoint via ApprovalGate.
+- **Rollback System (Safe)**: `/rollback <id>` defaults to safe plan mode. `/rollback destructive <id>` securely restores the workspace to a previous checkpoint via ApprovalGate.
 - **Git Branch Management**: `/branch current`, `/branch create <name>` (requires ApprovalGate).
-- **Commit Preparation**: `/commit message`, `/commit create` (requires ApprovalGate).
-- **Status Updates**: `/status` and `/changes` now display current branch, dirty state, and checkpoint hints.
+- **Commit Preparation**: `/commit message` dynamically parses `git status` and `git diff` for a deterministic message. `/commit create` performs safety checks and blocks secret-like files from being staged automatically (requires ApprovalGate).
+- **Status Updates**: `/status` and `/changes` display current branch, dirty state, and checkpoint hints.
 
 ---
 
