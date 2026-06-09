@@ -317,6 +317,36 @@ async fn run_app(
                             let _ = app.handle_slash_command("/palette").await;
                         }
 
+                        // Phase 3.2: Layout shortcuts
+                        // Ctrl+B — toggle sidebar (in dashboard mode)
+                        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.sidebar_visible = !app.sidebar_visible;
+                            let state = if app.sidebar_visible {
+                                "visible"
+                            } else {
+                                "hidden"
+                            };
+                            app.push_log(format!("[SYSTEM] Sidebar {}", state));
+                        }
+                        // Ctrl+R — toggle context panel (in dashboard mode)
+                        KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.context_visible = !app.context_visible;
+                            let state = if app.context_visible {
+                                "visible"
+                            } else {
+                                "hidden"
+                            };
+                            app.push_log(format!("[SYSTEM] Context panel {}", state));
+                        }
+                        // Ctrl+F — switch to Focus layout
+                        KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/layout focus").await;
+                        }
+                        // Ctrl+D — switch to Dashboard layout
+                        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            let _ = app.handle_slash_command("/layout dashboard").await;
+                        }
+
                         KeyCode::Char(c) => {
                             app.input.push(c);
                             app.update_suggestions();

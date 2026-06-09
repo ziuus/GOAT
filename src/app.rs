@@ -64,6 +64,31 @@ pub enum ActiveView {
     ExternalAgents,
     Help,
     CommandPalette,
+    /// System/tool logs (Phase 3.2)
+    Logs,
+    /// Agent & subagent selector modal (Phase 3.2)
+    AgentSelector,
+}
+
+/// TUI layout mode — controls how panels are arranged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayoutMode {
+    /// Clean centered interface — default for focus work (OpenCode-style)
+    Focus,
+    /// 3-pane dashboard layout (sidebar + center + context)
+    Dashboard,
+    /// Chat + input only — best for narrow terminals
+    Compact,
+}
+
+impl LayoutMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            LayoutMode::Focus => "focus",
+            LayoutMode::Dashboard => "dashboard",
+            LayoutMode::Compact => "compact",
+        }
+    }
 }
 
 pub struct App {
@@ -122,6 +147,12 @@ pub struct App {
     pub cmd_suggestions: Vec<String>,
     /// Selected index in cmd_suggestions popup (for Up/Down navigation)
     pub cmd_suggestion_idx: usize,
+    /// TUI layout mode (focus / dashboard / compact) — Phase 3.2
+    pub layout_mode: LayoutMode,
+    /// Whether the sidebar is visible in dashboard mode (Ctrl+B toggle)
+    pub sidebar_visible: bool,
+    /// Whether the context panel is visible in dashboard mode (Ctrl+R toggle)
+    pub context_visible: bool,
 }
 
 impl App {
@@ -207,6 +238,9 @@ impl App {
             active_view: ActiveView::Chat,
             cmd_suggestions: Vec::new(),
             cmd_suggestion_idx: 0,
+            layout_mode: LayoutMode::Focus,
+            sidebar_visible: true,
+            context_visible: true,
         }
     }
 
@@ -505,8 +539,10 @@ impl App {
                     "subagents" => self.active_view = ActiveView::Subagents,
                     "external" => self.active_view = ActiveView::ExternalAgents,
                     "help" => self.active_view = ActiveView::Help,
+                    "logs" | "log" => self.active_view = ActiveView::Logs,
+                    "agents" | "agent-selector" => self.active_view = ActiveView::AgentSelector,
                     _ => {
-                        self.push_log(format!("[SYSTEM] Unknown view '{}'. Valid views: chat, tasks, repo, patches, tools, memory, skills, subagents, external, help", view_name));
+                        self.push_log(format!("[SYSTEM] Unknown view '{}'. Valid views: chat, tasks, repo, patches, tools, memory, skills, subagents, external, help, logs, agents", view_name));
                     }
                 }
                 if self.active_view != ActiveView::Chat {
@@ -1921,6 +1957,117 @@ impl App {
                     self.push_log(
                         "[VERIFY] No verification commands detected for this project.".to_string(),
                     );
+                }
+                true
+            }
+
+            // ── Phase 3.2: Layout control ──────────────────────────────────────
+            "/layout" => {
+                let target = parts.get(1).copied().unwrap_or("").trim().to_lowercase();
+                match target.as_str() {
+                    "focus" => {
+                        self.layout_mode = LayoutMode::Focus;
+                        self.push_log(
+                            "[SYSTEM] ✅ Switched to Focus layout — clean, centered interface.",
+                        );
+                        self.push_log(
+                            "[SYSTEM] Ctrl+B = toggle sidebar  Ctrl+R = toggle context panel",
+                        );
+                    }
+                    "dashboard" => {
+                        self.layout_mode = LayoutMode::Dashboard;
+                        self.push_log("[SYSTEM] ✅ Switched to Dashboard layout — 3-pane view.");
+                        self.push_log(
+                            "[SYSTEM] Ctrl+B = toggle sidebar  Ctrl+R = toggle context panel",
+                        );
+                    }
+                    "compact" => {
+                        self.layout_mode = LayoutMode::Compact;
+                        self.push_log(
+                            "[SYSTEM] ✅ Switched to Compact layout — chat + input only.",
+                        );
+                    }
+                    "" => {
+                        let ver = env!("CARGO_PKG_VERSION");
+                        self.push_log(format!(
+                            "[STATUS] Current layout: {}  (GOAT v{})",
+                            self.layout_mode.label(),
+                            ver
+                        ));
+                        self.push_log(
+                            "[HELP] /layout focus     — focused, centered interface (default)",
+                        );
+                        self.push_log("[HELP] /layout dashboard — 3-pane sidebar+center+context");
+                        self.push_log(
+                            "[HELP] /layout compact   — chat+input only, best for narrow terminals",
+                        );
+                        self.push_log(
+                            "[HELP] Ctrl+B = toggle sidebar  Ctrl+R = toggle context panel",
+                        );
+                    }
+                    other => {
+                        self.push_log(format!(
+                            "[WARN] Unknown layout '{}'. Valid: focus, dashboard, compact",
+                            other
+                        ));
+                    }
+                }
+                true
+            }
+
+            // ── Phase 3.2: Logs view ───────────────────────────────────────────
+            "/logs" | "/log" => {
+                let view_arg = parts.get(1).copied().unwrap_or("").trim().to_lowercase();
+                match view_arg.as_str() {
+                    "clear" => {
+                        self.logs
+                            .retain(|l| l.starts_with("[YOU]") || l.starts_with("[GOAT]"));
+                        self.push_log("[SYSTEM] Logs cleared (kept conversation messages).");
+                    }
+                    _ => {
+                        self.active_view = ActiveView::Logs;
+                        self.push_log("[SYSTEM] Viewing logs — /view chat to return to chat.");
+                    }
+                }
+                true
+            }
+
+            // ── Phase 3.2: Agent/subagent selector ────────────────────────────
+            "/agents" | "/agent-selector" | "/subagent-selector" | "/agent-select" => {
+                self.active_view = ActiveView::AgentSelector;
+                self.push_log(
+                    "[SYSTEM] Agent Selector — showing internal + external agents and skills.",
+                );
+                true
+            }
+
+            // ── Phase 3.2: Theme ───────────────────────────────────────────────
+            "/theme" => {
+                let theme_arg = parts.get(1).copied().unwrap_or("").trim().to_lowercase();
+                match theme_arg.as_str() {
+                    "" | "status" => {
+                        self.push_log("[THEME] 🎨 Current theme: goat-dark");
+                        self.push_log(
+                            "[THEME] ─────────────────────────────────────────────────────────",
+                        );
+                        self.push_log(
+                            "[THEME] ✅ goat-dark      — Default deep navy + mint accents (active)",
+                        );
+                        self.push_log("[THEME] 🔮 minimal        — Minimal monochrome (planned)");
+                        self.push_log(
+                            "[THEME] 🔮 glass          — Glassmorphism light/dark (planned)",
+                        );
+                        self.push_log("[THEME] 🔮 high-contrast  — WCAG accessible (planned)");
+                        self.push_log(
+                            "[THEME] ─────────────────────────────────────────────────────────",
+                        );
+                        self.push_log("[HELP] Additional themes are planned for Phase 3.3.");
+                    }
+                    other => {
+                        self.push_log(format!("[THEME] Theme '{}' is not yet available.", other));
+                        self.push_log("[THEME] Current theme: goat-dark (only available theme).");
+                        self.push_log("[THEME] Additional themes planned for Phase 3.3.");
+                    }
                 }
                 true
             }

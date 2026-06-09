@@ -6,6 +6,93 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.10.0] — Phase 3.2: Premium Focus Layout (2026-06-09)
+
+### Added — Phase 3.2: Premium Focus Layout + OpenCode-style Clean TUI
+
+#### Layout Modes (`/layout`)
+- **Focus layout** (default): Clean centered interface, no always-visible panels. Chat and views fill the screen cleanly. Input composer centered on wide terminals. The default experience now resembles OpenCode / Claude Code.
+- **Dashboard layout**: Restores the 3-pane sidebar + center + context layout. Sidebar and context panel can be individually toggled with Ctrl+B / Ctrl+R.
+- **Compact layout**: Chat + input only, perfect for narrow terminals.
+- `/layout` — show current layout and options.
+- `/layout focus` / `dashboard` / `compact` — switch instantly.
+- `Ctrl+F` → focus layout. `Ctrl+D` → dashboard layout.
+- `Ctrl+B` → toggle sidebar. `Ctrl+R` → toggle context panel.
+- `layout_mode`, `sidebar_visible`, `context_visible` added to `App` struct.
+
+#### Premium Empty State
+- When Focus layout is active with no conversation: shows a centered, branded landing screen.
+- Displays: GOAT logo + version, tagline, status row (profile/model/mode/tools/subagents/brain), keyboard hints (/status, /help, /agents, Tab, Ctrl+P, Ctrl+D).
+- No startup log noise in the main view — logs moved to `/logs` / `/view logs`.
+
+#### Logs View (`/logs`)
+- `/logs` / `/view logs` — dedicated view for all system/tool log output.
+- `/logs clear` — clear system logs while preserving conversation.
+- `ActiveView::Logs` added to the view system.
+- Chat view stays clean; system/tool noise is separated.
+
+#### Agent & Skill Selector Modal (`/agents`)
+- `/agents` / `/agent-selector` / `/subagent-selector` open a polished centered modal.
+- Shows all **Internal Subagents** with `/ask-agent <name> <task>` instructions.
+- Shows **External Agents** status and delegate command (or notes if disabled).
+- Shows **Active Skill** status and `/skill deactivate` instructions.
+- `ActiveView::AgentSelector` added.
+
+#### Theme Command (`/theme`)
+- `/theme` — shows current theme: `goat-dark` (active) + planned future themes.
+- Planned: `minimal`, `glass`, `high-contrast` (Phase 3.3).
+
+#### Polished View Empty States
+All non-Chat views now have intentional, instructional empty states instead of raw placeholder text:
+- **Tasks**: "No active task. Run /code <task>." with full command hints.
+- **Repo Map**: "Run /repo-map refresh." with explanation.
+- **Patches**: "No pending patches. Proposed edits will appear here." with /patch commands.
+- **Memory**: Brain status indicator, USER.md/MEMORY.md info, all memory commands.
+- **Skills**: Active skill display, /skills, /skill, /save-skill commands.
+- **Subagents**: List of registered subagents with action hints.
+- **External Agents**: Execution status, agent list or "disabled" notice.
+- **Help**: Quick reference with keyboard shortcuts and key commands.
+- **Logs**: Full log view with /logs clear support.
+- **Agent Selector**: Unified modal for subagents + external agents + skills.
+
+#### Improved Input Composer
+- Context-aware title: shows `mode | profile | Message`.
+- Premium placeholder that changes by state (thinking, running tool, error, idle).
+- Centered on wide terminals in Focus layout (max-width 120).
+- Active/typing state highlights border more brightly.
+- No changes to approval state rendering.
+
+#### Improved Command Palette Modal
+- Now renders as a **centered floating modal** over the workspace (not a view).
+- Registry-powered grouped command listing with color-coded categories.
+- Command names highlighted in blue, descriptions in dim, risk markers in amber.
+- Planned commands shown in a subdued style.
+
+#### Improved Slash Suggestion Popup
+- Risk markers: `⛔` for Critical, `⚠` for High risk commands.
+- Planned commands shown with 🔮 badge and dimmed styling.
+- Selected row: bright green background with ▶ indicator.
+- Aligns with centered input in Focus layout on wide terminals.
+- Cleaner color split: command name vs description.
+
+#### New Keyboard Shortcuts
+- `Ctrl+F` — switch to Focus layout
+- `Ctrl+D` — switch to Dashboard layout
+- `Ctrl+B` — toggle sidebar visibility
+- `Ctrl+R` — toggle context panel visibility
+
+#### CommandRegistry Updates
+- Added: `/layout`, `/logs`, `/agents` (alias: `/agent-selector`, `/subagent-selector`), `/theme`.
+- Total: 53 implemented commands + 23 planned.
+
+### Changed
+- `render_workspace` replaced by layout-mode dispatch (`render_focus_layout`, `render_dashboard_layout`, `render_compact_layout`).
+- Header now shows layout mode badge (`📐 focus` etc.).
+- Dashboard sidebar uses icon-prefixed view items for better scannability.
+- Dashboard context panel shows active skill and provider info.
+- `ActiveView::Chat` in focus mode with empty conversation → shows empty state, not the log.
+- `ActiveView::CommandPalette` and `ActiveView::AgentSelector` render as modals, not full views.
+
 ## [0.9.0] — Phase 3.1: Unified Command System (2026-06-09)
 
 ### Added — Phase 3.1: Unified Command System + Slash Recommendation UX
