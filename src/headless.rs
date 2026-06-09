@@ -106,6 +106,8 @@ fn print_banner(rt: &GoatRuntime) {
     );
     println!("╚══════════════════════════════════════════════════╝");
     println!("Provider : {}", rt.provider_label);
+    println!("Profile  : {}", rt.active_profile);
+    println!("Fallback : {}", rt.model_chain.fallback_display());
     println!(
         "Session  : {}",
         if rt.session_id.len() > 20 {
@@ -116,7 +118,9 @@ fn print_banner(rt: &GoatRuntime) {
     );
     println!(
         "Brain    : {}",
-        if rt.brain.is_some() {
+        if rt.brain_disabled {
+            "disabled (--no-brain)".to_string()
+        } else if rt.brain.is_some() {
             rt.paths.db_file.to_string_lossy().to_string()
         } else {
             "unavailable (running without memory)".to_string()
@@ -158,18 +162,22 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime) -> bool {
         }
 
         "/status" => {
-            println!("[STATUS] Provider  : {}", rt.provider_label);
-            println!("[STATUS] Session   : {}", rt.session_id);
+            println!("[STATUS] Provider : {}", rt.provider_label);
+            println!("[STATUS] Profile  : {}", rt.active_profile);
+            println!("[STATUS] Fallback : {}", rt.model_chain.fallback_display());
+            println!("[STATUS] Session  : {}", rt.session_id);
             println!(
-                "[STATUS] Brain     : {}",
-                if rt.brain.is_some() {
+                "[STATUS] Brain    : {}",
+                if rt.brain_disabled {
+                    "disabled (--no-brain)"
+                } else if rt.brain.is_some() {
                     "connected"
                 } else {
                     "unavailable"
                 }
             );
-            println!("[STATUS] History   : {} messages", rt.history.len());
-            println!("[STATUS] MCP servers: {}", rt.mcp_server_count);
+            println!("[STATUS] History  : {} messages", rt.history.len());
+            println!("[STATUS] MCP      : {} server(s)", rt.mcp_server_count);
             true
         }
 
@@ -279,7 +287,6 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String) {
                 .and_then(|m| m.content.as_deref())
                 .unwrap_or_default(),
         );
-        rt.provider_label = format!("{}:{}", route.profile.provider, route.profile.model);
 
         let mut routed_history = vec![Message {
             role: "system".to_string(),
@@ -294,15 +301,13 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String) {
 
         match rt
             .llm_router
-            .completion(
-                route.profile.provider,
-                route.profile.model,
-                routed_history,
-                tools,
-            )
+            .completion_with_fallback(&rt.model_chain, routed_history, tools)
             .await
         {
-            Ok(response) => {
+            Ok((response, used_label)) => {
+                // Update provider label to show which model actually responded.
+                rt.provider_label = used_label;
+
                 rt.history.push(Message {
                     role: "assistant".to_string(),
                     content: response.content.clone(),

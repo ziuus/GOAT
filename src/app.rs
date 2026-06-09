@@ -6,6 +6,7 @@ use crate::brain::Brain;
 use crate::config::Config;
 use crate::llm::{FunctionDeclaration, LlmRouter, Message, Tool};
 use crate::mcp::McpManager;
+use crate::models::ModelChain;
 use crate::paths::GoatPaths;
 use crate::runtime::GoatRuntime;
 use crate::swarm::{RouteDecision, SwarmRouter};
@@ -66,12 +67,18 @@ pub struct App {
     pub swarm_router: SwarmRouter,
     pub active_route: Option<RouteDecision>,
     pub session_id: String,
-    /// Active provider label for the header bar (e.g. "openai:gpt-4o").
+    /// Active provider:model label shown in the header bar.
     pub provider_label: String,
+    /// Active profile name (e.g. "balanced", "coding").
+    pub active_profile: String,
+    /// Fallback chain for the active profile.
+    pub model_chain: ModelChain,
     /// Number of running MCP servers.
     pub mcp_server_count: usize,
     /// The approval gate for this session.
     pub approval_gate: ApprovalGate,
+    /// Whether brain was disabled via --no-brain.
+    pub brain_disabled: bool,
     /// Pending approval (Some ↔ approval overlay visible).
     pending_approval: Option<DeferredToolCall>,
 }
@@ -87,10 +94,13 @@ impl App {
 
         // TUI splash header.
         logs.push(
-            "[GOAT] v0.2 — Universal AI Agent Platform | Type your message and press Enter"
+            "[GOAT] v0.3 — Universal AI Agent Platform | Type your message and press Enter"
                 .to_string(),
         );
-        logs.push("[GOAT] Slash commands: /help /status /mcp /learn /route /clear".to_string());
+        logs.push(
+            "[GOAT] Slash commands: /help /status /mcp /learn /route /clear /tools /sessions"
+                .to_string(),
+        );
         logs.push("[GOAT] Keys: Enter send · Ctrl+C quit · ↑↓ scroll log · Esc cancel".to_string());
 
         // Show startup_warnings (config permission issues, etc.).
@@ -98,14 +108,16 @@ impl App {
             logs.push(warning.clone());
         }
 
-        // Show runtime boot log (brain connection, session, security notice).
+        // Show runtime boot log (brain connection, session, profile, security).
         for msg in &boot_log {
             logs.push(msg.clone());
         }
 
         let provider_label = rt.provider_label.clone();
+        let active_profile = rt.active_profile.clone();
         let session_id = rt.session_id.clone();
         let mcp_server_count = rt.mcp_server_count;
+        let brain_disabled = rt.brain_disabled;
 
         Self {
             running: true,
@@ -122,8 +134,11 @@ impl App {
             active_route: None,
             session_id,
             provider_label,
+            active_profile,
+            model_chain: rt.model_chain,
             mcp_server_count,
             approval_gate: rt.approval_gate,
+            brain_disabled,
             pending_approval: None,
         }
     }
@@ -134,7 +149,7 @@ impl App {
     /// Production code should prefer `from_runtime()` to avoid duplicating
     /// bootstrap logic.
     pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
-        let (runtime, boot_log) = GoatRuntime::bootstrap(config, paths, startup_warnings);
+        let (runtime, boot_log) = GoatRuntime::bootstrap(config, paths, startup_warnings, false);
         Self::from_runtime(runtime, boot_log)
     }
 
@@ -303,19 +318,31 @@ impl App {
             }
 
             "/status" => {
-                self.push_log(format!("[STATUS] Provider: {}", self.provider_label));
-                self.push_log(format!("[STATUS] Session:  {}", self.session_id));
-                self.push_log(format!("[STATUS] MCP servers: {}", self.mcp_server_count));
+                self.push_log(format!("[STATUS] Provider : {}", self.provider_label));
+                self.push_log(format!("[STATUS] Profile  : {}", self.active_profile));
                 self.push_log(format!(
-                    "[STATUS] Brain: {}",
-                    if self.brain.is_some() {
+                    "[STATUS] Fallback : {}",
+                    self.model_chain.fallback_display()
+                ));
+                self.push_log(format!("[STATUS] Session  : {}", self.session_id));
+                self.push_log(format!(
+                    "[STATUS] Brain    : {}",
+                    if self.brain_disabled {
+                        "disabled (--no-brain)"
+                    } else if self.brain.is_some() {
                         "connected"
                     } else {
                         "unavailable"
                     }
                 ));
-                self.push_log(format!("[STATUS] History messages: {}", self.history.len()));
-                self.push_log(format!("[STATUS] Log lines: {}", self.logs.len()));
+                self.push_log(format!(
+                    "[STATUS] History  : {} messages",
+                    self.history.len()
+                ));
+                self.push_log(format!(
+                    "[STATUS] MCP      : {} server(s)",
+                    self.mcp_server_count
+                ));
                 true
             }
 
@@ -534,9 +561,6 @@ impl App {
             self.active_route = Some(route.clone());
             self.status = AppStatus::Thinking;
 
-            // Update provider label from the selected route.
-            self.provider_label = format!("{}:{}", route.profile.provider, route.profile.model);
-
             let mut routed_history = vec![Message {
                 role: "system".to_string(),
                 content: Some(route.profile.system_prompt.to_string()),
@@ -547,15 +571,13 @@ impl App {
 
             match self
                 .llm_router
-                .completion(
-                    route.profile.provider,
-                    route.profile.model,
-                    routed_history,
-                    tools,
-                )
+                .completion_with_fallback(&self.model_chain, routed_history, tools)
                 .await
             {
-                Ok(response) => {
+                Ok((response, used_label)) => {
+                    // Update provider label to reflect actual model used (may differ from chain primary).
+                    self.provider_label = used_label;
+
                     self.history.push(Message {
                         role: "assistant".to_string(),
                         content: response.content.clone(),

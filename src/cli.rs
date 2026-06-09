@@ -54,6 +54,11 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub headless: bool,
 
+    /// Disable brain (SQLite memory). Runs without persistent session storage.
+    /// History is ephemeral and lost when GOAT exits.
+    #[arg(long, global = true)]
+    pub no_brain: bool,
+
     /// Subcommand to run. If omitted, the TUI (or --headless) mode is used.
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -76,8 +81,8 @@ pub enum Command {
     /// Check system readiness and print a health report.
     ///
     /// Checks: OS, GOAT version, config file + permissions, data directory,
-    /// database, legacy DB migration status, provider keys, ApprovalGate,
-    /// headless readiness, log directory.
+    /// database, legacy DB migration status, provider keys, profile + chain,
+    /// ApprovalGate, headless readiness, log directory.
     #[command(name = "doctor")]
     Doctor,
 
@@ -92,6 +97,10 @@ pub enum Command {
     /// Shows session ID, title, and (if available) the first user message.
     #[command(name = "sessions")]
     Sessions,
+
+    /// List configured providers, model profiles, and fallback chains.
+    #[command(name = "models")]
+    Models,
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -141,6 +150,11 @@ pub async fn handle_subcommand(
 
         Command::Sessions => {
             handle_sessions_command(paths)?;
+            Ok(true)
+        }
+
+        Command::Models => {
+            handle_models_command(config);
             Ok(true)
         }
     }
@@ -227,4 +241,69 @@ fn handle_migrate_db(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
         legacy_path.display()
     );
     Ok(())
+}
+
+// ── models command ────────────────────────────────────────────────────────────
+
+fn handle_models_command(config: &crate::config::Config) {
+    use crate::models::ProfileRegistry;
+
+    let registry = ProfileRegistry::from_config(&config.profiles);
+
+    // Build a temporary LlmRouter just to check provider availability.
+    let router = crate::llm::LlmRouter::new(
+        config.keys.openai_api_key.clone(),
+        config.keys.groq_api_key.clone(),
+    );
+
+    println!("GOAT Model Profiles");
+    println!("{}", "─".repeat(70));
+
+    // Provider status (never print keys).
+    println!("Providers:");
+    for provider in &[
+        "openai",
+        "groq",
+        "anthropic",
+        "gemini",
+        "ollama",
+        "openrouter",
+    ] {
+        println!(
+            "  {:12} {}",
+            provider,
+            router.provider_status_label(provider)
+        );
+    }
+    println!();
+
+    // Profile list.
+    println!("Default profile: {}", registry.default_profile);
+    println!();
+    println!("Profiles:");
+    println!("{}", "─".repeat(70));
+    for name in registry.profile_names() {
+        let (_, chain) = registry.resolve(name);
+        let primary = chain.primary_display();
+        let fallback = chain.fallback_display();
+        // Mark each entry as ready or unavailable.
+        let primary_status = if let Some(e) = chain.entries.first() {
+            if router.is_provider_available(&e.provider) {
+                "✓"
+            } else {
+                "✗"
+            }
+        } else {
+            "✗"
+        };
+        println!("  {:12} primary: {} {}", name, primary_status, primary);
+        if fallback != "none" {
+            println!("  {:12} fallback: {}", "", fallback);
+        }
+    }
+    println!("{}", "─".repeat(70));
+    println!();
+    println!("Legend: ✓ = provider ready   ✗ = provider not configured");
+    println!("To configure a provider, add its API key to ~/.config/goat/goat.toml [keys]");
+    println!("To customize profiles, add a [profiles] section to goat.toml");
 }

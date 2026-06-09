@@ -9,8 +9,9 @@
 //!
 //! ```text
 //!  main()
-//!   ├─ GoatRuntime::bootstrap(config, paths, warnings)
-//!   │     ├─ Brain::new(paths.db_file)
+//!   ├─ GoatRuntime::bootstrap(config, paths, warnings, no_brain)
+//!   │     ├─ ProfileRegistry::from_config()  → profile/chain setup
+//!   │     ├─ Brain::new(paths.db_file)        → SQLite (optional via --no-brain)
 //!   │     ├─ LlmRouter::new(keys)
 //!   │     ├─ SwarmRouter::default()
 //!   │     ├─ ApprovalGate::new()
@@ -20,14 +21,14 @@
 //!   └─ Headless path → headless::run(runtime)
 //! ```
 //!
-//! Future surfaces (web dashboard, Tauri, daemon) follow the same pattern:
-//! `GoatRuntime::bootstrap()` once, then pass to the surface-specific loop.
+//! Future surfaces (web dashboard, Tauri, daemon) follow the same pattern.
 
 use crate::approval::{ApprovalGate, ApprovalRequest};
 use crate::brain::Brain;
 use crate::config::Config;
 use crate::llm::{LlmRouter, Message};
 use crate::mcp::McpManager;
+use crate::models::{ModelChain, ProfileRegistry};
 use crate::paths::GoatPaths;
 use crate::swarm::SwarmRouter;
 use tracing::info;
@@ -49,12 +50,17 @@ pub struct GoatRuntime {
     pub session_id: String,
     /// Whether this session was resumed from the brain (true) or is fresh (false).
     pub session_resumed: bool,
+    /// Whether brain (SQLite) is disabled via `--no-brain`.
+    pub brain_disabled: bool,
 
     // ── Agent components ──────────────────────────────────────────────────────
-    /// SQLite brain (memory/session store). `None` if DB is unavailable.
+    /// SQLite brain (memory/session store).
+    /// `None` if DB is unavailable OR if `--no-brain` was passed.
     pub brain: Option<Brain>,
     /// LLM provider router.
     pub llm_router: LlmRouter,
+    /// Model profile registry (built-in defaults + user config).
+    pub profile_registry: ProfileRegistry,
     /// Keyword-based swarm router.
     pub swarm_router: SwarmRouter,
     /// Approval gate for dangerous tools.
@@ -65,8 +71,13 @@ pub struct GoatRuntime {
     /// Conversation history (sent to LLM each turn).
     pub history: Vec<Message>,
 
-    /// Human-readable provider label (e.g. "openai:gpt-4o-mini").
+    // ── Provider display ──────────────────────────────────────────────────────
+    /// Human-readable provider:model label for the currently active entry.
     pub provider_label: String,
+    /// Name of the active profile (e.g. "balanced", "coding").
+    pub active_profile: String,
+    /// The active fallback chain (from the active profile).
+    pub model_chain: ModelChain,
     /// Number of running MCP servers.
     pub mcp_server_count: usize,
 }
@@ -74,31 +85,52 @@ pub struct GoatRuntime {
 impl GoatRuntime {
     /// Bootstrap the shared agent runtime from config and paths.
     ///
-    /// This is the single place where session resume / UUID creation,
-    /// brain connection, provider setup, and gate initialization happen.
-    /// Both the TUI and headless mode call this.
+    /// - `no_brain`: when `true`, skip SQLite entirely (ephemeral session).
     pub fn bootstrap(
         config: Config,
         paths: GoatPaths,
         startup_warnings: Vec<String>,
+        no_brain: bool,
     ) -> (Self, Vec<String>) {
         let mut boot_log: Vec<String> = Vec::new();
 
-        // ── Brain / DB ────────────────────────────────────────────────────────
-        let brain = match Brain::new(&paths.db_file) {
-            Ok(b) => {
-                boot_log.push(format!(
-                    "[SYSTEM] Brain connected: {}",
-                    paths.db_file.display()
-                ));
-                Some(b)
+        // ── Profile registry ──────────────────────────────────────────────────
+        let profile_registry = ProfileRegistry::from_config(&config.profiles);
+        let active_profile = profile_registry.default_profile.clone();
+        let model_chain = profile_registry.default_chain().clone();
+
+        boot_log.push(format!(
+            "[SYSTEM] Profile: {} | Chain: {}{}",
+            active_profile,
+            model_chain.primary_display(),
+            if model_chain.len() > 1 {
+                format!(" → {}", model_chain.fallback_display())
+            } else {
+                String::new()
             }
-            Err(e) => {
-                boot_log.push(format!(
-                    "[WARN] Brain (SQLite) unavailable — running without memory: {}",
-                    e
-                ));
-                None
+        ));
+
+        // ── Brain / DB ────────────────────────────────────────────────────────
+        let brain = if no_brain {
+            boot_log
+                .push("[SYSTEM] Brain disabled (--no-brain) — running without memory.".to_string());
+            None
+        } else {
+            match Brain::new(&paths.db_file) {
+                Ok(b) => {
+                    boot_log.push(format!(
+                        "[SYSTEM] Brain connected: {}",
+                        paths.db_file.display()
+                    ));
+                    Some(b)
+                }
+                Err(e) => {
+                    boot_log.push(format!(
+                        "[WARN] Brain (SQLite) unavailable — running without memory: {}",
+                        e
+                    ));
+                    None
+                }
             }
         };
 
@@ -111,12 +143,10 @@ impl GoatRuntime {
             match b.get_sessions() {
                 Ok(sessions) => {
                     if let Some((latest_id, _)) = sessions.first() {
-                        // Resume the most recent session.
                         session_id = latest_id.clone();
                         session_resumed = true;
                         boot_log.push(format!("[SYSTEM] Resumed session: {}", session_id));
 
-                        // Load history for resumed session.
                         match b.load_session_history(&session_id) {
                             Ok(loaded) => {
                                 for (role, content) in loaded {
@@ -140,7 +170,6 @@ impl GoatRuntime {
                             }
                         }
                     } else {
-                        // Fresh database — create first session.
                         let _ = b.create_session(&session_id, "New Session");
                         boot_log.push(format!("[SYSTEM] Created session: {}", session_id));
                     }
@@ -149,6 +178,8 @@ impl GoatRuntime {
                     boot_log.push(format!("[WARN] Could not query sessions: {}", e));
                 }
             }
+        } else if no_brain {
+            boot_log.push(format!("[SYSTEM] Ephemeral session: {}", session_id));
         }
 
         // ── Provider / LLM ────────────────────────────────────────────────────
@@ -157,18 +188,21 @@ impl GoatRuntime {
             config.keys.groq_api_key.clone(),
         );
 
-        let provider_label = if config.keys.openai_api_key.is_some() {
-            "openai:gpt-4o-mini".to_string()
-        } else if config.keys.groq_api_key.is_some() {
-            "groq:llama3-8b".to_string()
-        } else {
-            "no provider configured".to_string()
-        };
+        // Build the display label from the first available entry in the chain.
+        let provider_label = model_chain
+            .entries
+            .iter()
+            .find(|e| llm_router.is_provider_available(&e.provider))
+            .map(|e| e.display())
+            .unwrap_or_else(|| "no provider configured".to_string());
 
         info!(
             session_id = %session_id,
             provider = %provider_label,
+            profile = %active_profile,
+            chain_len = model_chain.len(),
             resumed = session_resumed,
+            no_brain,
             "runtime bootstrapped"
         );
 
@@ -183,13 +217,17 @@ impl GoatRuntime {
             startup_warnings,
             session_id,
             session_resumed,
+            brain_disabled: no_brain,
             brain,
             llm_router,
+            profile_registry,
             swarm_router: SwarmRouter::default(),
             approval_gate: ApprovalGate::new(),
             mcp_manager: McpManager::new(),
             history,
             provider_label,
+            active_profile,
+            model_chain,
             mcp_server_count: 0,
         };
 

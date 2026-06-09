@@ -8,6 +8,112 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 1: Minimal Working Core
 
+### Added — Phase 1.5: Provider Abstraction + Model Profiles + Fallback Chain (2026-06-08)
+
+**Version bump: 0.3.0 → 0.4.0**
+
+**New file: `src/provider.rs`**
+- `ProviderError` — typed, classified error enum for all provider failures
+  - Variants: `RateLimit`, `AuthFailed`, `BadRequest`, `ModelNotFound`, `ServerError`, `NetworkError`, `NotConfigured`, `UnknownProvider`, `ChainExhausted`, `Other`
+  - `.is_recoverable()` — whether the fallback chain should try the next model
+  - `.is_retryable()` — whether the same provider/model should be retried
+  - `ProviderError::from_http(provider, model, status, body)` — classify HTTP status codes
+- `ProviderStatus` — `Ready`, `NotConfigured`, `Planned` (for doctor/models display)
+- `ProviderInfo` — summary struct for listing providers with their available models
+- 10 unit tests covering all error classifications
+
+**New file: `src/models.rs`**
+- `ModelEntry` — a single `provider:model` entry in a chain (parsed from `"openai:gpt-4o-mini"`)
+- `ModelChain` — ordered list of `ModelEntry` values; `primary_display()`, `fallback_display()`
+- `ProfilesConfig` — TOML-deserializable config struct for `[profiles]` section
+- `ProfileEntry` — per-profile TOML config (list of `chain` strings)
+- `ProfileRegistry` — runtime model profile registry
+  - `ProfileRegistry::from_config(config)` — merges user config with built-in defaults (user wins)
+  - `ProfileRegistry::with_defaults()` — built-in defaults only (no user config)
+  - `ProfileRegistry::resolve(name)` — resolves by name, falls back to default then "balanced"
+  - `ProfileRegistry::default_chain()` — returns the default profile's chain
+- **6 built-in profiles**: `balanced`, `cheap`, `powerful`, `coding`, `reasoning`, `local`
+  - `balanced`: openai:gpt-4o-mini → groq:llama-3.3-70b-versatile
+  - `cheap`: groq:llama-3.1-8b-instant → openai:gpt-4o-mini
+  - `powerful`: openai:gpt-4o → groq:llama-3.3-70b-versatile
+  - `coding`: openai:gpt-4o → groq:qwen-qwq-32b
+  - `reasoning`: openai:o1-mini → groq:llama-3.3-70b-versatile
+  - `local`: ollama:llama3 (planned — not implemented)
+- 12 unit tests covering parsing, chain ops, registry resolution, user config override
+
+**`src/llm.rs` — rewrite**
+- `LlmRouter::completion()` now returns `Result<MessageContent, ProviderError>` (was `Box<dyn Error>`)
+- `LlmRouter::completion_with_fallback(chain, messages, tools)` — new fallback chain runner
+  - Iterates `ModelChain` entries in order
+  - Skips unimplemented providers (`ollama`, `anthropic`, `gemini`, `openrouter`) with a log warning
+  - Retries retryable errors (network, 5xx) up to `MAX_RETRIES=2` times with 500ms*attempt delay
+  - Advances chain on recoverable errors (rate limit, server error, network after retries)
+  - Stops immediately on non-recoverable errors (401 auth, 400 bad request, 404 model not found)
+  - Returns `(MessageContent, String)` — response + actual provider:model label used
+- `LlmRouter::is_provider_available(provider)` — checks if a provider has a key and is implemented
+- `LlmRouter::is_provider_implemented(provider)` — static check for coded support
+- `LlmRouter::provider_status_label(provider)` — human-readable status without secrets
+- HTTP error classification via `ProviderError::from_http()` — replaces raw string errors
+- Network errors: timeout vs connection refused now classified correctly
+
+**`src/config.rs`**
+- `Config` struct: new `profiles: ProfilesConfig` field with `#[serde(default)]`
+  - Absent `[profiles]` in TOML → built-in defaults used automatically
+
+**`src/runtime.rs`**
+- `GoatRuntime` struct: new fields:
+  - `profile_registry: ProfileRegistry` — registry of all profiles
+  - `active_profile: String` — name of the active profile (e.g. `"balanced"`)
+  - `model_chain: ModelChain` — active fallback chain
+  - `brain_disabled: bool` — whether `--no-brain` was passed
+- `GoatRuntime::bootstrap()`: new `no_brain: bool` parameter
+  - Builds `ProfileRegistry::from_config()` at startup
+  - Skips SQLite entirely if `no_brain=true` (ephemeral session)
+  - `provider_label` now resolved from first *available* chain entry (not hardcoded if-else)
+  - Boot log now includes profile/chain summary
+
+**`src/app.rs`**
+- `App` struct: new `active_profile: String`, `model_chain: ModelChain`, `brain_disabled: bool` fields
+- `App::from_runtime()`: copies new fields from `GoatRuntime`
+- `App::new()`: passes `no_brain=false` to `GoatRuntime::bootstrap()`
+- `/status` command output updated:
+  - `Provider :`, `Profile  :`, `Fallback :`  (provider + profile + fallback chain)
+  - Brain shows `"disabled (--no-brain)"` when brain disabled
+- LLM call changed from `completion()` → `completion_with_fallback(&self.model_chain, …)`
+  - `provider_label` updated with actual model used after each response
+
+**`src/headless.rs`**
+- Banner now shows `Profile  :` and `Fallback :` lines
+- `Brain :` shows `"disabled (--no-brain)"` when brain disabled
+- `/status` output updated to match TUI output (Profile + Fallback)
+- LLM call changed from `completion()` → `completion_with_fallback(&rt.model_chain, …)`
+  - `rt.provider_label` updated with actual model used
+
+**`src/cli.rs`**
+- New global flag `--no-brain` — disables SQLite brain for ephemeral sessions
+- New subcommand `goat models` — lists all providers and profiles:
+  - Provider status for openai, groq, anthropic (planned), gemini (planned), ollama (planned), openrouter (planned)
+  - Each profile: primary (✓/✗), fallback chain, ready status
+  - Legend and config instructions at bottom
+
+**`src/main.rs`**
+- `mod models` and `mod provider` registered
+- `GoatRuntime::bootstrap()` call updated: passes `cli.no_brain`
+
+**`src/paths.rs`**
+- Doctor: 2 new checks after Provider count:
+  - `Default profile` — shows profile name, primary, and fallback; WARN if primary provider unavailable
+  - `Model profiles` — shows count and list of built-in profiles; includes `Run: goat models` hint
+
+### Not Implemented (Deferred to Phase 1.6)
+- Anthropic, Gemini, Ollama, OpenRouter providers (planned — no fake implementations)
+- `--profile <name>` flag to select a non-default profile at launch
+- Per-session profile switching via `/profile <name>` slash command
+- `anyhow` adoption in `brain.rs` (safe to defer — no user-facing changes)
+- Custom max-retry and timeout configuration in `goat.toml`
+
+---
+
 ### Added — Phase 1.4: Headless Mode + Runtime Separation (2026-06-08)
 
 **Version bump: 0.2.0 → 0.3.0**

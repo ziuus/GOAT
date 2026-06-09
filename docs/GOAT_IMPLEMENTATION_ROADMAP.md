@@ -174,6 +174,64 @@
 ---
 
 
+#### 1.5 Provider Abstraction + Model Profiles + Fallback Chain ✅ COMPLETE
+
+- [x] `src/provider.rs` — `ProviderError` enum with recoverability/retryability classification
+  - [x] `ProviderError::from_http()` — HTTP status → typed error
+  - [x] `.is_recoverable()` — drives fallback chain advancement
+  - [x] `.is_retryable()` — drives retry-same-provider logic
+  - [x] `ProviderStatus` — `Ready`, `NotConfigured`, `Planned`
+  - [x] 10 unit tests
+- [x] `src/models.rs` — `ModelEntry`, `ModelChain`, `ProfilesConfig`, `ProfileRegistry`
+  - [x] `ProfileRegistry::from_config()` — merges user config + built-in defaults (user wins)
+  - [x] `ProfileRegistry::with_defaults()` — built-in defaults only
+  - [x] `ProfileRegistry::resolve(name)` — falls back to default → balanced
+  - [x] 6 built-in profiles: `balanced`, `cheap`, `powerful`, `coding`, `reasoning`, `local`
+  - [x] `ProfilesConfig` — TOML-deserializable with `#[serde(default)]` support
+  - [x] 12 unit tests
+- [x] `src/llm.rs` — `completion_with_fallback()`, typed `ProviderError`, retry policy
+  - [x] MAX_RETRIES=2 with 500ms×attempt delay for retryable errors
+  - [x] Chain advances on recoverable errors; stops on non-recoverable
+  - [x] Returns `(MessageContent, used_label)` — surface knows which model was used
+  - [x] Unimplemented providers (ollama/anthropic/gemini) skipped with warn log
+- [x] `src/config.rs` — `Config.profiles: ProfilesConfig` field (serde default)
+- [x] `src/runtime.rs` — `profile_registry`, `active_profile`, `model_chain`, `brain_disabled`
+  - [x] `bootstrap()` accepts `no_brain: bool` — skips SQLite if true
+  - [x] `provider_label` from first available chain entry (not hardcoded)
+  - [x] Boot log includes profile + chain summary
+- [x] `src/app.rs` — uses `completion_with_fallback`, new profile/chain/brain_disabled fields
+  - [x] `/status` shows Profile + Fallback
+  - [x] `provider_label` updated with actual model used per response
+- [x] `src/headless.rs` — banner + /status shows Profile + Fallback
+  - [x] Uses `completion_with_fallback`, updates `rt.provider_label` per response
+- [x] `src/cli.rs` — `--no-brain` global flag; `goat models` subcommand
+  - [x] `goat models` prints providers (✓/✗), profiles, chains; no secrets
+- [x] `src/main.rs` — `mod models`, `mod provider` registered; `no_brain` passed to bootstrap
+- [x] `src/paths.rs` — doctor: `Default profile` + `Model profiles` checks (2 new)
+- [x] 47 total tests pass (was 26)
+- [x] Version bumped to 0.4.0
+
+**NOT implemented in Phase 1.5 (deferred):**
+- `--profile <name>` flag to select profile at launch
+- `/profile <name>` slash command for per-session switching
+- Anthropic, Gemini, Ollama, OpenRouter — planned, no fake implementations
+- `anyhow` in `brain.rs`
+- Configurable max-retry / timeout in `goat.toml`
+
+### Exit Criteria: ✅ ALL PASSED
+- `cargo check` passes ✅
+- `cargo test` 47/47 ✅
+- `goat models` shows providers, profiles, status ✅
+- `goat doctor` shows Default profile + Model profiles ✅
+- `goat --headless /status` shows Provider + Profile + Fallback ✅
+- `goat --headless --no-brain` runs ephemeral (brain disabled) ✅
+- Fallback chain implemented and used for all LLM calls ✅
+- No fake Anthropic/Gemini/Ollama provider ✅
+- Version 0.4.0 ✅
+
+---
+
+
 ## Phase 2: TUI Foundation
 
 **Goal:** A genuinely useful multi-panel TUI with sessions, diff view, and proper task flow.

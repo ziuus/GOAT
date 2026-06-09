@@ -7,7 +7,9 @@ mod error;
 mod headless;
 mod llm;
 mod mcp;
+mod models;
 mod paths;
+mod provider;
 mod runtime;
 mod swarm;
 mod tools;
@@ -120,9 +122,10 @@ async fn main() -> Result<()> {
     }
 
     // ── 7. Bootstrap shared runtime ───────────────────────────────────────────
-    // Shared between TUI and headless: brain, LLM, session, approval gate.
+    // Shared between TUI and headless: brain, LLM, session, approval gate,
+    // model profiles and fallback chain.
     let (runtime, boot_log) =
-        runtime::GoatRuntime::bootstrap(goat_config, goat_paths, config_warnings);
+        runtime::GoatRuntime::bootstrap(goat_config, goat_paths, config_warnings, cli.no_brain);
 
     // ── 8. Route to TUI or headless ───────────────────────────────────────────
     if cli.headless {

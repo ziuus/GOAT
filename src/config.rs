@@ -7,6 +7,7 @@
 //! On Unix, a warning is emitted (and stored in the startup log) if the
 //! file has group- or world-readable permissions.
 
+use crate::models::ProfilesConfig;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,6 +20,10 @@ pub struct Config {
     pub keys: Keys,
     #[serde(default)]
     pub mcp_servers: HashMap<String, McpServerConfig>,
+    /// Model profile configuration.  Optional — built-in defaults are used
+    /// if this section is absent from the config file.
+    #[serde(default)]
+    pub profiles: ProfilesConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]

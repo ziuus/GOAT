@@ -374,6 +374,49 @@ pub fn run_doctor(
         ),
     });
 
+    // ── Model profiles ────────────────────────────────────────────────────────
+    {
+        use crate::models::ProfileRegistry;
+        // Use default config to get registry without importing Config.
+        let registry = ProfileRegistry::with_defaults();
+        let default_name = &registry.default_profile;
+        let (_, chain) = registry.resolve(default_name);
+        let primary_ok = chain
+            .entries
+            .first()
+            .map(|e| match e.provider.as_str() {
+                "openai" => has_openai_key,
+                "groq" => has_groq_key,
+                _ => false,
+            })
+            .unwrap_or(false);
+
+        checks.push(DoctorCheck {
+            status: if primary_ok {
+                DoctorStatus::Ok
+            } else {
+                DoctorStatus::Warn
+            },
+            label: "Default profile".to_string(),
+            detail: format!(
+                "'{}' — primary: {}  fallback: {}",
+                default_name,
+                chain.primary_display(),
+                chain.fallback_display()
+            ),
+        });
+
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Model profiles".to_string(),
+            detail: format!(
+                "{} profiles: {}   Run: goat models",
+                registry.profiles.len(),
+                registry.profile_names().join(", ")
+            ),
+        });
+    }
+
     // ── DB migration status ───────────────────────────────────────────────────
     if GoatPaths::detect_legacy_db().is_some() {
         checks.push(DoctorCheck {
