@@ -1,5 +1,6 @@
-use crate::config::Config;
+use crate::config::{Config, ExternalWorkspaceMode};
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -99,15 +100,19 @@ pub struct ExternalAgentResponse {
     pub success: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExternalAgentRun {
+    pub id: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub agent_name: String,
     pub command_path: PathBuf,
     pub task: String,
     pub mode: String,
+    pub workspace_path: PathBuf,
     pub duration: Duration,
     pub exit_code: Option<i32>,
     pub success: bool,
+    pub changed_files_count: Option<usize>,
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -331,13 +336,15 @@ impl ExternalAgentRegistry {
 pub struct ExternalAgentManager {
     pub registry: ExternalAgentRegistry,
     audit_log_path: PathBuf,
+    data_dir: PathBuf,
 }
 
 impl ExternalAgentManager {
-    pub fn new(audit_log_path: PathBuf) -> Self {
+    pub fn new(audit_log_path: PathBuf, data_dir: PathBuf) -> Self {
         Self {
             registry: ExternalAgentRegistry::new(),
             audit_log_path,
+            data_dir,
         }
     }
 
@@ -440,20 +447,33 @@ impl ExternalAgentManager {
         }
 
         let run_mode = config.external_agents.workspace_mode.clone();
+        let run_id = uuid::Uuid::new_v4().to_string();
+        let mut workspace_path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-        // Note: For Phase 2.8, since we don't fully trust agents yet, if they are modifying files
-        // we should technically isolate them, but the user must opt-in via config.
+        if run_mode == ExternalWorkspaceMode::IsolatedCopy {
+            let target_dir = self.data_dir.join("external-runs").join(&run_id);
+            if let Err(e) = copy_safe_workspace(&workspace_path, &target_dir) {
+                return Err(anyhow!("Failed to create isolated workspace: {}", e));
+            }
+            workspace_path = target_dir;
+            cmd.current_dir(&workspace_path);
+        } else if run_mode == ExternalWorkspaceMode::DetectOnly {
+            return Err(anyhow!("External execution is configured to detect-only. Execution aborted."));
+        }
         
         // Log execution start
         self.log_execution(&ExternalAgentRun {
+            id: run_id.clone(),
             timestamp: chrono::Utc::now(),
             agent_name: adapter.name.clone(),
             command_path: binary_path.clone(),
             task: task.to_string(),
-            mode: run_mode.clone(),
+            mode: run_mode.to_string(),
+            workspace_path: workspace_path.clone(),
             duration: Duration::from_secs(0),
             exit_code: None,
             success: false, // not done yet
+            changed_files_count: None,
         });
 
         // Normally we'd use tokio timeout here, but since this is sync/blocking for now or we spawn:
@@ -464,14 +484,17 @@ impl ExternalAgentManager {
         let success = output.status.success();
         
         let run_record = ExternalAgentRun {
+            id: run_id.clone(),
             timestamp: chrono::Utc::now(),
             agent_name: adapter.name.clone(),
             command_path: binary_path.clone(),
             task: task.to_string(),
-            mode: run_mode,
+            mode: run_mode.to_string(),
+            workspace_path: workspace_path.clone(),
             duration,
             exit_code: output.status.code(),
             success,
+            changed_files_count: None,
         };
         
         self.log_execution(&run_record);
@@ -505,6 +528,41 @@ impl ExternalAgentManager {
                 run.success,
             );
             let _ = file.write_all(log_entry.as_bytes());
+            
+            // Also write JSONL
+            let jsonl_path = self.data_dir.join("external-agent-runs.jsonl");
+            if let Ok(mut json_file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
+                if let Ok(json_str) = serde_json::to_string(run) {
+                    let _ = writeln!(json_file, "{}", json_str);
+                }
+            }
         }
     }
+}
+
+fn copy_safe_workspace(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+    let ignore_names = [".git", "node_modules", "target", "dist", "build", ".next", ".turbo", ".cache", "venv", ".venv", "__pycache__", ".env", "secrets", "credentials", "keys"];
+    fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path, ignore: &[&str]) -> Result<()> {
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let ft = entry.file_type()?;
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy().to_lowercase();
+            if ignore.iter().any(|&i| file_name_str.contains(i)) {
+                continue;
+            }
+            let dst_path = dst.join(file_name);
+            if ft.is_dir() {
+                std::fs::create_dir_all(&dst_path)?;
+                copy_dir_all(&entry.path(), &dst_path, ignore)?;
+            } else {
+                let _ = std::fs::copy(&entry.path(), &dst_path);
+            }
+        }
+        Ok(())
+    }
+    copy_dir_all(src, dst, &ignore_names)
 }

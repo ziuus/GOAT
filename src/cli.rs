@@ -1414,9 +1414,55 @@ fn handle_external_agents_command(mut rt: crate::runtime::GoatRuntime, action: &
             let checks = crate::paths::run_doctor(&rt.paths, &rt.config, false);
             crate::paths::print_doctor_results(&checks);
         }
+        "runs" => {
+            let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
+            if jsonl_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                    println!("External Agent Runs:");
+                    for line in content.lines() {
+                        if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                            println!("  {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" });
+                        }
+                    }
+                }
+            } else {
+                println!("No runs recorded yet.");
+            }
+        }
+        "run" => {
+            if let Some(run_id) = arg {
+                let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
+                let mut found = false;
+                if jsonl_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                        for line in content.lines() {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                if run.id == run_id {
+                                    println!("Run ID: {}", run.id);
+                                    println!("Agent: {}", run.agent_name);
+                                    println!("Timestamp: {}", run.timestamp);
+                                    println!("Mode: {}", run.mode);
+                                    println!("Workspace: {}", run.workspace_path.display());
+                                    println!("Task: {}", run.task);
+                                    println!("Success: {}", run.success);
+                                    println!("Duration: {:?}", run.duration);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if !found {
+                    println!("Run ID '{}' not found.", run_id);
+                }
+            } else {
+                println!("Usage: goat external-agents run <id>");
+            }
+        }
         _ => {
             println!("Unknown external-agents action: {}", action);
-            println!("Valid actions: list, detect, show <name>, audit, doctor");
+            println!("Valid actions: list, detect, show <name>, audit, doctor, runs, run <id>");
         }
     }
 }

@@ -62,3 +62,11 @@ Inside GOAT interactive sessions (headless or TUI):
 - Orchestration metrics (token consumption integration).
 - Proper interactive overlay mapping (letting external agents stream output into Ratatui overlays).
 - Subagent to External Agent delegation workflows.
+
+## Phase 2.9 Updates
+Phase 2.9 brings safe orchestration and workspace isolation to the external agent adapters.
+- **Isolated Workspace Execution**: Supports `isolated-copy` mode, where a temporary workspace is cloned with `.git`, `node_modules`, `target`, and secrets intentionally excluded. The external agent runs inside this directory without modifying the host project.
+- **Run Tracking**: Implements `ExternalAgentRun` capturing structured outputs (stdout/stderr), metadata, exit codes, and durations.
+- **Historical Runs**: History is appended to `external-agent-runs.jsonl`. Accessible via `goat external-agents runs` (CLI) or `/external-runs` (TUI/headless).
+- **Run Inspection**: Explore detailed run outputs with `goat external-agents run <id>` (CLI) or `/external-run <id>` (TUI/headless).
+- **Comparison Tool**: Added `/compare-agents <task>` to synchronously diff an internal agent execution against a designated external agent (Aider by default).

@@ -32,6 +32,8 @@ pub struct GoatPaths {
     pub tool_audit_log_file: PathBuf,
     /// `<data_dir>/subagent-audit.log`
     pub subagent_audit_log_file: PathBuf,
+    /// `<data_dir>/external-agent-audit.log`
+    pub external_agent_audit_log_file: PathBuf,
     /// `~/.config/goat/skills/`
     pub skills_dir: PathBuf,
 }
@@ -71,6 +73,7 @@ impl GoatPaths {
         let memory_file = data_dir.join("MEMORY.md");
         let tool_audit_log_file = data_dir.join("tool-audit.log");
         let subagent_audit_log_file = data_dir.join("subagent-audit.log");
+        let external_agent_audit_log_file = data_dir.join("external-agent-audit.log");
         let skills_dir = config_dir.join("skills");
 
         Ok(Self {
@@ -83,6 +86,7 @@ impl GoatPaths {
             memory_file,
             tool_audit_log_file,
             subagent_audit_log_file,
+            external_agent_audit_log_file,
             skills_dir,
         })
     }
@@ -709,6 +713,32 @@ pub fn run_doctor(
             status: DoctorStatus::Info,
             label: "Subagent Audit Log".to_string(),
             detail: "Not yet created (will be created on first subagent run)".to_string(),
+        });
+    }
+
+    // ── External Agents ────────────────────────────────────────────────────────
+    let mut ext_mgr = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone(), paths.data_dir.clone());
+    ext_mgr.detect_all(config);
+
+    let detected_count = ext_mgr.registry.adapters.values().filter(|a| a.status == crate::external_agents::ExternalAgentStatus::Detected).count();
+    
+    checks.push(DoctorCheck {
+        status: if config.external_agents.enabled { DoctorStatus::Ok } else { DoctorStatus::Info },
+        label: "External Agent Framework".to_string(),
+        detail: format!("{} ({} agents detected)", if config.external_agents.enabled { "Enabled" } else { "Disabled" }, detected_count),
+    });
+
+    if paths.external_agent_audit_log_file.exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "External Agent Audit Log".to_string(),
+            detail: "Exists and writable".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "External Agent Audit Log".to_string(),
+            detail: "Not yet created".to_string(),
         });
     }
 

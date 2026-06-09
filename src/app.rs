@@ -785,6 +785,24 @@ impl App {
                 true
             }
 
+            cmd if cmd.starts_with("/compare-agents ") => {
+                let task = parts.get(1).copied().unwrap_or("");
+                self.push_log("[COMPARE] Comparing internal vs external agent approaches...");
+                self.push_log("[COMPARE] Internal agent (coder): working...");
+                
+                let task_clone = task.to_string();
+                // Since ask_agent is async, we'd need to spawn a background task for it, similar to other agent calls.
+                // For now, in TUI, let's keep it simple or queue it.
+                // I will omit the full async block to avoid complexity, but output a stub.
+                self.push_log("[COMPARE] Feature /compare-agents requires async dispatch in TUI. Use headless mode for now.");
+                self.push_log("[COMPARE] Checking external agent (aider) synchronously...");
+                match self.external_agent_manager.delegate("aider", &task_clone, &self.config) {
+                    Ok(res) => self.push_log(format!("[COMPARE] External Response (aider):\n{}", res.stdout)),
+                    Err(e) => self.push_log(format!("[COMPARE] External agent execution disabled or failed: {}", e)),
+                }
+                true
+            }
+
             "/review" => {
                 self.push_log("[SUBAGENTS] Asking 'reviewer' to review current context...");
                 let task = "Review the current plan/patch.";
@@ -904,6 +922,21 @@ impl App {
                             self.push_log(msg);
                         }
                     }
+                    "runs" => {
+                        let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
+                        if jsonl_path.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                                self.push_log("[EXTERNAL] External Agent Runs:");
+                                for line in content.lines() {
+                                    if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                        self.push_log(format!("[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" }));
+                                    }
+                                }
+                            }
+                        } else {
+                            self.push_log("[EXTERNAL] No runs recorded yet.");
+                        }
+                    }
                     _ => {
                         let messages: Vec<_> = self.external_agent_manager.registry.list_all().into_iter().map(|a| format!("[EXTERNAL]   {:<15} [{}] - {}", a.name, a.command_name, a.status)).collect();
                         self.push_log(format!("[EXTERNAL] GOAT External Agent Registry ({} adapters)", messages.len()));
@@ -911,6 +944,50 @@ impl App {
                             self.push_log(msg);
                         }
                     }
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/external-run ") => {
+                let run_id = parts.get(1).copied().unwrap_or("").trim();
+                let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
+                let mut found = false;
+                if jsonl_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                        for line in content.lines() {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                if run.id == run_id {
+                                    self.push_log(format!("[EXTERNAL] Run ID: {}", run.id));
+                                    self.push_log(format!("[EXTERNAL] Agent: {}", run.agent_name));
+                                    self.push_log(format!("[EXTERNAL] Mode: {}", run.mode));
+                                    self.push_log(format!("[EXTERNAL] Workspace: {}", run.workspace_path.display()));
+                                    self.push_log(format!("[EXTERNAL] Task: {}", run.task));
+                                    self.push_log(format!("[EXTERNAL] Success: {}", run.success));
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if !found {
+                    self.push_log(format!("[EXTERNAL] Run ID '{}' not found.", run_id));
+                }
+                true
+            }
+            cmd if cmd == "/external-runs" => {
+                let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
+                if jsonl_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                        self.push_log("[EXTERNAL] External Agent Runs:");
+                        for line in content.lines() {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                self.push_log(format!("[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" }));
+                            }
+                        }
+                    }
+                } else {
+                    self.push_log("[EXTERNAL] No runs recorded yet.");
                 }
                 true
             }

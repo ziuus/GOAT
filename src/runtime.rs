@@ -88,6 +88,8 @@ pub struct GoatRuntime {
     pub tool_registry: crate::tool_registry::ToolRegistry,
     /// Phase 2.7 Subagent Manager.
     pub subagent_manager: crate::subagents::SubagentManager,
+    /// Phase 2.8 External Agent Manager.
+    pub external_agent_manager: crate::external_agents::ExternalAgentManager,
 }
 
 impl GoatRuntime {
@@ -233,8 +235,12 @@ impl GoatRuntime {
                 .to_string(),
         );
 
+        let mut external_agent_manager = crate::external_agents::ExternalAgentManager::new(paths.external_agent_audit_log_file.clone(), paths.data_dir.clone());
+        external_agent_manager.detect_all(&config);
+
         let runtime = GoatRuntime {
             subagent_manager: crate::subagents::SubagentManager::new(paths.clone()),
+            external_agent_manager,
             paths,
             config,
             startup_warnings,

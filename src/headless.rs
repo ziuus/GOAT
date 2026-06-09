@@ -522,26 +522,6 @@ async fn handle_slash_command(
                 let name = subparts[0];
                 let task = subparts[1];
                 
-                let action = rt.tool_registry.evaluate_action("delegate_external_agent", &rt.config.tools);
-                if let crate::tool_registry::ToolAction::Deny(reason) = action {
-                    println!("[EXTERNAL] Delegation denied by tool registry: {}", reason);
-                    return true;
-                }
-                
-                let req = crate::approval::ApprovalRequest {
-                    tool_name: "delegate_external_agent".to_string(),
-                    action_summary: format!("agent: {}, task: {}", name, task),
-                    risk_level: crate::approval::RiskLevel::High,
-                    explanation: None,
-                    working_directory: None,
-                };
-                
-                // For headless, we could prompt, but slash command implies intent.
-                if let Some(crate::approval::ApprovalDecision::Denied(msg)) = rt.approval_gate.check_policy(&req) {
-                    println!("[EXTERNAL] Delegation denied via policy: {}", msg);
-                    return true;
-                }
-                
                 println!("[SUBAGENTS] Asking '{}'...", name);
                 let summary = "Headless context summary... (limited repo map)";
                 match rt
@@ -559,6 +539,139 @@ async fn handle_slash_command(
                 {
                     Ok(res) => println!("[SUBAGENTS] Response:\n{}", res),
                     Err(e) => println!("[SUBAGENTS] Error: {}", e),
+                }
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/delegate-external ") => {
+            let args_str = parts.get(1).copied().unwrap_or("");
+            let subparts: Vec<&str> = args_str.splitn(2, ' ').collect();
+            if subparts.len() < 2 {
+                println!("[EXTERNAL] Usage: /delegate-external <agent_name> <task>");
+            } else {
+                let name = subparts[0];
+                let task = subparts[1];
+                
+                let action = rt.tool_registry.evaluate_action("delegate_external_agent", &rt.config.tools);
+                if let crate::tool_registry::ToolAction::Deny(reason) = action {
+                    println!("[EXTERNAL] Delegation denied by tool registry: {}", reason);
+                    return true;
+                }
+                
+                let req = crate::approval::ApprovalRequest {
+                    tool_name: "delegate_external_agent".to_string(),
+                    action_summary: format!("agent: {}, task: {}", name, task),
+                    risk_level: crate::approval::RiskLevel::High,
+                    explanation: None,
+                    working_directory: None,
+                };
+                
+                if let Some(crate::approval::ApprovalDecision::Denied(msg)) = rt.approval_gate.check_policy(&req) {
+                    println!("[EXTERNAL] Delegation denied via policy: {}", msg);
+                    return true;
+                }
+                
+                println!("[EXTERNAL] Delegating to '{}'...", name);
+                match rt.external_agent_manager.delegate(name, task, &rt.config) {
+                    Ok(res) => {
+                        println!("[EXTERNAL] Done. Success: {}", res.success);
+                        println!("[EXTERNAL] STDOUT:\n{}", res.stdout);
+                        if !res.stderr.is_empty() {
+                            println!("[EXTERNAL] STDERR:\n{}", res.stderr);
+                        }
+                    }
+                    Err(e) => {
+                        println!("[EXTERNAL] Execution failed: {}", e);
+                        println!("[EXTERNAL] (To enable, check your config: allow_execution = true, workspace_mode = \"isolated-copy\")");
+                    }
+                }
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/compare-agents ") => {
+            let task = parts.get(1).copied().unwrap_or("");
+            println!("[COMPARE] Comparing internal vs external agent approaches...");
+            println!("[COMPARE] Internal agent (coder): working...");
+            let summary = "Headless context summary... (limited repo map)";
+            match rt.subagent_manager.ask_agent("coder", task, summary, active_skill.clone(), None, &rt.llm_router, &rt.model_chain).await {
+                Ok(res) => println!("[COMPARE] Internal Response:\n{}", res),
+                Err(e) => println!("[COMPARE] Internal Error: {}", e),
+            }
+            println!("[COMPARE] Checking external agent (aider)...");
+            if rt.config.external_agents.allow_execution {
+                match rt.external_agent_manager.delegate("aider", task, &rt.config) {
+                    Ok(res) => println!("[COMPARE] External Response (aider):\n{}", res.stdout),
+                    Err(e) => println!("[COMPARE] External agent execution disabled or failed: {}", e),
+                }
+            } else {
+                println!("[COMPARE] External agent execution is disabled in config. Cannot compare.");
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/external-agents") => {
+            let subcmd = parts.get(1).copied().unwrap_or("list");
+            match subcmd {
+                "detect" => {
+                    println!("[EXTERNAL] Detecting...");
+                    rt.external_agent_manager.detect_all(&rt.config);
+                    for a in rt.external_agent_manager.registry.list_all() {
+                        println!("  {} - {}", a.name, a.status);
+                    }
+                }
+                "runs" => {
+                    let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
+                    if jsonl_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                            for line in content.lines() {
+                                if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                    println!("{} | {} | {}", run.id, run.agent_name, run.mode);
+                                }
+                            }
+                        }
+                    } else {
+                        println!("[EXTERNAL] No runs.");
+                    }
+                }
+                _ => {
+                    for a in rt.external_agent_manager.registry.list_all() {
+                        println!("  {} [{}] - {}", a.name, a.command_name, a.status);
+                    }
+                }
+            }
+            true
+        }
+
+        cmd if cmd == "/external-runs" => {
+            let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
+            if jsonl_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                    for line in content.lines() {
+                        if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                            println!("{} | {} | {}", run.id, run.agent_name, run.mode);
+                        }
+                    }
+                }
+            } else {
+                println!("[EXTERNAL] No runs.");
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/external-run ") => {
+            let run_id = parts.get(1).copied().unwrap_or("").trim();
+            let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
+            if jsonl_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                    for line in content.lines() {
+                        if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                            if run.id == run_id {
+                                println!("Run ID: {}\nAgent: {}\nWorkspace: {}\nTask: {}", run.id, run.agent_name, run.workspace_path.display(), run.task);
+                            }
+                        }
+                    }
                 }
             }
             true
