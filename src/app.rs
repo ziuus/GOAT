@@ -94,6 +94,10 @@ pub struct App {
     pub history_idx: Option<usize>,
     /// Workflow state for Phase 2.5
     pub workflow: crate::task::WorkflowState,
+    /// Tool registry
+    pub tool_registry: crate::tool_registry::ToolRegistry,
+    /// Subagent Manager
+    pub subagent_manager: crate::subagents::SubagentManager,
 }
 
 impl App {
@@ -173,6 +177,8 @@ impl App {
             input_history: Vec::new(),
             history_idx: None,
             workflow: rt.workflow,
+            tool_registry: rt.tool_registry,
+            subagent_manager: rt.subagent_manager,
         }
     }
 
@@ -330,7 +336,7 @@ impl App {
                 self.status = AppStatus::ToolRunning(deferred.name.clone());
 
                 let tool_result = execute_native_tool(&deferred.name, deferred.args.clone()).await;
-                
+
                 if let Some(id) = &deferred.patch_id {
                     if let Some(p) = self.workflow.get_patch_mut(id) {
                         p.status = crate::task::PatchStatus::Applied;
@@ -443,6 +449,18 @@ impl App {
                 self.push_log("[HELP]   /learn            — index project files into brain");
                 self.push_log("[HELP]   /route            — show swarm route for current input");
                 self.push_log("[HELP] ─────────────────────────────────────────────────────────");
+                self.push_log("[HELP] Subagents (Phase 2.7):");
+                self.push_log("[HELP]   /subagents        — list internal subagents");
+                self.push_log("[HELP]   /subagent <name>  — show subagent details");
+                self.push_log("[HELP]   /ask-agent <n> <t>— run a subagent turn");
+                self.push_log(
+                    "[HELP]   /review           — ask reviewer to review current patch/plan",
+                );
+                self.push_log("[HELP]   /debug            — ask debugger to analyze recent error");
+                self.push_log(
+                    "[HELP]   /test-plan        — ask tester for a verification strategy",
+                );
+                self.push_log("[HELP] ─────────────────────────────────────────────────────────");
                 self.push_log("[HELP] Keyboard:");
                 self.push_log("[HELP]   Enter     — send message");
                 self.push_log("[HELP]   ↑         — recall previous command (history)");
@@ -516,13 +534,142 @@ impl App {
                         self.push_log("[STATUS] Project  : Not scanned (/project scan)");
                     }
                 }
+                self.push_log(format!(
+                    "[STATUS] Subagents: {} available",
+                    self.subagent_manager.registry.list_all().len()
+                ));
                 true
             }
 
             "/mcp" => {
-                self.push_log("[MCP] Starting configured MCP servers...");
-                info!("starting configured MCP servers via slash command");
-                self.start_configured_mcp_servers().await;
+                let subcommand = _args;
+                match subcommand {
+                    "status" | "" => {
+                        let count = self.config.mcp_servers.len();
+                        self.push_log(format!("[MCP] Configured MCP Servers: {}", count));
+                        let srvs: Vec<_> = self
+                            .config
+                            .mcp_servers
+                            .iter()
+                            .map(|(n, s)| (n.clone(), s.command.clone()))
+                            .collect();
+                        for (name, cmd) in srvs {
+                            self.push_log(format!("[MCP] - {}: {}", name, cmd));
+                        }
+                    }
+                    "list" => {
+                        let mcp_tools = self.mcp_manager.all_tools();
+                        self.push_log(format!("[MCP] {} MCP tools:", mcp_tools.len()));
+                        for t in &mcp_tools {
+                            if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
+                                self.push_log(format!("[MCP]   {}", name));
+                            }
+                        }
+                    }
+                    "start" => {
+                        self.push_log("[MCP] Starting configured MCP servers...");
+                        info!("starting configured MCP servers via slash command");
+                        self.start_configured_mcp_servers().await;
+                    }
+                    _ => self.push_log(
+                        "[MCP] Unknown command. Use /mcp status, /mcp list, or /mcp start.",
+                    ),
+                }
+                true
+            }
+
+            "/tools" => {
+                let subcommand = _args;
+                match subcommand {
+                    "list" | "" => {
+                        let tools = self
+                            .tool_registry
+                            .list_all()
+                            .into_iter()
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        self.push_log(format!(
+                            "[TOOLS] GOAT Tool Registry ({} tools)",
+                            tools.len()
+                        ));
+                        for t in &tools {
+                            let perm = self
+                                .tool_registry
+                                .get_permission(&t.name, &self.config.tools);
+                            self.push_log(format!(
+                                "[TOOLS]   {:<15} [{:?}] - {}",
+                                t.name, perm, t.description
+                            ));
+                        }
+
+                        let mcp_tools = self.mcp_manager.all_tools();
+                        if !mcp_tools.is_empty() {
+                            self.push_log(format!("[TOOLS] {} MCP tools:", mcp_tools.len()));
+                            for t in &mcp_tools {
+                                if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
+                                    self.push_log(format!("[TOOLS]   {}", name));
+                                }
+                            }
+                        }
+                    }
+                    "categories" => {
+                        self.push_log(
+                            "[TOOLS] Categories: filesystem, shell, project, subagent...",
+                        );
+                    }
+                    "doctor" => {
+                        let tools_len = self.tool_registry.list_all().len();
+                        self.push_log(format!(
+                            "[TOOLS] Registry Doctor: {} total native tools.",
+                            tools_len
+                        ));
+                        self.push_log(format!("[TOOLS] Enabled: {}", self.config.tools.enabled));
+                    }
+                    "audit" => {
+                        if self.paths.tool_audit_log_file.exists() {
+                            if let Ok(content) =
+                                std::fs::read_to_string(&self.paths.tool_audit_log_file)
+                            {
+                                for line in content.lines() {
+                                    self.push_log(line.to_string());
+                                }
+                            }
+                        } else {
+                            self.push_log("[TOOLS] No audit log found.");
+                        }
+                    }
+                    name => {
+                        let tool_opt = self.tool_registry.get(name).cloned();
+                        if let Some(tool) = tool_opt {
+                            let perm = self
+                                .tool_registry
+                                .get_permission(&tool.name, &self.config.tools);
+                            self.push_log(format!("[TOOLS] Tool: {}", tool.name));
+                            self.push_log(format!("[TOOLS] Category: {}", tool.category));
+                            self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
+                            self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
+                        } else {
+                            self.push_log(format!("[TOOLS] Tool '{}' not found.", name));
+                        }
+                    }
+                }
+                true
+            }
+
+            "/tool" => {
+                let name = _args;
+                let tool_opt = self.tool_registry.get(name).cloned();
+                if let Some(tool) = tool_opt {
+                    let perm = self
+                        .tool_registry
+                        .get_permission(&tool.name, &self.config.tools);
+                    self.push_log(format!("[TOOLS] Tool: {}", tool.name));
+                    self.push_log(format!("[TOOLS] Category: {}", tool.category));
+                    self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
+                    self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
+                } else {
+                    self.push_log(format!("[TOOLS] Tool '{}' not found.", name));
+                }
                 true
             }
 
@@ -535,6 +682,169 @@ impl App {
             "/route" => {
                 info!("swarm route requested via slash command");
                 self.route_current_input();
+                true
+            }
+
+            "/subagents" => {
+                let subcommand = _args;
+                match subcommand {
+                    "audit" => {
+                        if self.paths.subagent_audit_log_file.exists() {
+                            if let Ok(content) =
+                                std::fs::read_to_string(&self.paths.subagent_audit_log_file)
+                            {
+                                for line in content.lines() {
+                                    self.push_log(line.to_string());
+                                }
+                            }
+                        } else {
+                            self.push_log("[SUBAGENTS] No audit log found.");
+                        }
+                    }
+                    _ => {
+                        let list = self.subagent_manager.registry.list_all();
+                        self.push_log(format!(
+                            "[SUBAGENTS] GOAT Subagent Registry ({} internal subagents)",
+                            list.len()
+                        ));
+                        for agent in list {
+                            self.push_log(format!(
+                                "[SUBAGENTS]   {:<15} [{}] - {}",
+                                agent.name,
+                                agent.kind.to_string(),
+                                agent.purpose
+                            ));
+                        }
+                    }
+                }
+                true
+            }
+
+            "/subagent" => {
+                let name = _args;
+                if let Some(agent) = self.subagent_manager.registry.get(name) {
+                    self.push_log(format!("[SUBAGENTS] Name: {}", agent.name));
+                    self.push_log(format!("[SUBAGENTS] Kind: {}", agent.kind));
+                    self.push_log(format!("[SUBAGENTS] Risk: {}", agent.risk_level));
+                    self.push_log(format!(
+                        "[SUBAGENTS] Model Profile: {}",
+                        agent.default_model_profile
+                    ));
+                    self.push_log(format!(
+                        "[SUBAGENTS] Allowed Tools: {:?}",
+                        agent.allowed_tools
+                    ));
+                    self.push_log(format!(
+                        "[SUBAGENTS] Context Budget: {}",
+                        agent.context_budget
+                    ));
+                } else {
+                    self.push_log(format!("[SUBAGENTS] Subagent '{}' not found.", name));
+                }
+                true
+            }
+
+            "/ask-agent" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                if parts.len() < 2 {
+                    self.push_log("[SUBAGENTS] Usage: /ask-agent <name> <task>");
+                } else {
+                    let name = parts[0];
+                    let task = parts[1];
+                    self.push_log(format!("[SUBAGENTS] Asking '{}'...", name));
+                    let summary = "CLI context summary... (limited repo map)";
+                    let name_clone = name.to_string();
+                    let task_clone = task.to_string();
+                    self.status = crate::app::AppStatus::Thinking;
+
+                    match self
+                        .subagent_manager
+                        .ask_agent(
+                            &name_clone,
+                            &task_clone,
+                            summary,
+                            None,
+                            None,
+                            &self.llm_router,
+                            &self.model_chain,
+                        )
+                        .await
+                    {
+                        Ok(res) => self.push_log(format!("[SUBAGENTS] Response:\n{}", res)),
+                        Err(e) => self.push_log(format!("[SUBAGENTS] Error: {}", e)),
+                    }
+                }
+                true
+            }
+
+            "/review" => {
+                self.push_log("[SUBAGENTS] Asking 'reviewer' to review current context...");
+                let task = "Review the current plan/patch.";
+                let summary = "CLI context summary... (limited repo map)";
+                match self
+                    .subagent_manager
+                    .ask_agent(
+                        "reviewer",
+                        task,
+                        summary,
+                        None,
+                        None,
+                        &self.llm_router,
+                        &self.model_chain,
+                    )
+                    .await
+                {
+                    Ok(res) => self.push_log(format!("[SUBAGENTS] Response:\n{}", res)),
+                    Err(e) => self.push_log(format!("[SUBAGENTS] Error: {}", e)),
+                }
+                true
+            }
+
+            "/debug" => {
+                self.push_log("[SUBAGENTS] Asking 'debugger' to analyze...");
+                let task = "Analyze recent errors or bugs.";
+                let summary = "CLI context summary... (limited repo map)";
+
+                match self
+                    .subagent_manager
+                    .ask_agent(
+                        "debugger",
+                        task,
+                        summary,
+                        None,
+                        None,
+                        &self.llm_router,
+                        &self.model_chain,
+                    )
+                    .await
+                {
+                    Ok(res) => self.push_log(format!("[SUBAGENTS] Response:\n{}", res)),
+                    Err(e) => self.push_log(format!("[SUBAGENTS] Error: {}", e)),
+                }
+                true
+            }
+
+            "/test-plan" => {
+                self.push_log("[SUBAGENTS] Asking 'tester' for verification strategy...");
+                let task = "Suggest a verification strategy or test plan.";
+                let summary = "CLI context summary... (limited repo map)";
+
+                match self
+                    .subagent_manager
+                    .ask_agent(
+                        "tester",
+                        task,
+                        summary,
+                        None,
+                        None,
+                        &self.llm_router,
+                        &self.model_chain,
+                    )
+                    .await
+                {
+                    Ok(res) => self.push_log(format!("[SUBAGENTS] Response:\n{}", res)),
+                    Err(e) => self.push_log(format!("[SUBAGENTS] Error: {}", e)),
+                }
                 true
             }
 
@@ -756,27 +1066,6 @@ impl App {
                 self.push_log("[UI] Planned: Phase 6.0 — Voice Companion (opt-in only)");
                 self.push_log("[UI] ─────────────────────────────────────────────────────────");
                 self.push_log("[UI] See docs/GOAT_MULTI_FRONTEND_ARCHITECTURE.md for details.");
-                true
-            }
-
-            "/tools" => {
-                let tools = NativeTools::all_tools();
-                self.push_log(format!("[TOOLS] {} native tools available:", tools.len()));
-                for t in &tools {
-                    self.push_log(format!(
-                        "[TOOLS]   {} — {}",
-                        t.function.name, t.function.description
-                    ));
-                }
-                let mcp_tools = self.mcp_manager.all_tools();
-                if !mcp_tools.is_empty() {
-                    self.push_log(format!("[TOOLS] {} MCP tools available:", mcp_tools.len()));
-                    for t in &mcp_tools {
-                        if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
-                            self.push_log(format!("[TOOLS]   {}", name));
-                        }
-                    }
-                }
                 true
             }
 
@@ -1203,7 +1492,7 @@ impl App {
             }
 
             "/verify" => {
-                // To implement verify, we need the runtime. Since App contains runtime components but not the struct itself, 
+                // To implement verify, we need the runtime. Since App contains runtime components but not the struct itself,
                 // wait, handle_verify_command requires &mut GoatRuntime, but we are inside App.
                 // I need to adapt the handle_verify_command to not need GoatRuntime if possible.
                 // I'll inline the verify logic here for App, or change handle_verify_command to take active_task.
@@ -1211,17 +1500,31 @@ impl App {
                 let cmds = crate::repo_map::ProjectCommands::detect(&root);
                 self.push_log("[VERIFY] Verification checks available:".to_string());
                 let mut found = false;
-                if let Some(cmd) = &cmds.check { self.push_log(format!("  - check: {}", cmd)); found = true; }
-                if let Some(cmd) = &cmds.test { self.push_log(format!("  - test: {}", cmd)); found = true; }
-                if let Some(cmd) = &cmds.lint { self.push_log(format!("  - lint: {}", cmd)); found = true; }
-                if let Some(cmd) = &cmds.format { self.push_log(format!("  - format: {}", cmd)); found = true; }
+                if let Some(cmd) = &cmds.check {
+                    self.push_log(format!("  - check: {}", cmd));
+                    found = true;
+                }
+                if let Some(cmd) = &cmds.test {
+                    self.push_log(format!("  - test: {}", cmd));
+                    found = true;
+                }
+                if let Some(cmd) = &cmds.lint {
+                    self.push_log(format!("  - lint: {}", cmd));
+                    found = true;
+                }
+                if let Some(cmd) = &cmds.format {
+                    self.push_log(format!("  - format: {}", cmd));
+                    found = true;
+                }
                 if found {
                     self.push_log("[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate.".to_string());
                     if let Some(task) = &mut self.workflow.active_task {
                         task.status = crate::task::TaskStatus::Testing;
                     }
                 } else {
-                    self.push_log("[VERIFY] No verification commands detected for this project.".to_string());
+                    self.push_log(
+                        "[VERIFY] No verification commands detected for this project.".to_string(),
+                    );
                 }
                 true
             }
@@ -1398,7 +1701,10 @@ impl App {
                 }
             }
             if let Some(task) = &self.workflow.active_task {
-                sys_prompt.push_str(&format!("\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n", task.request, task.status));
+                sys_prompt.push_str(&format!(
+                    "\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n",
+                    task.request, task.status
+                ));
                 if let Some(plan) = &task.plan_text {
                     sys_prompt.push_str(&format!("PLAN:\n{}\n", plan));
                 }
@@ -1464,14 +1770,50 @@ impl App {
 
                                 let mut patch_id = None;
                                 if tc.function.name == "write_file" {
-                                    let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                                    let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                                    let preview = crate::repo_map::generate_diff_preview(path, content);
-                                    let diff_lines = crate::repo_map::format_diff_preview(&preview).join("\n");
-                                    patch_id = Some(self.workflow.add_patch(path.to_string(), content.to_string(), diff_lines));
+                                    let path =
+                                        args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                                    let content =
+                                        args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                                    let preview =
+                                        crate::repo_map::generate_diff_preview(path, content);
+                                    let diff_lines =
+                                        crate::repo_map::format_diff_preview(&preview).join("\n");
+                                    patch_id = Some(self.workflow.add_patch(
+                                        path.to_string(),
+                                        content.to_string(),
+                                        diff_lines,
+                                    ));
                                     if let Some(task) = &mut self.workflow.active_task {
                                         task.status = crate::task::TaskStatus::PatchProposed;
                                     }
+                                }
+
+                                let tool_action = self
+                                    .tool_registry
+                                    .evaluate_action(&tc.function.name, &self.config.tools);
+                                if let crate::tool_registry::ToolAction::Deny(ref reason) =
+                                    tool_action
+                                {
+                                    self.push_log(format!("[TOOL] Denied by policy: {}", reason));
+                                    self.tool_registry.log_execution(
+                                        &self.paths,
+                                        &self.session_id,
+                                        &tc.function.name,
+                                        &tool_action,
+                                        false,
+                                        reason,
+                                    );
+                                    self.history.push(Message {
+                                        role: "tool".to_string(),
+                                        content: Some(format!(
+                                            "Tool execution denied. Reason: {}",
+                                            reason
+                                        )),
+                                        tool_calls: None,
+                                        tool_call_id: Some(tc.id),
+                                    });
+                                    self.trim_history();
+                                    continue;
                                 }
 
                                 let approval_request =
@@ -1491,10 +1833,21 @@ impl App {
                                                     p.status = crate::task::PatchStatus::Applied;
                                                 }
                                                 if let Some(task) = &mut self.workflow.active_task {
-                                                    task.status = crate::task::TaskStatus::PatchApplied;
+                                                    task.status =
+                                                        crate::task::TaskStatus::PatchApplied;
                                                 }
                                             }
                                             self.push_log(format!("[TOOL] {}", result));
+
+                                            self.tool_registry.log_execution(
+                                                &self.paths,
+                                                &self.session_id,
+                                                &tc.function.name,
+                                                &tool_action,
+                                                true,
+                                                &result,
+                                            );
+
                                             self.history.push(Message {
                                                 role: "tool".to_string(),
                                                 content: Some(result),
@@ -1522,6 +1875,18 @@ impl App {
                                                 tool_calls: None,
                                                 tool_call_id: Some(tc.id),
                                             });
+
+                                            self.tool_registry.log_execution(
+                                                &self.paths,
+                                                &self.session_id,
+                                                &tc.function.name,
+                                                &crate::tool_registry::ToolAction::Deny(
+                                                    reason.clone(),
+                                                ),
+                                                false,
+                                                &reason,
+                                            );
+
                                             self.trim_history();
                                         }
                                         None => {
@@ -1566,6 +1931,16 @@ impl App {
                                     };
 
                                     self.push_log(format!("[TOOL] {}", tool_result));
+
+                                    self.tool_registry.log_execution(
+                                        &self.paths,
+                                        &self.session_id,
+                                        &tc.function.name,
+                                        &tool_action,
+                                        true,
+                                        &tool_result,
+                                    );
+
                                     self.history.push(Message {
                                         role: "tool".to_string(),
                                         content: Some(tool_result),

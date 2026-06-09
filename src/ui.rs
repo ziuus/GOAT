@@ -98,7 +98,7 @@ fn render_header(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     };
 
     // Session display: prefer title over UUID snippet.
-    let session_display = if app.session_id.len() > 12 {
+    let _session_display = if app.session_id.len() > 12 {
         format!("s:{}", &app.session_id[..8])
     } else {
         format!("s:{}", &app.session_id)

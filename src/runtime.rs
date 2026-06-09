@@ -85,6 +85,9 @@ pub struct GoatRuntime {
     // ── Workflow state ────────────────────────────────────────────────────────
     /// Phase 2.5 Agentic Coding workflow state.
     pub workflow: WorkflowState,
+    pub tool_registry: crate::tool_registry::ToolRegistry,
+    /// Phase 2.7 Subagent Manager.
+    pub subagent_manager: crate::subagents::SubagentManager,
 }
 
 impl GoatRuntime {
@@ -231,6 +234,7 @@ impl GoatRuntime {
         );
 
         let runtime = GoatRuntime {
+            subagent_manager: crate::subagents::SubagentManager::new(paths.clone()),
             paths,
             config,
             startup_warnings,
@@ -249,6 +253,7 @@ impl GoatRuntime {
             model_chain,
             mcp_server_count: 0,
             workflow: WorkflowState::default(),
+            tool_registry: crate::tool_registry::ToolRegistry::new(),
         };
 
         (runtime, boot_log)

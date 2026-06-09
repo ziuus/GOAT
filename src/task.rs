@@ -82,21 +82,24 @@ impl WorkflowState {
         self.patches.push(patch);
         id
     }
-    
+
     pub fn get_patch_mut(&mut self, id: &str) -> Option<&mut Patch> {
         self.patches.iter_mut().find(|p| p.id == id)
     }
 
     pub fn get_pending_patches(&self) -> Vec<&Patch> {
-        self.patches.iter().filter(|p| matches!(p.status, PatchStatus::Pending)).collect()
+        self.patches
+            .iter()
+            .filter(|p| matches!(p.status, PatchStatus::Pending))
+            .collect()
     }
-    
+
     pub fn clear_patches(&mut self) {
         self.patches.clear();
     }
 }
+use crate::approval::{ApprovalRequest, RiskLevel};
 use crate::runtime::GoatRuntime;
-use crate::approval::{RiskLevel, ApprovalRequest};
 
 pub fn handle_mode_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<String> {
     let mut logs = Vec::new();
@@ -112,7 +115,9 @@ pub fn handle_mode_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<S
             "plan" => {
                 workflow.mode = crate::task::AgentMode::Plan;
                 logs.push("[MODE] Switched to Plan mode.".to_string());
-                logs.push("[MODE] GOAT will only create plans and will not modify files.".to_string());
+                logs.push(
+                    "[MODE] GOAT will only create plans and will not modify files.".to_string(),
+                );
             }
             "act" => {
                 workflow.mode = crate::task::AgentMode::Act;
@@ -120,7 +125,10 @@ pub fn handle_mode_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<S
                 logs.push("[MODE] GOAT can propose patches (requires ApprovalGate).".to_string());
             }
             _ => {
-                logs.push(format!("[MODE] Unknown mode: {}. Use 'plan' or 'act'.", args[0]));
+                logs.push(format!(
+                    "[MODE] Unknown mode: {}. Use 'plan' or 'act'.",
+                    args[0]
+                ));
             }
         }
     }
@@ -157,7 +165,9 @@ pub fn handle_task_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<S
         workflow.active_task = None;
         logs.push("[TASK] Active task cleared.".to_string());
     } else {
-        logs.push("[TASK] Unknown task command. Use /task, /task status, or /task clear.".to_string());
+        logs.push(
+            "[TASK] Unknown task command. Use /task, /task status, or /task clear.".to_string(),
+        );
     }
     logs
 }
@@ -173,7 +183,10 @@ pub fn handle_patch_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<
             for p in pending {
                 logs.push(format!("  [{}] {}", p.id, p.file_path));
             }
-            logs.push("[PATCH] Commands: /patch show <id> · /patch apply <id> · /patch discard <id>".to_string());
+            logs.push(
+                "[PATCH] Commands: /patch show <id> · /patch apply <id> · /patch discard <id>"
+                    .to_string(),
+            );
         }
     } else if args[0] == "show" {
         if args.len() < 2 {
@@ -196,9 +209,12 @@ pub fn handle_patch_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<
         } else {
             let id = args[1];
             if let Some(_patch) = workflow.patches.iter().find(|p| p.id == id) {
-                // To apply, we just need to send it to the ApprovalGate. 
+                // To apply, we just need to send it to the ApprovalGate.
                 // But from here we return log lines. The actual approval must be requested by the UI.
-                logs.push(format!("[PATCH] Found patch {}. Use write_file tool to apply it with ApprovalGate.", id));
+                logs.push(format!(
+                    "[PATCH] Found patch {}. Use write_file tool to apply it with ApprovalGate.",
+                    id
+                ));
                 logs.push("[PATCH] (Direct /patch apply without tool call requires injecting an ApprovalRequest directly into the app state.)".to_string());
             } else {
                 logs.push(format!("[PATCH] Patch {} not found.", id));
@@ -220,7 +236,10 @@ pub fn handle_patch_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<
         workflow.clear_patches();
         logs.push("[PATCH] All patches cleared.".to_string());
     } else {
-        logs.push("[PATCH] Unknown command. Commands: list, show <id>, apply <id>, discard <id>, clear".to_string());
+        logs.push(
+            "[PATCH] Unknown command. Commands: list, show <id>, apply <id>, discard <id>, clear"
+                .to_string(),
+        );
     }
     logs
 }
@@ -228,14 +247,21 @@ pub fn handle_patch_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<
 pub fn handle_plan_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<String> {
     let mut logs = Vec::new();
     if args.is_empty() {
-        logs.push("[PLAN] Please specify a task request. Example: /plan add a README section".to_string());
+        logs.push(
+            "[PLAN] Please specify a task request. Example: /plan add a README section".to_string(),
+        );
         return logs;
     }
     let request = args.join(" ");
     workflow.mode = crate::task::AgentMode::Plan;
     workflow.active_task = Some(crate::task::CodingTask::new(request.clone()));
-    logs.push(format!("[PLAN] Switched to Plan mode. Created new task: {}", request));
-    logs.push("[PLAN] GOAT will now analyze the project and produce a structured plan.".to_string());
+    logs.push(format!(
+        "[PLAN] Switched to Plan mode. Created new task: {}",
+        request
+    ));
+    logs.push(
+        "[PLAN] GOAT will now analyze the project and produce a structured plan.".to_string(),
+    );
     logs
 }
 
@@ -246,14 +272,20 @@ pub fn handle_act_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<St
             workflow.mode = crate::task::AgentMode::Act;
             logs.push("[ACT] Switched to Act mode for current task.".to_string());
         } else {
-            logs.push("[ACT] No active task to act on. Please specify a task request or run /plan first.".to_string());
+            logs.push(
+                "[ACT] No active task to act on. Please specify a task request or run /plan first."
+                    .to_string(),
+            );
         }
         return logs;
     }
     let request = args.join(" ");
     workflow.mode = crate::task::AgentMode::Act;
     workflow.active_task = Some(crate::task::CodingTask::new(request.clone()));
-    logs.push(format!("[ACT] Switched to Act mode. Created new task: {}", request));
+    logs.push(format!(
+        "[ACT] Switched to Act mode. Created new task: {}",
+        request
+    ));
     logs.push("[ACT] GOAT will now propose patches via ApprovalGate.".to_string());
     logs
 }
@@ -261,7 +293,10 @@ pub fn handle_act_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<St
 pub fn handle_code_command(workflow: &mut WorkflowState, args: &[&str]) -> Vec<String> {
     let mut logs = Vec::new();
     if args.is_empty() {
-        logs.push("[CODE] Please specify a task request. Example: /code improve README formatting".to_string());
+        logs.push(
+            "[CODE] Please specify a task request. Example: /code improve README formatting"
+                .to_string(),
+        );
         return logs;
     }
     let request = args.join(" ");
@@ -279,7 +314,7 @@ pub fn handle_verify_command(workflow: &mut WorkflowState, _args: &[&str]) -> Ve
     let root = std::env::current_dir().unwrap_or_default();
     let cmds = crate::repo_map::ProjectCommands::detect(&root);
     logs.push("[VERIFY] Verification checks available:".to_string());
-    
+
     let mut found = false;
     if let Some(cmd) = &cmds.check {
         logs.push(format!("  - check: {}", cmd));
@@ -297,7 +332,7 @@ pub fn handle_verify_command(workflow: &mut WorkflowState, _args: &[&str]) -> Ve
         logs.push(format!("  - format: {}", cmd));
         found = true;
     }
-    
+
     if found {
         logs.push("[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate.".to_string());
         if let Some(task) = &mut workflow.active_task {

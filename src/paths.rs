@@ -22,10 +22,16 @@ pub struct GoatPaths {
     pub db_file: PathBuf,
     /// Directory for rolling log files.
     pub log_dir: PathBuf,
-    /// `~/.config/goat/USER.md`
+    /// `<data_dir>/brain/`
+    pub brain_dir: PathBuf,
+    /// `<data_dir>/USER.md`
     pub user_file: PathBuf,
-    /// `~/.config/goat/MEMORY.md`
+    /// `<data_dir>/MEMORY.md`
     pub memory_file: PathBuf,
+    /// `<data_dir>/tool-audit.log`
+    pub tool_audit_log_file: PathBuf,
+    /// `<data_dir>/subagent-audit.log`
+    pub subagent_audit_log_file: PathBuf,
     /// `~/.config/goat/skills/`
     pub skills_dir: PathBuf,
 }
@@ -60,8 +66,11 @@ impl GoatPaths {
         let log_dir = data_dir.join("logs");
 
         let config_dir = config_file.parent().unwrap_or(Path::new("")).to_path_buf();
-        let user_file = config_dir.join("USER.md");
-        let memory_file = config_dir.join("MEMORY.md");
+        let brain_dir = data_dir.join("brain");
+        let user_file = data_dir.join("USER.md");
+        let memory_file = data_dir.join("MEMORY.md");
+        let tool_audit_log_file = data_dir.join("tool-audit.log");
+        let subagent_audit_log_file = data_dir.join("subagent-audit.log");
         let skills_dir = config_dir.join("skills");
 
         Ok(Self {
@@ -69,8 +78,11 @@ impl GoatPaths {
             data_dir,
             db_file,
             log_dir,
+            brain_dir,
             user_file,
             memory_file,
+            tool_audit_log_file,
+            subagent_audit_log_file,
             skills_dir,
         })
     }
@@ -672,6 +684,31 @@ pub fn run_doctor(
             status: DoctorStatus::Info,
             label: "Skills Directory".to_string(),
             detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Subagents ──────────────────────────────────────────────────────────────
+    let subagents_registry = crate::subagents::SubagentRegistry::new();
+    checks.push(DoctorCheck {
+        status: DoctorStatus::Ok,
+        label: "Subagents".to_string(),
+        detail: format!(
+            "{} internal subagents loaded",
+            subagents_registry.list_all().len()
+        ),
+    });
+
+    if paths.subagent_audit_log_file.exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Subagent Audit Log".to_string(),
+            detail: "Exists and writable".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Subagent Audit Log".to_string(),
+            detail: "Not yet created (will be created on first subagent run)".to_string(),
         });
     }
 

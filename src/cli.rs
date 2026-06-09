@@ -114,9 +114,47 @@ pub enum Command {
     #[command(name = "new-session")]
     NewSession,
 
-    /// List configured providers, model profiles, and fallback chains.
+    /// List and switch model profiles and providers.
     #[command(name = "models")]
-    Models,
+    Models {
+        /// Optional specific action (e.g., 'list', 'status')
+        action: Option<String>,
+    },
+
+    /// Manage tools, permissions, and tool registry.
+    #[command(name = "tools")]
+    Tools {
+        /// Action to perform: list, show, categories, doctor, audit.
+        #[arg(default_value = "list")]
+        action: String,
+        /// Optional argument for the action (e.g. tool name).
+        arg: Option<String>,
+    },
+
+    /// Internal Subagent Framework management.
+    Subagents {
+        /// Action to perform: list, show, audit.
+        #[arg(default_value = "list")]
+        action: String,
+        /// Optional argument for the action (e.g. subagent name).
+        arg: Option<String>,
+    },
+
+    /// Run a single internal subagent turn.
+    AskAgent {
+        /// The name of the subagent to run.
+        name: String,
+        /// The task for the subagent.
+        task: String,
+    },
+
+    /// MCP server integration management.
+    #[command(name = "mcp")]
+    Mcp {
+        /// Action to perform: status, list.
+        #[arg(default_value = "status")]
+        action: String,
+    },
 
     /// Show project awareness status or scan the current directory.
     #[command(name = "project")]
@@ -255,7 +293,7 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Models => {
+        Command::Models { action: _ } => {
             handle_models_command(config);
             Ok(true)
         }
@@ -313,6 +351,31 @@ pub async fn handle_subcommand(
 
         Command::Patch { action } => {
             handle_patch_command(action);
+            Ok(true)
+        }
+
+        Command::Tools { action, arg } => {
+            handle_tools_command(paths, config, &action, arg.as_deref())?;
+            Ok(true)
+        }
+        Command::Subagents { action, arg } => {
+            handle_subagents_command(paths, config, &action, arg.as_deref())?;
+            Ok(true)
+        }
+        Command::AskAgent { name, task } => {
+            let rt = crate::runtime::GoatRuntime::bootstrap(
+                config.clone(),
+                paths.clone(),
+                vec![],
+                false,
+                None,
+            )
+            .0;
+            handle_ask_agent_command(&name, &task, &rt).await?;
+            Ok(true)
+        }
+        Command::Mcp { action } => {
+            handle_mcp_command(paths, config, action)?;
             Ok(true)
         }
     }
@@ -398,6 +461,147 @@ fn handle_new_session_command(paths: &crate::paths::GoatPaths) -> anyhow::Result
             session_id
         );
         eprintln!("[GOAT] Run `goat` to start and persist this session.");
+    }
+
+    Ok(())
+}
+
+// ── tools command ─────────────────────────────────────────────────────────────
+
+fn handle_tools_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
+    let registry = crate::tool_registry::ToolRegistry::new();
+
+    match action {
+        "list" => {
+            println!("GOAT Tool Registry ({} tools)", registry.list_all().len());
+            println!("{:-<80}", "");
+            println!(
+                "{:<20} | {:<15} | {:<10} | {:<10} | {}",
+                "Name", "Category", "Risk", "Approval", "Permission"
+            );
+            println!("{:-<80}", "");
+
+            for tool in registry.list_all() {
+                let perm = registry.get_permission(&tool.name, &config.tools);
+                let approval = if tool.requires_approval {
+                    "Required"
+                } else {
+                    "None"
+                };
+                println!(
+                    "{:<20} | {:<15} | {:<10} | {:<10} | {:?}",
+                    tool.name,
+                    tool.category.to_string(),
+                    tool.risk_level.to_string(),
+                    approval,
+                    perm
+                );
+            }
+        }
+        "show" => {
+            if let Some(name) = arg {
+                if let Some(tool) = registry.get(name) {
+                    println!("Tool: {}", tool.name);
+                    println!("Description: {}", tool.description);
+                    println!("Category: {}", tool.category);
+                    println!("Risk Level: {}", tool.risk_level);
+                    println!("Requires Approval: {}", tool.requires_approval);
+                    println!("Read Only: {}", tool.read_only);
+                    println!("Permission Group: {}", tool.permission_group);
+                    println!(
+                        "Effective Permission: {:?}",
+                        registry.get_permission(&tool.name, &config.tools)
+                    );
+                    println!(
+                        "Effective Action: {:?}",
+                        registry.evaluate_action(&tool.name, &config.tools)
+                    );
+                } else {
+                    println!("Tool '{}' not found.", name);
+                }
+            } else {
+                println!("Please provide a tool name. Example: goat tools show bash");
+            }
+        }
+        "categories" => {
+            println!("Tool Categories:");
+            println!("- filesystem");
+            println!("- shell");
+            println!("- project");
+            println!("- subagent");
+            // etc
+        }
+        "doctor" => {
+            let tools = registry.list_all();
+            println!("Tool Registry Doctor:");
+            println!("  Total tools: {}", tools.len());
+            println!(
+                "  High/Critical risk tools: {}",
+                tools
+                    .iter()
+                    .filter(|t| t.risk_level == crate::approval::RiskLevel::High
+                        || t.risk_level == crate::approval::RiskLevel::Critical)
+                    .count()
+            );
+            println!(
+                "  Tool audit log path: {}",
+                paths.tool_audit_log_file.display()
+            );
+            println!(
+                "  Permission configuration enabled: {}",
+                config.tools.enabled
+            );
+        }
+        "audit" => {
+            if paths.tool_audit_log_file.exists() {
+                match std::fs::read_to_string(&paths.tool_audit_log_file) {
+                    Ok(content) => println!("{}", content),
+                    Err(e) => println!("Failed to read audit log: {}", e),
+                }
+            } else {
+                println!(
+                    "No audit log found at {}.",
+                    paths.tool_audit_log_file.display()
+                );
+            }
+        }
+        _ => {
+            println!(
+                "Unknown action '{}'. Expected: list, show, categories, doctor, audit.",
+                action
+            );
+        }
+    }
+
+    Ok(())
+}
+
+// ── mcp command ───────────────────────────────────────────────────────────────
+
+fn handle_mcp_command(
+    _paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+) -> anyhow::Result<()> {
+    match action {
+        "status" => {
+            println!("MCP Expansion Foundation (Phase 2.6)");
+            println!("Configured MCP Servers: {}", config.mcp_servers.len());
+            for (name, srv) in &config.mcp_servers {
+                println!("- {}: {} args={:?}", name, srv.command, srv.args);
+            }
+        }
+        "list" => {
+            println!("MCP list is managed through tool registry. Use 'goat tools list'.");
+        }
+        _ => {
+            println!("Unknown action '{}'. Expected: status, list.", action);
+        }
     }
 
     Ok(())
@@ -1028,4 +1232,92 @@ fn handle_patch_command(action: &str) {
             );
         }
     }
+}
+
+fn handle_subagents_command(
+    paths: &crate::paths::GoatPaths,
+    _config: &crate::config::Config,
+    action: &str,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
+    let registry = crate::subagents::SubagentRegistry::new();
+
+    match action {
+        "list" | "" => {
+            let list = registry.list_all();
+            println!("GOAT Subagent Registry ({} subagents)", list.len());
+            println!("{:-<80}", "");
+            println!(
+                "{:<15} | {:<15} | {:<15} | {}",
+                "Name", "Kind", "Risk Level", "Profile"
+            );
+            println!("{:-<80}", "");
+            for agent in list {
+                println!(
+                    "{:<15} | {:<15} | {:<15} | {}",
+                    agent.name,
+                    agent.kind.to_string(),
+                    agent.risk_level.to_string(),
+                    agent.default_model_profile
+                );
+            }
+        }
+        "show" => {
+            if let Some(name) = arg {
+                if let Some(agent) = registry.get(name) {
+                    println!("Subagent: {}", agent.name);
+                    println!("Kind: {}", agent.kind);
+                    println!("Purpose: {}", agent.purpose);
+                    println!("Risk Level: {}", agent.risk_level);
+                    println!("Model Profile: {}", agent.default_model_profile);
+                    println!("Allowed Tools: {:?}", agent.allowed_tools);
+                    println!("Context Budget: {}", agent.context_budget);
+                    println!("Requires Approval: {}", agent.requires_approval);
+                    println!("Can Propose Patches: {}", agent.can_propose_patches);
+                } else {
+                    println!("Subagent '{}' not found.", name);
+                }
+            } else {
+                println!("Please specify a subagent name to show.");
+            }
+        }
+        "audit" => {
+            if paths.subagent_audit_log_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&paths.subagent_audit_log_file) {
+                    println!("{}", content);
+                } else {
+                    println!("Error reading subagent audit log.");
+                }
+            } else {
+                println!("No subagent audit log found.");
+            }
+        }
+        _ => {
+            println!("Unknown action: {}. Available: list, show, audit.", action);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_ask_agent_command(
+    name: &str,
+    task: &str,
+    rt: &crate::runtime::GoatRuntime,
+) -> anyhow::Result<()> {
+    println!("Asking subagent '{}'...", name);
+    let manager = &rt.subagent_manager;
+    let summary = "CLI context summary... (limited repo map)";
+    let result = manager
+        .ask_agent(
+            name,
+            task,
+            summary,
+            None,
+            None,
+            &rt.llm_router,
+            &rt.model_chain,
+        )
+        .await?;
+    println!("\nResponse:\n{}\n", result);
+    Ok(())
 }

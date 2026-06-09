@@ -183,6 +183,14 @@ async fn handle_slash_command(
             println!("[HELP]   n — deny");
             println!("[HELP]   a — always allow this tool (session)");
             println!("[HELP]   d — always deny this tool (session)");
+            println!("[HELP]");
+            println!("[HELP] Subagents (Phase 2.7):");
+            println!("[HELP]   /subagents        — list internal subagents");
+            println!("[HELP]   /subagent <name>  — show subagent details");
+            println!("[HELP]   /ask-agent <n> <t>— run a subagent turn");
+            println!("[HELP]   /review           — ask reviewer to review current patch/plan");
+            println!("[HELP]   /debug            — ask debugger to analyze recent error");
+            println!("[HELP]   /test-plan        — ask tester for a verification strategy");
             true
         }
 
@@ -254,6 +262,10 @@ async fn handle_slash_command(
                     }
                 }
             }
+            println!(
+                "[STATUS] Subagents: {} available",
+                rt.subagent_manager.registry.list_all().len()
+            );
             true
         }
 
@@ -341,20 +353,254 @@ async fn handle_slash_command(
             true
         }
 
-        "/tools" => {
-            let tools = NativeTools::all_tools();
-            println!("[TOOLS] {} native tools:", tools.len());
-            for t in &tools {
-                println!("[TOOLS]   {} — {}", t.function.name, t.function.description);
-            }
-            let mcp_tools = rt.mcp_manager.all_tools();
-            if !mcp_tools.is_empty() {
-                println!("[TOOLS] {} MCP tools:", mcp_tools.len());
-                for t in &mcp_tools {
-                    if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
-                        println!("[TOOLS]   {}", name);
+        cmd if cmd.starts_with("/tools") => {
+            let subcommand = parts.get(1).copied().unwrap_or("list");
+            match subcommand {
+                "list" => {
+                    let tools = rt.tool_registry.list_all();
+                    println!("[TOOLS] GOAT Tool Registry ({} tools)", tools.len());
+                    for t in &tools {
+                        let perm = rt
+                            .tool_registry
+                            .get_permission(&t.name, &rt.config.tools);
+                        println!("[TOOLS]   {:<15} [{:?}] - {}", t.name, perm, t.description);
+                    }
+
+                    let mcp_tools = rt.mcp_manager.all_tools();
+                    if !mcp_tools.is_empty() {
+                        println!("[TOOLS] {} MCP tools:", mcp_tools.len());
+                        for t in &mcp_tools {
+                            if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
+                                println!("[TOOLS]   {}", name);
+                            }
+                        }
                     }
                 }
+                "categories" => {
+                    println!("[TOOLS] Categories: filesystem, shell, project, subagent...");
+                }
+                "doctor" => {
+                    let tools = rt.tool_registry.list_all();
+                    println!(
+                        "[TOOLS] Registry Doctor: {} total native tools.",
+                        tools.len()
+                    );
+                    println!("[TOOLS] Enabled: {}", rt.config.tools.enabled);
+                }
+                "audit" => {
+                    if rt.paths.tool_audit_log_file.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&rt.paths.tool_audit_log_file)
+                        {
+                            println!("{}", content);
+                        }
+                    } else {
+                        println!("[TOOLS] No audit log found.");
+                    }
+                }
+                name => {
+                    if let Some(tool) = rt.tool_registry.get(name) {
+                        println!("[TOOLS] Tool: {}", tool.name);
+                        println!("[TOOLS] Category: {}", tool.category);
+                        println!("[TOOLS] Risk: {}", tool.risk_level);
+                        println!(
+                            "[TOOLS] Effective Permission: {:?}",
+                            rt.tool_registry
+                                .get_permission(&tool.name, &rt.config.tools)
+                        );
+                    } else {
+                        println!("[TOOLS] Tool '{}' not found.", name);
+                    }
+                }
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/tool ") => {
+            let name = parts.get(1).copied().unwrap_or("").trim();
+            if let Some(tool) = rt.tool_registry.get(name) {
+                println!("[TOOLS] Tool: {}", tool.name);
+                println!("[TOOLS] Category: {}", tool.category);
+                println!("[TOOLS] Risk: {}", tool.risk_level);
+                println!(
+                    "[TOOLS] Effective Permission: {:?}",
+                    rt.tool_registry
+                        .get_permission(&tool.name, &rt.config.tools)
+                );
+            } else {
+                println!("[TOOLS] Tool '{}' not found.", name);
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/mcp") => {
+            let subcommand = parts.get(1).copied().unwrap_or("status");
+            match subcommand {
+                "status" => {
+                    println!(
+                        "[MCP] Configured MCP Servers: {}",
+                        rt.config.mcp_servers.len()
+                    );
+                    for (name, srv) in &rt.config.mcp_servers {
+                        println!("[MCP] - {}: {}", name, srv.command);
+                    }
+                }
+                "list" => {
+                    let mcp_tools = rt.mcp_manager.all_tools();
+                    println!("[MCP] {} MCP tools:", mcp_tools.len());
+                    for t in &mcp_tools {
+                        if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
+                            println!("[MCP]   {}", name);
+                        }
+                    }
+                }
+                _ => println!("[MCP] Unknown command. Use /mcp status or /mcp list."),
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/subagents") => {
+            let subcommand = parts.get(1).copied().unwrap_or("list");
+            match subcommand {
+                "audit" => {
+                    if rt.paths.subagent_audit_log_file.exists() {
+                        if let Ok(content) =
+                            std::fs::read_to_string(&rt.paths.subagent_audit_log_file)
+                        {
+                            println!("{}", content);
+                        }
+                    } else {
+                        println!("[SUBAGENTS] No audit log found.");
+                    }
+                }
+                _ => {
+                    let list = rt.subagent_manager.registry.list_all();
+                    println!(
+                        "[SUBAGENTS] GOAT Subagent Registry ({} internal subagents)",
+                        list.len()
+                    );
+                    for agent in list {
+                        println!(
+                            "[SUBAGENTS]   {:<15} [{}] - {}",
+                            agent.name,
+                            agent.kind.to_string(),
+                            agent.purpose
+                        );
+                    }
+                }
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/subagent ") => {
+            let name = parts.get(1).copied().unwrap_or("").trim();
+            if let Some(agent) = rt.subagent_manager.registry.get(name) {
+                println!("[SUBAGENTS] Name: {}", agent.name);
+                println!("[SUBAGENTS] Kind: {}", agent.kind);
+                println!("[SUBAGENTS] Risk: {}", agent.risk_level);
+                println!("[SUBAGENTS] Model Profile: {}", agent.default_model_profile);
+                println!("[SUBAGENTS] Allowed Tools: {:?}", agent.allowed_tools);
+                println!("[SUBAGENTS] Context Budget: {}", agent.context_budget);
+            } else {
+                println!("[SUBAGENTS] Subagent '{}' not found.", name);
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/ask-agent ") => {
+            let args_str = parts.get(1).copied().unwrap_or("");
+            let subparts: Vec<&str> = args_str.splitn(2, ' ').collect();
+            if subparts.len() < 2 {
+                println!("[SUBAGENTS] Usage: /ask-agent <name> <task>");
+            } else {
+                let name = subparts[0];
+                let task = subparts[1];
+                println!("[SUBAGENTS] Asking '{}'...", name);
+                let summary = "Headless context summary... (limited repo map)";
+                match rt
+                    .subagent_manager
+                    .ask_agent(
+                        name,
+                        task,
+                        summary,
+                        active_skill.clone(),
+                        None,
+                        &rt.llm_router,
+                        &rt.model_chain,
+                    )
+                    .await
+                {
+                    Ok(res) => println!("[SUBAGENTS] Response:\n{}", res),
+                    Err(e) => println!("[SUBAGENTS] Error: {}", e),
+                }
+            }
+            true
+        }
+
+        "/review" => {
+            println!("[SUBAGENTS] Asking 'reviewer' to review current context...");
+            let task = "Review the current plan/patch.";
+            let summary = "Headless context summary... (limited repo map)";
+            match rt
+                .subagent_manager
+                .ask_agent(
+                    "reviewer",
+                    task,
+                    summary,
+                    active_skill.clone(),
+                    None,
+                    &rt.llm_router,
+                    &rt.model_chain,
+                )
+                .await
+            {
+                Ok(res) => println!("[SUBAGENTS] Response:\n{}", res),
+                Err(e) => println!("[SUBAGENTS] Error: {}", e),
+            }
+            true
+        }
+
+        "/debug" => {
+            println!("[SUBAGENTS] Asking 'debugger' to analyze...");
+            let task = "Analyze recent errors or bugs.";
+            let summary = "Headless context summary... (limited repo map)";
+            match rt
+                .subagent_manager
+                .ask_agent(
+                    "debugger",
+                    task,
+                    summary,
+                    active_skill.clone(),
+                    None,
+                    &rt.llm_router,
+                    &rt.model_chain,
+                )
+                .await
+            {
+                Ok(res) => println!("[SUBAGENTS] Response:\n{}", res),
+                Err(e) => println!("[SUBAGENTS] Error: {}", e),
+            }
+            true
+        }
+
+        "/test-plan" => {
+            println!("[SUBAGENTS] Asking 'tester' for verification strategy...");
+            let task = "Suggest a verification strategy or test plan.";
+            let summary = "Headless context summary... (limited repo map)";
+            match rt
+                .subagent_manager
+                .ask_agent(
+                    "tester",
+                    task,
+                    summary,
+                    active_skill.clone(),
+                    None,
+                    &rt.llm_router,
+                    &rt.model_chain,
+                )
+                .await
+            {
+                Ok(res) => println!("[SUBAGENTS] Response:\n{}", res),
+                Err(e) => println!("[SUBAGENTS] Error: {}", e),
             }
             true
         }
@@ -818,32 +1064,44 @@ async fn handle_slash_command(
         // ── Patch ────────────────────────────────────────────────────────────
         cmd if cmd.starts_with("/patch") => {
             let logs = crate::task::handle_patch_command(&mut rt.workflow, &parts);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/task") => {
             let logs = crate::task::handle_task_command(&mut rt.workflow, &parts[1..]);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/mode") => {
             let logs = crate::task::handle_mode_command(&mut rt.workflow, &parts[1..]);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/plan") => {
             let logs = crate::task::handle_plan_command(&mut rt.workflow, &parts[1..]);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/act") => {
             let logs = crate::task::handle_act_command(&mut rt.workflow, &parts[1..]);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/code") => {
             let logs = crate::task::handle_code_command(&mut rt.workflow, &parts[1..]);
-            for l in logs { println!("{}", l); }
+            for l in logs {
+                println!("{}", l);
+            }
             true
         }
         cmd if cmd.starts_with("/verify") => {
@@ -851,12 +1109,26 @@ async fn handle_slash_command(
             let cmds = crate::repo_map::ProjectCommands::detect(&root);
             println!("[VERIFY] Verification checks available:");
             let mut found = false;
-            if let Some(cmd) = &cmds.check { println!("  - check: {}", cmd); found = true; }
-            if let Some(cmd) = &cmds.test { println!("  - test: {}", cmd); found = true; }
-            if let Some(cmd) = &cmds.lint { println!("  - lint: {}", cmd); found = true; }
-            if let Some(cmd) = &cmds.format { println!("  - format: {}", cmd); found = true; }
+            if let Some(cmd) = &cmds.check {
+                println!("  - check: {}", cmd);
+                found = true;
+            }
+            if let Some(cmd) = &cmds.test {
+                println!("  - test: {}", cmd);
+                found = true;
+            }
+            if let Some(cmd) = &cmds.lint {
+                println!("  - lint: {}", cmd);
+                found = true;
+            }
+            if let Some(cmd) = &cmds.format {
+                println!("  - format: {}", cmd);
+                found = true;
+            }
             if found {
-                println!("[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate.");
+                println!(
+                    "[VERIFY] Use 'goat check' or 'goat test' CLI commands to execute these safely with ApprovalGate."
+                );
                 if let Some(task) = &mut rt.workflow.active_task {
                     task.status = crate::task::TaskStatus::Testing;
                 }
@@ -944,7 +1216,10 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
             }
         }
         if let Some(task) = &rt.workflow.active_task {
-            sys_prompt.push_str(&format!("\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n", task.request, task.status));
+            sys_prompt.push_str(&format!(
+                "\n\n<active_task>\nTASK: {}\nSTATUS: {:?}\n",
+                task.request, task.status
+            ));
             if let Some(plan) = &task.plan_text {
                 sys_prompt.push_str(&format!("PLAN:\n{}\n", plan));
             }
@@ -1014,13 +1289,46 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                             let mut patch_id = None;
                             if tc.function.name == "write_file" {
                                 let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                                let content =
+                                    args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                                 let preview = crate::repo_map::generate_diff_preview(path, content);
-                                let diff_lines = crate::repo_map::format_diff_preview(&preview).join("\n");
-                                patch_id = Some(rt.workflow.add_patch(path.to_string(), content.to_string(), diff_lines));
+                                let diff_lines =
+                                    crate::repo_map::format_diff_preview(&preview).join("\n");
+                                patch_id = Some(rt.workflow.add_patch(
+                                    path.to_string(),
+                                    content.to_string(),
+                                    diff_lines,
+                                ));
                                 if let Some(task) = &mut rt.workflow.active_task {
                                     task.status = crate::task::TaskStatus::PatchProposed;
                                 }
+                            }
+
+                            let tool_action = rt
+                                .tool_registry
+                                .evaluate_action(&tc.function.name, &rt.config.tools);
+                            if let crate::tool_registry::ToolAction::Deny(ref reason) = tool_action
+                            {
+                                println!("[TOOL] Denied by policy: {}", reason);
+                                rt.tool_registry.log_execution(
+                                    &rt.paths,
+                                    "headless",
+                                    &tc.function.name,
+                                    &tool_action,
+                                    false,
+                                    reason,
+                                );
+                                rt.history.push(Message {
+                                    role: "tool".to_string(),
+                                    content: Some(format!(
+                                        "Tool execution denied. Reason: {}",
+                                        reason
+                                    )),
+                                    tool_calls: None,
+                                    tool_call_id: Some(tc.id),
+                                });
+                                trim_history(&mut rt.history);
+                                continue;
                             }
 
                             let approval_req = build_approval_request(&tc.function.name, &args);
@@ -1044,6 +1352,16 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             }
                                         }
                                         println!("[TOOL] {}", result);
+
+                                        rt.tool_registry.log_execution(
+                                            &rt.paths,
+                                            "headless",
+                                            &tc.function.name,
+                                            &tool_action,
+                                            true,
+                                            &result,
+                                        );
+
                                         rt.history.push(Message {
                                             role: "tool".to_string(),
                                             content: Some(result),
@@ -1071,6 +1389,16 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             tool_calls: None,
                                             tool_call_id: Some(tc.id),
                                         });
+
+                                        rt.tool_registry.log_execution(
+                                            &rt.paths,
+                                            "headless",
+                                            &tc.function.name,
+                                            &crate::tool_registry::ToolAction::Deny(reason.clone()),
+                                            false,
+                                            &reason,
+                                        );
+
                                         trim_history(&mut rt.history);
                                     }
                                     None => {
@@ -1089,13 +1417,26 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                         .await;
                                                 if let Some(id) = &patch_id {
                                                     if let Some(p) = rt.workflow.get_patch_mut(id) {
-                                                        p.status = crate::task::PatchStatus::Applied;
+                                                        p.status =
+                                                            crate::task::PatchStatus::Applied;
                                                     }
-                                                    if let Some(task) = &mut rt.workflow.active_task {
-                                                        task.status = crate::task::TaskStatus::PatchApplied;
+                                                    if let Some(task) = &mut rt.workflow.active_task
+                                                    {
+                                                        task.status =
+                                                            crate::task::TaskStatus::PatchApplied;
                                                     }
                                                 }
                                                 println!("[TOOL] {}", result);
+
+                                                rt.tool_registry.log_execution(
+                                                    &rt.paths,
+                                                    "headless",
+                                                    &tc.function.name,
+                                                    &tool_action,
+                                                    true,
+                                                    &result,
+                                                );
+
                                                 rt.history.push(Message {
                                                     role: "tool".to_string(),
                                                     content: Some(result),
@@ -1111,7 +1452,8 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                 );
                                                 if let Some(id) = &patch_id {
                                                     if let Some(p) = rt.workflow.get_patch_mut(id) {
-                                                        p.status = crate::task::PatchStatus::Discarded;
+                                                        p.status =
+                                                            crate::task::PatchStatus::Discarded;
                                                     }
                                                 }
                                                 rt.history.push(Message {

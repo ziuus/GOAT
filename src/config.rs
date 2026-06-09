@@ -74,6 +74,9 @@ pub struct Config {
     /// Repo map config.
     #[serde(default)]
     pub repo_map: RepoMapConfig,
+    /// Tools and permissions config.
+    #[serde(default)]
+    pub tools: ToolsConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -247,6 +250,68 @@ fn default_max_index_chars() -> usize {
 }
 fn default_max_skill_chars() -> usize {
     4000
+}
+
+// ── Tools settings ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ToolsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub permissions: ToolPermissionsConfig,
+}
+
+impl Default for ToolsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            permissions: ToolPermissionsConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ToolPermissionsConfig {
+    #[serde(default = "default_ask")]
+    pub shell: String,
+    #[serde(default = "default_ask")]
+    pub filesystem_write: String,
+    #[serde(default = "default_allow")]
+    pub filesystem_read: String,
+    #[serde(default = "default_ask")]
+    pub network: String,
+    #[serde(default = "default_ask")]
+    pub git: String,
+    #[serde(default = "default_allow")]
+    pub memory: String,
+    #[serde(default = "default_allow")]
+    pub skills: String,
+    #[serde(default = "default_ask")]
+    pub subagent: String,
+}
+
+impl Default for ToolPermissionsConfig {
+    fn default() -> Self {
+        Self {
+            shell: "ask".to_string(),
+            filesystem_write: "ask".to_string(),
+            filesystem_read: "allow".to_string(),
+            network: "ask".to_string(),
+            git: "ask".to_string(),
+            memory: "allow".to_string(),
+            skills: "allow".to_string(),
+            subagent: "ask".to_string(),
+        }
+    }
+}
+
+fn default_ask() -> String {
+    "ask".to_string()
+}
+
+fn default_allow() -> String {
+    "allow".to_string()
 }
 
 // ── Repo Map settings ─────────────────────────────────────────────────────────

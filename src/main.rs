@@ -15,8 +15,10 @@ pub mod provider;
 pub mod repo_map;
 pub mod runtime;
 mod skills;
+pub mod subagents;
 pub mod swarm;
 pub mod task;
+pub mod tool_registry;
 mod tools;
 mod ui;
 

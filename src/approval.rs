@@ -25,7 +25,9 @@ use tracing::{info, warn};
 // ── Risk classification ──────────────────────────────────────────────────────
 
 /// How dangerous a proposed operation is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum RiskLevel {
     /// Low risk — informational or read-only.
     Low,
