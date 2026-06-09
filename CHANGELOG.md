@@ -8,6 +8,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 2: GOAT Brain Foundation
 
+### Added — Phase 2.1: GOAT Skills System (2026-06-09)
+
+**Version bump: 0.7.0 → 0.8.0**
+
+- **Skills Directory:** Created local-first skills directory at `~/.config/goat/skills/`.
+- **SKILL.md Format:** Implemented Markdown parser for GOAT reusable skills, supporting Name, Description, Triggers, Tools Needed, and Content.
+- **Skill Discovery & Index:** Implemented an indexer with progressive disclosure — only skill summaries (names, descriptions, triggers) are injected to save context budget, unless specifically activated.
+- **Context Injection:** `SkillManager::build_context` handles injecting the skill index and the active skill's content directly into the system prompt.
+- **CLI Commands:** Added `goat skills [list|show|path|create|validate|search]`.
+- **Slash Commands:** Added `/skills`, `/skill <name>`, `/skill search <query>`, `/skill create <name>`, `/skill path`, and `/save-skill <name>`.
+- **Security & Validation:** Implemented naive pattern detection during parsing (checking for `rm -rf`, `sk-`, `password=`, `sudo`, etc.). Skills cannot bypass ApprovalGate.
+- **Doctor Check:** Added Skills System status to `goat doctor`.
+
 ### Added — Phase 2.0: Curated Memory & Safe Context Injection (2026-06-09)
 
 **Version bump: 0.6.0 → 0.7.0**

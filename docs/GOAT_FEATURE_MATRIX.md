@@ -1,7 +1,7 @@
 # GOAT — Feature Matrix
 
 **Last Updated:** 2026-06-09  
-**Current Phase:** 2.0 (Curated Memory & Safe Context Injection)
+**Current Phase:** 2.1 (GOAT Skills System)
 
 Status legend:
 - `planned` — Designed, not started
@@ -131,11 +131,30 @@ Status legend:
 | Scans ~/Projects, ~/PAI, ~/Documents | `partial` | Hard-coded paths |
 | User approval before scanning | `planned` | Phase 1 security priority |
 | Tech stack detection | `planned` | Phase 4 |
-| Project command detection | `planned` | Phase 4 |
-| Architecture detection | `planned` | Phase 4 |
+| Project Context Injection | `working` | Phase 1.7 |
+| Memory Injection | `working` | Phase 2.0 |
+| Recall | `working` | Phase 2.0 |
+| Skills System | `working` | Phase 2.1 |
+| Automatic Context Pruning | `planned` | Phase 4 |
 | Configurable scan roots | `planned` | Phase 4 |
 | Re-indexing on change | `planned` | Phase 4 |
 | Project summaries | `planned` | Phase 4 |
+
+---
+
+## Skills System
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Skills Directory (`~/.config/goat/skills`) | `working` | Phase 2.1 |
+| SKILL.md format & parsing | `working` | Phase 2.1 |
+| CLI commands (`goat skills ...`) | `working` | Phase 2.1 |
+| Slash commands (`/skills`, `/skill`) | `working` | Phase 2.1 |
+| Search & Validation | `working` | Phase 2.1 |
+| Context Injection (Progressive) | `working` | Phase 2.1 |
+| Security / Suspicious Pattern Detection | `working` | Phase 2.1 |
+| `save-skill` | `partial` | Creates placeholder template |
+| Auto-summarization of sessions into skills | `planned` | Phase 2.2 |
 
 ---
 

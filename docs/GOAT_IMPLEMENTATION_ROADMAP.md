@@ -249,6 +249,17 @@
 - [ ] Session rename command
 - [ ] Session delete command
 
+#### 2.1 GOAT Skills System ✅ COMPLETE
+- [x] Local-first skills directory (`~/.config/goat/skills/`)
+- [x] SKILL.md parsing (Name, Description, Triggers, Tools Needed, Content)
+- [x] Skill Discovery & Indexer (ignores malformed skills safely)
+- [x] CLI commands (`goat skills [list|show|path|create|validate|search]`)
+- [x] Slash commands (`/skills`, `/skill <name>`, `/skill search <query>`, `/skill create <name>`, `/skill path`)
+- [x] Context Injection with progressive disclosure
+- [x] Security/Validation (blocklists for `rm -rf`, `sk-`, `password=`, `sudo`)
+- [x] `save-skill` command (creates placeholder template)
+- [x] Skills status added to `goat doctor` and `/status`
+
 #### 2.3 Command Execution Log Panel
 - [ ] Separate panel for tool execution logs
 - [ ] Distinguish user input, LLM response, tool call, tool result, errors

@@ -216,7 +216,19 @@ Before spawning any external agent:
 
 ---
 
-## 7. MCP Server Security
+## 7. Skills System Security (Phase 2.1)
+
+Skills are treated as **untrusted markdown files** that provide instructions to the LLM. 
+
+Security rules:
+1. **No automatic execution**: Skills *never* bypass the `ApprovalGate`. If a skill instructs the agent to run a shell command or write a file, the user must still approve it.
+2. **Progressive Disclosure**: Only a short index is injected by default. The full skill content is loaded only when requested.
+3. **Validation & Suspicious Content**: Skills are scanned during load (and via `goat skills validate`) for patterns like `rm -rf`, `curl | sh`, `sk-`, `sudo`, and password fragments. If detected, the skill is loaded with a `[SUSPICIOUS]` warning tag.
+4. **Context Budget Enforcement**: Skills are truncated if they exceed the configured injection budget, preventing prompt overflow attacks.
+
+---
+
+## 8. MCP Server Security
 
 ### 7.1 Current State
 

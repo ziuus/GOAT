@@ -659,7 +659,7 @@ pub fn run_doctor(
     if paths.skills_dir.exists() {
         // Just checking basic existence and count
         let count = std::fs::read_dir(&paths.skills_dir)
-            .map(|mut i| i.filter_map(|e| e.ok()).count())
+            .map(|i| i.filter_map(|e| e.ok()).count())
             .unwrap_or(0);
             
         checks.push(DoctorCheck {

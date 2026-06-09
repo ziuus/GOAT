@@ -142,11 +142,14 @@ pub enum Command {
     /// Manage GOAT reusable skills.
     #[command(name = "skills")]
     Skills {
-        /// "list", "show", "path", "create", "validate", "search"
+        /// "list", "show", "path", "create", "validate", "search", "create-from-session"
         #[arg(default_value = "list")]
         action: String,
         /// The name or query
         arg: Option<String>,
+        /// Session ID to extract from (for create-from-session)
+        #[arg(long)]
+        session: Option<String>,
     },
 }
 
@@ -217,8 +220,8 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Skills { action, arg } => {
-            handle_skills_command(paths, config, action, arg.as_deref())?;
+        Command::Skills { action, arg, session } => {
+            handle_skills_command(paths, config, action, arg.as_deref(), session.as_deref()).await?;
             Ok(true)
         }
     }
@@ -608,11 +611,12 @@ fn handle_recall_command(paths: &crate::paths::GoatPaths, query: &str) -> anyhow
 
 // ── skills command ────────────────────────────────────────────────────────────
 
-fn handle_skills_command(
+async fn handle_skills_command(
     paths: &crate::paths::GoatPaths,
     config: &crate::config::Config,
     action: &str,
     arg: Option<&str>,
+    session_id: Option<&str>,
 ) -> anyhow::Result<()> {
     let skill_manager = crate::skills::SkillManager::new(paths.clone(), config.skills.clone());
 
@@ -687,8 +691,66 @@ fn handle_skills_command(
                 println!("  - {name:<20} {desc}", name=s.name, desc=s.description);
             }
         }
+        "create-from-session" => {
+            let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let sid = session_id.ok_or_else(|| anyhow::anyhow!("Expected --session <id> for create-from-session"))?;
+            
+            let brain = crate::brain::Brain::new(&paths.db_file)
+                .map_err(|e| anyhow::anyhow!("Could not open brain db: {}", e))?;
+                
+            let history = brain.load_session_history(sid)?;
+            if history.is_empty() {
+                anyhow::bail!("No history found for session {}", sid);
+            }
+            
+            let mut history_text = String::new();
+            for msg in history {
+                if msg.0 != "system" {
+                    history_text.push_str(&format!("{}: {}\n", msg.0, msg.1));
+                }
+            }
+            
+            println!("Extracting skill '{}' from session {}...", name, sid);
+            
+            let mut registry = crate::models::ProfileRegistry::from_config(&config.profiles);
+            let mut router = crate::llm::LlmRouter::from_config(config);
+            
+            let profile_name = &registry.default_profile;
+            let (_, chain) = registry.resolve(profile_name);
+            
+            let prompt = format!(
+                "You are a skill curator. The user wants to extract a reusable skill from the following session history.\n\
+                 Generate a valid SKILL.md file with the following headers: Name, Description, Triggers, Tools Needed, Procedure, Safety Notes, Verification.\n\
+                 The skill name should be: {}\n\n\
+                 Rules:\n\
+                 - NEVER include real API keys, passwords, or secrets.\n\
+                 - Focus on the generalized workflow, not the exact files edited.\n\
+                 - Output only the Markdown content.\n\n\
+                 Session History:\n{}",
+                name, history_text
+            );
+            
+            let messages = vec![crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            }];
+            
+            match router.completion_with_fallback(&chain, messages, None).await {
+                Ok((resp, _)) => {
+                    let content = resp.content.unwrap_or_default();
+                    let skill_dir = skill_manager.skills_dir().join(name);
+                    std::fs::create_dir_all(&skill_dir)?;
+                    let skill_file = skill_dir.join("SKILL.md");
+                    std::fs::write(&skill_file, content)?;
+                    println!("Extracted and saved skill '{}' to {}", name, skill_file.display());
+                }
+                Err(e) => anyhow::bail!("Failed to extract skill from LLM: {}", e),
+            }
+        }
         _ => {
-            println!("Unknown action '{}'. Expected: list, show, path, create, validate, search.", action);
+            println!("Unknown action '{}'. Expected: list, show, path, create, validate, search, create-from-session.", action);
         }
     }
     Ok(())

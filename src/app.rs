@@ -481,13 +481,53 @@ impl App {
                 if arg.is_empty() {
                     self.push_log("[SKILLS] Usage: /save-skill <name>");
                 } else {
-                    let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
-                    match skill_manager.create_template(&arg) {
-                        Ok(path) => {
-                            self.push_log(format!("[SKILLS] Saved placeholder skill template at {}", path.display()));
-                            self.push_log("[SKILLS] (Auto-summarization from session history is planned for Phase 2.2)");
+                    let mut history_text = String::new();
+                    for msg in self.history.iter().filter(|m| m.role != "system") {
+                        history_text.push_str(&format!("{}: {}\n", msg.role, msg.content.as_deref().unwrap_or("")));
+                    }
+                    
+                    if history_text.trim().is_empty() {
+                        self.push_log("[SKILLS] No history to extract from.");
+                        return true;
+                    }
+                    
+                    self.push_log(format!("[SKILLS] Extracting skill '{}' from session history...", arg));
+                    
+                    let prompt = format!(
+                        "You are a skill curator. The user wants to extract a reusable skill from the following session history.\n\
+                         Generate a valid SKILL.md file with the following headers: Name, Description, Triggers, Tools Needed, Procedure, Safety Notes, Verification.\n\
+                         The skill name should be: {}\n\n\
+                         Rules:\n\
+                         - NEVER include real API keys, passwords, or secrets.\n\
+                         - Focus on the generalized workflow, not the exact files edited.\n\
+                         - Output only the Markdown content.\n\n\
+                         Session History:\n{}",
+                        arg, history_text
+                    );
+                    
+                    let messages = vec![crate::llm::Message {
+                        role: "user".to_string(),
+                        content: Some(prompt),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    }];
+                    
+                    match self.llm_router.completion_with_fallback(&self.model_chain, messages, None).await {
+                        Ok((resp, _)) => {
+                            let content = resp.content.unwrap_or_default();
+                            let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                            let skill_dir = skill_manager.skills_dir().join(&arg);
+                            let _ = std::fs::create_dir_all(&skill_dir);
+                            let skill_file = skill_dir.join("SKILL.md");
+                            if let Err(e) = std::fs::write(&skill_file, content) {
+                                self.push_log(format!("[SKILLS] Error writing skill file: {}", e));
+                            } else {
+                                self.push_log(format!("[SKILLS] Extracted and saved skill '{}' to {}", arg, skill_file.display()));
+                            }
                         }
-                        Err(e) => self.push_log(format!("[SKILLS] Error saving skill: {}", e)),
+                        Err(e) => {
+                            self.push_log(format!("[SKILLS] Failed to extract skill from LLM: {}", e));
+                        }
                     }
                 }
                 true
