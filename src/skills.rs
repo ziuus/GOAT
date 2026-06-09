@@ -43,7 +43,11 @@ impl SkillManager {
             if path.is_dir() {
                 let skill_md = path.join("SKILL.md");
                 if skill_md.exists() {
-                    let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    let name = path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
                     if let Ok(skill) = self.parse_skill(&skill_md, name) {
                         skills.push(skill);
                     }
@@ -60,7 +64,7 @@ impl SkillManager {
                 }
             }
         }
-        
+
         // Sort by name for consistency
         skills.sort_by(|a, b| a.name.cmp(&b.name));
         skills
@@ -69,7 +73,7 @@ impl SkillManager {
     /// Parse a single SKILL.md file.
     fn parse_skill(&self, path: &Path, name: String) -> Result<Skill> {
         let content = fs::read_to_string(path).context("Failed to read skill file")?;
-        
+
         let mut description = String::new();
         let mut triggers = String::new();
         let mut is_suspicious = false;
@@ -78,7 +82,7 @@ impl SkillManager {
         // Very basic markdown parsing
         let mut in_description = false;
         let mut in_triggers = false;
-        
+
         for line in content.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("## Description") {
@@ -133,7 +137,8 @@ impl SkillManager {
             is_suspicious = true;
             warnings.push("Suspicious string: password= or secret=".to_string());
         }
-        if lower_content.contains("-----begin rsa") || lower_content.contains("-----begin openssh") {
+        if lower_content.contains("-----begin rsa") || lower_content.contains("-----begin openssh")
+        {
             is_suspicious = true;
             warnings.push("Suspicious string: RSA/SSH private key".to_string());
         }
@@ -151,7 +156,9 @@ impl SkillManager {
     /// Load a specific skill by name.
     pub fn get_skill(&self, name: &str) -> Option<Skill> {
         let skills = self.list_skills();
-        skills.into_iter().find(|s| s.name.eq_ignore_ascii_case(name))
+        skills
+            .into_iter()
+            .find(|s| s.name.eq_ignore_ascii_case(name))
     }
 
     /// Search skills by query
@@ -177,9 +184,13 @@ impl SkillManager {
         let skill_dir = self.paths.skills_dir.join(name);
         fs::create_dir_all(&skill_dir)?;
         let skill_file = skill_dir.join("SKILL.md");
-        
+
         if skill_file.exists() {
-            anyhow::bail!("Skill '{}' already exists at {}", name, skill_file.display());
+            anyhow::bail!(
+                "Skill '{}' already exists at {}",
+                name,
+                skill_file.display()
+            );
         }
 
         let template = format!(
@@ -223,7 +234,7 @@ Short description of what this skill does.
 
         let mut out = String::new();
         let skills = self.list_skills();
-        
+
         if skills.is_empty() {
             return out;
         }
@@ -236,11 +247,13 @@ Short description of what this skill does.
                     "User has explicitly activated the skill: {}\n\n",
                     skill.name
                 ));
-                
+
                 if skill.is_suspicious {
-                    out.push_str("WARNING: This skill contains suspicious patterns and may be unsafe.\n");
+                    out.push_str(
+                        "WARNING: This skill contains suspicious patterns and may be unsafe.\n",
+                    );
                 }
-                
+
                 let mut content = skill.content.clone();
                 if content.len() > self.config.max_skill_chars {
                     content.truncate(self.config.max_skill_chars);
@@ -250,30 +263,43 @@ Short description of what this skill does.
                 out.push_str("\n</GOAT_SKILLS>\n");
                 return out;
             } else {
-                out.push_str(&format!("WARNING: Requested active skill '{}' was not found.\n\n", skill_name));
+                out.push_str(&format!(
+                    "WARNING: Requested active skill '{}' was not found.\n\n",
+                    skill_name
+                ));
             }
         }
 
         if self.config.inject_index {
             out.push_str("Available skills (use to assist with related tasks):\n\n");
             let mut index_str = String::new();
-            
+
             for skill in skills {
-                if skill.is_suspicious { continue; } // Do not advertise suspicious skills by default
+                if skill.is_suspicious {
+                    continue;
+                } // Do not advertise suspicious skills by default
                 let entry = format!(
                     "- **{}**: {}\n  Triggers: {}\n",
                     skill.name,
-                    if skill.description.is_empty() { "No description" } else { &skill.description },
-                    if skill.triggers.is_empty() { "None specified" } else { &skill.triggers }
+                    if skill.description.is_empty() {
+                        "No description"
+                    } else {
+                        &skill.description
+                    },
+                    if skill.triggers.is_empty() {
+                        "None specified"
+                    } else {
+                        &skill.triggers
+                    }
                 );
                 index_str.push_str(&entry);
             }
-            
+
             if index_str.len() > self.config.max_index_chars {
                 index_str.truncate(self.config.max_index_chars);
                 index_str.push_str("\n... [INDEX TRUNCATED DUE TO BUDGET]\n");
             }
-            
+
             out.push_str(&index_str);
             out.push_str("\n(If a skill is relevant, refer to it explicitly to load its full procedure on the next turn.)\n");
         }

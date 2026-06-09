@@ -151,6 +151,58 @@ pub enum Command {
         #[arg(long)]
         session: Option<String>,
     },
+
+    /// Show or refresh the repo map for the current project.
+    ///
+    /// goat repo-map          → show cached or auto-scan
+    /// goat repo-map refresh  → force rescan
+    /// goat repo-map show     → show compact repo map
+    #[command(name = "repo-map")]
+    RepoMap {
+        /// "show" (default), "refresh"
+        #[arg(default_value = "show")]
+        action: String,
+    },
+
+    /// Run the project's check command (e.g. cargo check, tsc, go build).
+    ///
+    /// Command is detected from the project. Requires approval before execution.
+    #[command(name = "check")]
+    Check,
+
+    /// Run the project's test command (e.g. cargo test, pytest, npm test).
+    ///
+    /// Command is detected from the project. Requires approval before execution.
+    #[command(name = "test")]
+    Test {
+        /// Optional test filter / extra args passed to the test runner.
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Run the project's lint command (e.g. cargo clippy, eslint, ruff).
+    ///
+    /// Command is detected from the project. Requires approval before execution.
+    #[command(name = "lint")]
+    Lint,
+
+    /// Run the project's format command (e.g. cargo fmt, prettier, ruff format).
+    ///
+    /// Command is detected from the project. Requires approval before execution.
+    #[command(name = "format")]
+    Format,
+
+    /// Inspect or manage pending code patches.
+    ///
+    /// goat patch          → show pending patch (if any)
+    /// goat patch apply    → apply the pending patch (requires approval)
+    /// goat patch discard  → discard pending patch
+    #[command(name = "patch")]
+    Patch {
+        /// "show" (default), "apply", or "discard"
+        #[arg(default_value = "show")]
+        action: String,
+    },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -220,8 +272,47 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Skills { action, arg, session } => {
-            handle_skills_command(paths, config, action, arg.as_deref(), session.as_deref()).await?;
+        Command::Skills {
+            action,
+            arg,
+            session,
+        } => {
+            handle_skills_command(paths, config, action, arg.as_deref(), session.as_deref())
+                .await?;
+            Ok(true)
+        }
+
+        Command::RepoMap { action } => {
+            handle_repo_map_command(paths, config, action)?;
+            Ok(true)
+        }
+
+        Command::Check => {
+            handle_dev_command("check")?;
+            Ok(true)
+        }
+
+        Command::Test { args } => {
+            let extra = args.join(" ");
+            handle_dev_command_with_args(
+                "test",
+                if extra.is_empty() { None } else { Some(&extra) },
+            )?;
+            Ok(true)
+        }
+
+        Command::Lint => {
+            handle_dev_command("lint")?;
+            Ok(true)
+        }
+
+        Command::Format => {
+            handle_dev_command("format")?;
+            Ok(true)
+        }
+
+        Command::Patch { action } => {
+            handle_patch_command(action);
             Ok(true)
         }
     }
@@ -627,7 +718,10 @@ async fn handle_skills_command(
         "list" => {
             let skills = skill_manager.list_skills();
             if skills.is_empty() {
-                println!("No skills found in {}", skill_manager.skills_dir().display());
+                println!(
+                    "No skills found in {}",
+                    skill_manager.skills_dir().display()
+                );
                 return Ok(());
             }
             println!("Skills ({}):", skills.len());
@@ -688,36 +782,38 @@ async fn handle_skills_command(
             }
             println!("Found {} matching skills:", results.len());
             for s in results {
-                println!("  - {name:<20} {desc}", name=s.name, desc=s.description);
+                println!("  - {name:<20} {desc}", name = s.name, desc = s.description);
             }
         }
         "create-from-session" => {
             let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
-            let sid = session_id.ok_or_else(|| anyhow::anyhow!("Expected --session <id> for create-from-session"))?;
-            
+            let sid = session_id.ok_or_else(|| {
+                anyhow::anyhow!("Expected --session <id> for create-from-session")
+            })?;
+
             let brain = crate::brain::Brain::new(&paths.db_file)
                 .map_err(|e| anyhow::anyhow!("Could not open brain db: {}", e))?;
-                
+
             let history = brain.load_session_history(sid)?;
             if history.is_empty() {
                 anyhow::bail!("No history found for session {}", sid);
             }
-            
+
             let mut history_text = String::new();
             for msg in history {
                 if msg.0 != "system" {
                     history_text.push_str(&format!("{}: {}\n", msg.0, msg.1));
                 }
             }
-            
+
             println!("Extracting skill '{}' from session {}...", name, sid);
-            
+
             let mut registry = crate::models::ProfileRegistry::from_config(&config.profiles);
             let mut router = crate::llm::LlmRouter::from_config(config);
-            
+
             let profile_name = &registry.default_profile;
             let (_, chain) = registry.resolve(profile_name);
-            
+
             let prompt = format!(
                 "You are a skill curator. The user wants to extract a reusable skill from the following session history.\n\
                  Generate a valid SKILL.md file with the following headers: Name, Description, Triggers, Tools Needed, Procedure, Safety Notes, Verification.\n\
@@ -729,30 +825,207 @@ async fn handle_skills_command(
                  Session History:\n{}",
                 name, history_text
             );
-            
+
             let messages = vec![crate::llm::Message {
                 role: "user".to_string(),
                 content: Some(prompt),
                 tool_calls: None,
                 tool_call_id: None,
             }];
-            
-            match router.completion_with_fallback(&chain, messages, None).await {
+
+            match router
+                .completion_with_fallback(&chain, messages, None)
+                .await
+            {
                 Ok((resp, _)) => {
                     let content = resp.content.unwrap_or_default();
                     let skill_dir = skill_manager.skills_dir().join(name);
                     std::fs::create_dir_all(&skill_dir)?;
                     let skill_file = skill_dir.join("SKILL.md");
                     std::fs::write(&skill_file, content)?;
-                    println!("Extracted and saved skill '{}' to {}", name, skill_file.display());
+                    println!(
+                        "Extracted and saved skill '{}' to {}",
+                        name,
+                        skill_file.display()
+                    );
                 }
                 Err(e) => anyhow::bail!("Failed to extract skill from LLM: {}", e),
             }
         }
         _ => {
-            println!("Unknown action '{}'. Expected: list, show, path, create, validate, search, create-from-session.", action);
+            println!(
+                "Unknown action '{}'. Expected: list, show, path, create, validate, search, create-from-session.",
+                action
+            );
         }
     }
     Ok(())
 }
 
+// ── repo-map command ──────────────────────────────────────────────────────────
+
+fn handle_repo_map_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+) -> anyhow::Result<()> {
+    use crate::repo_map::{ProjectCommands, RepoMapScanner};
+    use std::env;
+
+    let root = env::current_dir().unwrap_or_default();
+    let max_chars = config.repo_map.max_chars;
+    let include_symbols = config.repo_map.include_symbols;
+
+    match action {
+        "show" | "refresh" => {
+            if action == "refresh" {
+                println!("Refreshing repo map for {}...", root.display());
+            } else {
+                println!("Repo map for {}:", root.display());
+            }
+
+            let scanner = if include_symbols {
+                RepoMapScanner::new(root.clone())
+            } else {
+                RepoMapScanner::new(root.clone()).with_no_symbols()
+            };
+
+            let map = scanner
+                .scan()
+                .map_err(|e| anyhow::anyhow!("Scan failed: {}", e))?;
+            println!("{}", "─".repeat(60));
+            println!("{}", map.to_compact_string(max_chars, include_symbols));
+            println!("{}", "─".repeat(60));
+
+            let cmds = ProjectCommands::detect(&root);
+            println!("Detected commands:");
+            println!(
+                "  check  : {}",
+                cmds.check.as_deref().unwrap_or("not detected")
+            );
+            println!(
+                "  test   : {}",
+                cmds.test.as_deref().unwrap_or("not detected")
+            );
+            println!(
+                "  lint   : {}",
+                cmds.lint.as_deref().unwrap_or("not detected")
+            );
+            println!(
+                "  format : {}",
+                cmds.format.as_deref().unwrap_or("not detected")
+            );
+
+            // Save project scan to brain if available
+            if paths.db_file.exists() {
+                if let Ok(brain) = crate::brain::Brain::new(&paths.db_file) {
+                    let meta = crate::project::ProjectScanner::new(root.clone())
+                        .scan()
+                        .ok();
+                    if let Some(meta) = meta {
+                        let _ = brain.save_project(root.to_string_lossy().as_ref(), &meta);
+                    }
+                }
+            }
+        }
+        _ => {
+            println!("Unknown action '{}'. Expected: show, refresh.", action);
+        }
+    }
+
+    Ok(())
+}
+
+// ── dev command runner (check/test/lint/format) ───────────────────────────────
+
+fn handle_dev_command(kind: &str) -> anyhow::Result<()> {
+    handle_dev_command_with_args(kind, None)
+}
+
+fn handle_dev_command_with_args(kind: &str, extra: Option<&str>) -> anyhow::Result<()> {
+    use std::io::{self, BufRead, Write};
+
+    let root = std::env::current_dir().unwrap_or_default();
+    let cmds = crate::repo_map::ProjectCommands::detect(&root);
+
+    let base_cmd = match kind {
+        "check" => cmds.check,
+        "test" => cmds.test,
+        "lint" => cmds.lint,
+        "format" => cmds.format,
+        _ => None,
+    };
+
+    let cmd = match base_cmd {
+        Some(c) => {
+            if let Some(extra_args) = extra {
+                format!("{} {}", c, extra_args)
+            } else {
+                c
+            }
+        }
+        None => {
+            println!("[DEV] No {} command detected for this project.", kind);
+            println!("[DEV] GOAT scanned: {}", root.display());
+            println!(
+                "[DEV] Supported: Rust (Cargo.toml), Node (package.json), Python (pyproject.toml), Go (go.mod)."
+            );
+            return Ok(());
+        }
+    };
+
+    println!("[DEV] Detected {} command: {}", kind, cmd);
+    println!("[DEV] \u{26a0} This command will run in your terminal. Confirm to proceed.");
+    println!("[DEV] (In TUI/headless mode, the ApprovalGate prompt will appear instead.)");
+    print!("[DEV] Execute '{}' now? [y/N]: ", cmd);
+    io::stdout().flush().ok();
+
+    let mut line = String::new();
+    io::stdin().lock().read_line(&mut line).ok();
+    let answer = line.trim().to_lowercase();
+
+    if answer == "y" || answer == "yes" {
+        println!("[DEV] Running: {}", cmd);
+        let status = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(&cmd)
+            .status();
+        match status {
+            Ok(s) if s.success() => println!("[DEV] \u{2713} {} completed successfully.", kind),
+            Ok(s) => println!("[DEV] \u{2717} {} exited with code: {:?}", kind, s.code()),
+            Err(e) => println!("[DEV] Error running command: {}", e),
+        }
+    } else {
+        println!("[DEV] Cancelled.");
+    }
+
+    Ok(())
+}
+
+// ── patch command ─────────────────────────────────────────────────────────────
+
+fn handle_patch_command(action: &str) {
+    match action {
+        "show" => {
+            println!("[PATCH] No pending patch in current session.");
+            println!(
+                "[PATCH] Patches are created when GOAT proposes a file write during an agent session."
+            );
+            println!("[PATCH] Use /patch in TUI or headless mode to inspect pending diffs.");
+            println!("[PATCH] Full patch queue is planned for Phase 2.4.");
+        }
+        "apply" => {
+            println!("[PATCH] No pending patch to apply.");
+            println!("[PATCH] Start a session and let the agent propose a file write.");
+        }
+        "discard" => {
+            println!("[PATCH] No pending patch to discard.");
+        }
+        _ => {
+            println!(
+                "Unknown patch action '{}'. Expected: show, apply, discard.",
+                action
+            );
+        }
+    }
+}

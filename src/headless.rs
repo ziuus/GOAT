@@ -62,31 +62,31 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
                 break;
             }
             None => {
-        // EOF (Ctrl+D)
-        println!("\n[GOAT] EOF received — goodbye!");
-        break;
-    }
-};
+                // EOF (Ctrl+D)
+                println!("\n[GOAT] EOF received — goodbye!");
+                break;
+            }
+        };
 
-let input = line.trim().to_string();
-if input.is_empty() {
-    continue;
-}
+        let input = line.trim().to_string();
+        if input.is_empty() {
+            continue;
+        }
 
-// Handle built-in headless commands (subset of slash commands).
-if input.starts_with('/') {
-    if handle_slash_command(&input, &mut rt, &mut active_skill).await {
-        continue;
-    }
-    println!(
-        "[GOAT] Unknown command '{}'. Type /help for available commands.",
-        input
-    );
-    continue;
-}
+        // Handle built-in headless commands (subset of slash commands).
+        if input.starts_with('/') {
+            if handle_slash_command(&input, &mut rt, &mut active_skill).await {
+                continue;
+            }
+            println!(
+                "[GOAT] Unknown command '{}'. Type /help for available commands.",
+                input
+            );
+            continue;
+        }
 
-// Run the agent loop for this prompt.
-run_agent_turn(&mut rt, input, active_skill.as_deref()).await;
+        // Run the agent loop for this prompt.
+        run_agent_turn(&mut rt, input, active_skill.as_deref()).await;
     }
 
     // Shutdown MCP servers on exit.
@@ -135,14 +135,20 @@ fn print_banner(rt: &GoatRuntime) {
     );
     println!();
     println!("Type a message and press Enter. Ctrl+D or Ctrl+C to exit.");
-    println!("Slash commands: /help /status /profile /profiles /clear /sessions /tools /new /exit");
+    println!(
+        "Slash commands: /help /status /repo-map /check /test /lint /format /patch /profile /profiles /clear /sessions /tools /new /exit"
+    );
     println!();
 }
 
 // ── Slash command handling (headless subset) ──────────────────────────────────
 
 /// Handle headless slash commands.  Returns `true` if the command was handled.
-async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mut Option<String>) -> bool {
+async fn handle_slash_command(
+    cmd: &str,
+    rt: &mut GoatRuntime,
+    active_skill: &mut Option<String>,
+) -> bool {
     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
     let name = parts[0].to_lowercase();
 
@@ -150,7 +156,16 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
         "/help" => {
             println!("[HELP] Headless commands:");
             println!("[HELP]   /help            — show this help");
-            println!("[HELP]   /status          — show provider/session/brain status");
+            println!("[HELP]   /status          — show provider/session/brain/repo status");
+            println!("[HELP]   /repo-map        — show repo map for current project");
+            println!("[HELP]   /repo-map refresh — force rescan repo map");
+            println!("[HELP]   /check           — run project check command");
+            println!("[HELP]   /test [filter]   — run project test command");
+            println!("[HELP]   /lint            — run project lint command");
+            println!("[HELP]   /format          — run project format command");
+            println!("[HELP]   /patch           — show pending code patches");
+            println!("[HELP]   /patch apply     — apply pending patch");
+            println!("[HELP]   /patch discard   — discard pending patch");
             println!("[HELP]   /profile         — show current profile");
             println!("[HELP]   /profile <name>  — switch to a profile");
             println!("[HELP]   /profiles        — list available profiles");
@@ -212,8 +227,31 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
                     if !meta.stack.is_empty() {
                         println!("[STATUS] Stack    : {}", meta.stack.join(", "));
                     }
+                    // Git status
+                    if meta.is_git_repo {
+                        if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                            println!("[STATUS] Git      : {}", git.summary());
+                        } else {
+                            println!("[STATUS] Git      : repo (status unavailable)");
+                        }
+                    }
+                    // Detected commands
+                    let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                    println!(
+                        "[STATUS] Dev cmds : check={}, test={}, lint={}",
+                        cmds.check.as_deref().unwrap_or("none"),
+                        cmds.test.as_deref().unwrap_or("none"),
+                        cmds.lint.as_deref().unwrap_or("none"),
+                    );
                 } else {
-                    println!("[STATUS] Project  : Not scanned (/project scan)");
+                    println!("[STATUS] Project  : Not scanned (/project scan or /repo-map)");
+                    // Still show git status for current dir
+                    let root = env::current_dir().unwrap_or_default();
+                    if root.join(".git").exists() {
+                        if let Some(git) = crate::repo_map::GitStatus::read(&root) {
+                            println!("[STATUS] Git      : {}", git.summary());
+                        }
+                    }
                 }
             }
             true
@@ -439,7 +477,8 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
         }
 
         "/skills" => {
-            let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+            let skill_manager =
+                crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
             let skills = skill_manager.list_skills();
             if skills.is_empty() {
                 println!("[SKILLS] No skills found. Use /skill create <name> to make one.");
@@ -457,8 +496,9 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
         "/skill" => {
             let arg = parts.get(1).copied().unwrap_or("").trim();
             let rest = parts.get(2..).unwrap_or(&[]).join(" ");
-            let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
-            
+            let skill_manager =
+                crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+
             if arg.is_empty() {
                 println!("[SKILLS] Active skill:");
                 if let Some(skill) = active_skill {
@@ -471,7 +511,10 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
                 *active_skill = None;
                 println!("[SKILLS] Active skill cleared.");
             } else if arg == "path" {
-                println!("[SKILLS] Directory: {}", skill_manager.skills_dir().display());
+                println!(
+                    "[SKILLS] Directory: {}",
+                    skill_manager.skills_dir().display()
+                );
             } else if arg == "create" {
                 if rest.is_empty() {
                     println!("[SKILLS] Usage: /skill create <name>");
@@ -516,16 +559,23 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
             } else {
                 let mut history_text = String::new();
                 for msg in rt.history.iter().filter(|m| m.role != "system") {
-                    history_text.push_str(&format!("{}: {}\n", msg.role, msg.content.as_deref().unwrap_or("")));
+                    history_text.push_str(&format!(
+                        "{}: {}\n",
+                        msg.role,
+                        msg.content.as_deref().unwrap_or("")
+                    ));
                 }
-                
+
                 if history_text.trim().is_empty() {
                     println!("[SKILLS] No history to extract from.");
                     return true;
                 }
-                
-                println!("[SKILLS] Extracting skill '{}' from session history...", arg);
-                
+
+                println!(
+                    "[SKILLS] Extracting skill '{}' from session history...",
+                    arg
+                );
+
                 let prompt = format!(
                     "You are a skill curator. The user wants to extract a reusable skill from the following session history.\n\
                      Generate a valid SKILL.md file with the following headers: Name, Description, Triggers, Tools Needed, Procedure, Safety Notes, Verification.\n\
@@ -537,25 +587,36 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
                      Session History:\n{}",
                     arg, history_text
                 );
-                
+
                 let messages = vec![crate::llm::Message {
                     role: "user".to_string(),
                     content: Some(prompt),
                     tool_calls: None,
                     tool_call_id: None,
                 }];
-                
-                match rt.llm_router.completion_with_fallback(&rt.model_chain, messages, None).await {
+
+                match rt
+                    .llm_router
+                    .completion_with_fallback(&rt.model_chain, messages, None)
+                    .await
+                {
                     Ok((resp, _)) => {
                         let content = resp.content.unwrap_or_default();
-                        let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+                        let skill_manager = crate::skills::SkillManager::new(
+                            rt.paths.clone(),
+                            rt.config.skills.clone(),
+                        );
                         let skill_dir = skill_manager.skills_dir().join(&arg);
                         let _ = std::fs::create_dir_all(&skill_dir);
                         let skill_file = skill_dir.join("SKILL.md");
                         if let Err(e) = std::fs::write(&skill_file, content) {
                             println!("[SKILLS] Error writing skill file: {}", e);
                         } else {
-                            println!("[SKILLS] Extracted and saved skill '{}' to {}", arg, skill_file.display());
+                            println!(
+                                "[SKILLS] Extracted and saved skill '{}' to {}",
+                                arg,
+                                skill_file.display()
+                            );
                         }
                     }
                     Err(e) => {
@@ -596,6 +657,189 @@ async fn handle_slash_command(cmd: &str, rt: &mut GoatRuntime, active_skill: &mu
                 }
             } else {
                 println!("[RECALL] Brain is disabled (--no-brain).");
+            }
+            true
+        }
+
+        // ── Repo map ──────────────────────────────────────────────────────────
+        cmd if cmd.starts_with("/repo-map") => {
+            let sub = name.split_whitespace().nth(1).unwrap_or("show");
+            let root = std::env::current_dir().unwrap_or_default();
+            let max_chars = rt.config.repo_map.max_chars;
+            let include_symbols = rt.config.repo_map.include_symbols;
+
+            if sub == "refresh" {
+                println!("[REPO-MAP] Refreshing repo map for {}...", root.display());
+            } else {
+                println!("[REPO-MAP] Scanning {}...", root.display());
+            }
+
+            let scanner = crate::repo_map::RepoMapScanner::new(root.clone());
+            match scanner.scan() {
+                Ok(map) => {
+                    println!("{}", map.to_compact_string(max_chars, include_symbols));
+                    let cmds = crate::repo_map::ProjectCommands::detect(&root);
+                    println!(
+                        "[REPO-MAP] Commands: check={}, test={}, lint={}, format={}",
+                        cmds.check.as_deref().unwrap_or("none"),
+                        cmds.test.as_deref().unwrap_or("none"),
+                        cmds.lint.as_deref().unwrap_or("none"),
+                        cmds.format.as_deref().unwrap_or("none"),
+                    );
+                    if let Some(ref brain) = rt.brain {
+                        let meta = crate::project::ProjectScanner::new(root.clone())
+                            .scan()
+                            .ok();
+                        if let Some(meta) = meta {
+                            let _ = brain.save_project(root.to_string_lossy().as_ref(), &meta);
+                        }
+                    }
+                }
+                Err(e) => println!("[REPO-MAP] Scan failed: {}", e),
+            }
+            true
+        }
+
+        // ── Check/Test/Lint/Format (dev commands via ApprovalGate) ────────────
+        cmd if matches!(cmd, "/check" | "/test" | "/lint" | "/format") => {
+            let kind = &cmd[1..]; // strip leading /
+            let root = std::env::current_dir().unwrap_or_default();
+            let cmds = crate::repo_map::ProjectCommands::detect(&root);
+
+            let base_cmd = match kind {
+                "check" => cmds.check,
+                "test" => cmds.test,
+                "lint" => cmds.lint,
+                "format" => cmds.format,
+                _ => None,
+            };
+
+            let extra_args = parts.get(1).copied().unwrap_or("").trim();
+
+            match base_cmd {
+                None => {
+                    println!("[DEV] No {} command detected for {}.", kind, root.display());
+                    println!(
+                        "[DEV] Supported: Rust (Cargo.toml), Node (package.json), Python (pyproject.toml), Go (go.mod)."
+                    );
+                }
+                Some(c) => {
+                    let full_cmd = if extra_args.is_empty() {
+                        c.clone()
+                    } else {
+                        format!("{} {}", c, extra_args)
+                    };
+
+                    println!("[DEV] Detected {} command: {}", kind, full_cmd);
+
+                    // Build approval request for ApprovalGate
+                    let req = crate::approval::bash_approval_request(&full_cmd);
+                    if let Some(decision) = rt.approval_gate.check_policy(&req) {
+                        if decision.is_approved() {
+                            println!("[DEV] Auto-approved by session policy. Running...");
+                            let output = std::process::Command::new("bash")
+                                .arg("-c")
+                                .arg(&full_cmd)
+                                .output();
+                            match output {
+                                Ok(out) => {
+                                    let stdout = String::from_utf8_lossy(&out.stdout);
+                                    let stderr = String::from_utf8_lossy(&out.stderr);
+                                    if !stdout.is_empty() {
+                                        print!("{}", stdout);
+                                    }
+                                    if !stderr.is_empty() {
+                                        eprint!("{}", stderr);
+                                    }
+                                    if out.status.success() {
+                                        println!("[DEV] ✓ {} completed.", kind);
+                                    } else {
+                                        println!(
+                                            "[DEV] ✗ {} failed (exit {:?}).",
+                                            kind,
+                                            out.status.code()
+                                        );
+                                    }
+                                }
+                                Err(e) => println!("[DEV] Error: {}", e),
+                            }
+                        } else {
+                            println!("[DEV] {} denied by session policy.", kind);
+                        }
+                    } else {
+                        // Interactive approval prompt
+                        for line in req.display_lines() {
+                            println!("{}", line);
+                        }
+                        print!("Your choice: ");
+                        use std::io::{self, BufRead, Write};
+                        io::stdout().flush().ok();
+                        let mut input = String::new();
+                        io::stdin().lock().read_line(&mut input).ok();
+                        let ch = input.trim().chars().next().unwrap_or('n');
+                        let decision = rt.approval_gate.resolve(&req, ch);
+                        if decision.is_approved() {
+                            println!("[DEV] Running: {}", full_cmd);
+                            let output = std::process::Command::new("bash")
+                                .arg("-c")
+                                .arg(&full_cmd)
+                                .output();
+                            match output {
+                                Ok(out) => {
+                                    let stdout = String::from_utf8_lossy(&out.stdout);
+                                    let stderr = String::from_utf8_lossy(&out.stderr);
+                                    if !stdout.is_empty() {
+                                        print!("{}", stdout);
+                                    }
+                                    if !stderr.is_empty() {
+                                        eprint!("{}", stderr);
+                                    }
+                                    if out.status.success() {
+                                        println!("[DEV] ✓ {} completed.", kind);
+                                    } else {
+                                        println!(
+                                            "[DEV] ✗ {} failed (exit {:?}).",
+                                            kind,
+                                            out.status.code()
+                                        );
+                                    }
+                                }
+                                Err(e) => println!("[DEV] Error: {}", e),
+                            }
+                        } else {
+                            println!("[DEV] {} denied.", kind);
+                        }
+                    }
+                }
+            }
+            true
+        }
+
+        // ── Patch ────────────────────────────────────────────────────────────
+        cmd if cmd.starts_with("/patch") => {
+            let sub = name.split_whitespace().nth(1).unwrap_or("show");
+            match sub {
+                "show" => {
+                    println!("[PATCH] No pending patch in this session.");
+                    println!(
+                        "[PATCH] Diff-before-write is shown automatically when the agent proposes a file write."
+                    );
+                    println!("[PATCH] Full patch queue is planned for Phase 2.4.");
+                }
+                "apply" => {
+                    println!(
+                        "[PATCH] No pending patch to apply. Propose a file write via the agent first."
+                    );
+                }
+                "discard" => {
+                    println!("[PATCH] No pending patch to discard.");
+                }
+                _ => {
+                    println!(
+                        "[PATCH] Unknown: {}. Use /patch, /patch apply, /patch discard.",
+                        sub
+                    );
+                }
             }
             true
         }
@@ -673,7 +917,8 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
             sys_prompt.push_str("\n\n");
             sys_prompt.push_str(&memory_context);
         }
-        let skill_manager = crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
+        let skill_manager =
+            crate::skills::SkillManager::new(rt.paths.clone(), rt.config.skills.clone());
         let skill_context = skill_manager.build_context(active_skill);
         if !skill_context.is_empty() {
             sys_prompt.push_str("\n\n");
@@ -892,9 +1137,7 @@ fn prompt_approval_stdin(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalRequest> {
-    use crate::approval::{
-        bash_approval_request, call_subagent_approval_request, write_file_approval_request,
-    };
+    use crate::approval::{ApprovalRequest, bash_approval_request, call_subagent_approval_request};
     match tool_name {
         "bash" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
@@ -903,7 +1146,38 @@ fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalReque
         "write_file" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            Some(write_file_approval_request(path, content))
+
+            // Generate diff preview before showing the approval gate.
+            let preview = crate::repo_map::generate_diff_preview(path, content);
+            let diff_lines = crate::repo_map::format_diff_preview(&preview);
+
+            let risk = crate::approval::assess_write_risk(path);
+
+            let mut explanation = format!(
+                "{} file: {} line(s) added, {} line(s) removed",
+                if preview.is_new_file {
+                    "New"
+                } else {
+                    "Modified"
+                },
+                preview.added_lines,
+                preview.removed_lines
+            );
+            if preview.has_secret_warning {
+                explanation.push_str(
+                    " | \u{26a0} SECRET-LIKE CONTENT DETECTED \u{2014} values redacted in preview",
+                );
+            }
+            explanation.push('\n');
+            explanation.push_str(&diff_lines.join("\n"));
+
+            Some(ApprovalRequest {
+                tool_name: "write_file".to_string(),
+                action_summary: format!("Write to: {}", path),
+                risk_level: risk,
+                explanation: Some(explanation),
+                working_directory: None,
+            })
         }
         "call_subagent" => {
             let agent_cli = args.get("agent_cli").and_then(|v| v.as_str()).unwrap_or("");

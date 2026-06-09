@@ -71,6 +71,9 @@ pub struct Config {
     /// Skills system config.
     #[serde(default)]
     pub skills: SkillsConfig,
+    /// Repo map config.
+    #[serde(default)]
+    pub repo_map: RepoMapConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -243,6 +246,49 @@ fn default_max_index_chars() -> usize {
     2000
 }
 fn default_max_skill_chars() -> usize {
+    4000
+}
+
+// ── Repo Map settings ─────────────────────────────────────────────────────────
+
+/// Configuration for the repo map feature.
+///
+/// Example TOML:
+/// ```toml
+/// [repo_map]
+/// enabled = true
+/// inject = true
+/// max_chars = 4000
+/// include_symbols = true
+/// ```
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RepoMapConfig {
+    /// Enable the repo map system.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Inject repo map into the system prompt context.
+    #[serde(default = "default_true")]
+    pub inject: bool,
+    /// Maximum characters for the injected repo map context.
+    #[serde(default = "default_repo_map_max_chars")]
+    pub max_chars: usize,
+    /// Include symbol names in the repo map (fn/struct/class etc.)
+    #[serde(default = "default_true")]
+    pub include_symbols: bool,
+}
+
+impl Default for RepoMapConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            inject: true,
+            max_chars: 4000,
+            include_symbols: true,
+        }
+    }
+}
+
+fn default_repo_map_max_chars() -> usize {
     4000
 }
 

@@ -8,6 +8,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — Phase 2: GOAT Brain Foundation
 
+### Added — Phase 2.3: Agentic Coding Upgrade (2026-06-09)
+
+**Version bump: 0.5.0 → 0.6.0**
+
+- **Repo Map (`src/repo_map.rs`):** New module implementing safe, lightweight repository awareness:
+  - Scans project root for stack, source dirs, key files, and source file metadata.
+  - Symbol extraction via regex for Rust (fn/struct/enum/trait/mod), JS/TS (function/class/export), Python (def/class), Go (func/type).
+  - Git status awareness: current branch, dirty tree, changed file count (safe subprocess call, no libgit2).
+  - Ignored dirs: `node_modules`, `target`, `dist`, `.git`, `venv`, `__pycache__`, and more.
+  - Secret file detection: never reads `.env`, `id_rsa`, `*.key`, `*.pem`, etc.
+  - Budget-capped compact string output (default 4000 chars) for LLM context injection.
+- **Diff-before-write:** `write_file` tool now generates a unified diff preview before ApprovalGate:
+  - Shows `+N lines added / -N removed` plus a truncated unified diff for existing files.
+  - Shows line count for new files.
+  - Detects and redacts secret-like values in content previews before showing to user.
+  - Applies in both TUI and headless mode.
+- **RepoMapConfig:** Added `[repo_map]` config section to `goat.toml`:
+  - `enabled`, `inject`, `max_chars` (default 4000), `include_symbols` (default true).
+- **CLI Commands:** Added `goat repo-map [show|refresh]`, `goat check`, `goat test [args...]`, `goat lint`, `goat format`, `goat patch [show|apply|discard]`.
+- **Slash Commands (TUI + headless):** Added `/repo-map`, `/repo-map refresh`, `/check`, `/test`, `/lint`, `/format`, `/patch`, `/patch apply`, `/patch discard`.
+- **Command Detection (`ProjectCommands::detect`):** Auto-detects check/test/lint/format commands for:
+  - Rust: `cargo check/test/clippy/fmt`
+  - Node: detects runner (npm/pnpm/yarn) + package.json scripts
+  - Python: `pytest`, `ruff check/format`
+  - Go: `go build/test`, `gofmt`
+  - Makefile: `make`, `make test`
+- **Dev Command Runner:** `/check`, `/test`, `/lint`, `/format` slash commands route through ApprovalGate before execution.
+- **Git Awareness:** `/status` now shows git branch, dirty tree status, and changed file count when project is scanned. Works without libgit2 via safe subprocess.
+- **Agent Coding Loop Design:** Architecture documented in code and docs for future Plan/Act mode (Phase 2.4+).
+- **Security:** All file scans skip secret-named files; diff previews redact secret-like values; no files injected automatically; all shell commands require ApprovalGate.
+- **Tests:** Added 13 new tests covering repo map scanning, symbol extraction (Rust/Python/JS), ignore rules, secret detection, diff preview, command detection.
+
 ### Added — Phase 2.1: GOAT Skills System (2026-06-09)
 
 **Version bump: 0.7.0 → 0.8.0**

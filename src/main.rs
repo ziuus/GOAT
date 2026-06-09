@@ -12,6 +12,7 @@ pub mod models;
 pub mod paths;
 pub mod project;
 pub mod provider;
+pub mod repo_map;
 pub mod runtime;
 mod skills;
 pub mod swarm;

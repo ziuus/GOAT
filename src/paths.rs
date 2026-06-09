@@ -661,7 +661,7 @@ pub fn run_doctor(
         let count = std::fs::read_dir(&paths.skills_dir)
             .map(|i| i.filter_map(|e| e.ok()).count())
             .unwrap_or(0);
-            
+
         checks.push(DoctorCheck {
             status: DoctorStatus::Ok,
             label: "Skills Directory".to_string(),

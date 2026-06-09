@@ -406,17 +406,27 @@ impl App {
             }
 
             "/skills" => {
-                let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                let skill_manager = crate::skills::SkillManager::new(
+                    self.paths.clone(),
+                    self.config.skills.clone(),
+                );
                 let skills = skill_manager.list_skills();
                 if skills.is_empty() {
-                    self.push_log("[SKILLS] No skills found. Use /skill create <name> to make one.");
+                    self.push_log(
+                        "[SKILLS] No skills found. Use /skill create <name> to make one.",
+                    );
                 } else {
                     self.push_log(format!("[SKILLS] {} available skills:", skills.len()));
                     for s in skills {
                         let status = if s.is_suspicious { " [SUSPICIOUS]" } else { "" };
-                        self.push_log(format!("[SKILLS]   - {}{}: {}", s.name, status, s.description));
+                        self.push_log(format!(
+                            "[SKILLS]   - {}{}: {}",
+                            s.name, status, s.description
+                        ));
                     }
-                    self.push_log("[SKILLS] Use /skill <name> to activate a skill for this session.");
+                    self.push_log(
+                        "[SKILLS] Use /skill <name> to activate a skill for this session.",
+                    );
                 }
                 true
             }
@@ -424,8 +434,11 @@ impl App {
             "/skill" => {
                 let arg = parts.get(1).copied().unwrap_or("").trim();
                 let rest = parts.get(2..).unwrap_or(&[]).join(" ");
-                let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
-                
+                let skill_manager = crate::skills::SkillManager::new(
+                    self.paths.clone(),
+                    self.config.skills.clone(),
+                );
+
                 if arg.is_empty() {
                     self.push_log("[SKILLS] Active skill:");
                     if let Some(ref skill) = self.active_skill {
@@ -438,14 +451,22 @@ impl App {
                     self.active_skill = None;
                     self.push_log("[SKILLS] Active skill cleared.");
                 } else if arg == "path" {
-                    self.push_log(format!("[SKILLS] Directory: {}", skill_manager.skills_dir().display()));
+                    self.push_log(format!(
+                        "[SKILLS] Directory: {}",
+                        skill_manager.skills_dir().display()
+                    ));
                 } else if arg == "create" {
                     if rest.is_empty() {
                         self.push_log("[SKILLS] Usage: /skill create <name>");
                     } else {
                         match skill_manager.create_template(&rest) {
-                            Ok(path) => self.push_log(format!("[SKILLS] Created template at {}", path.display())),
-                            Err(e) => self.push_log(format!("[SKILLS] Error creating template: {}", e)),
+                            Ok(path) => self.push_log(format!(
+                                "[SKILLS] Created template at {}",
+                                path.display()
+                            )),
+                            Err(e) => {
+                                self.push_log(format!("[SKILLS] Error creating template: {}", e))
+                            }
                         }
                     }
                 } else if arg == "search" {
@@ -458,7 +479,10 @@ impl App {
                         } else {
                             self.push_log(format!("[SKILLS] {} matches:", results.len()));
                             for s in results {
-                                self.push_log(format!("[SKILLS]   - {}: {}", s.name, s.description));
+                                self.push_log(format!(
+                                    "[SKILLS]   - {}: {}",
+                                    s.name, s.description
+                                ));
                             }
                         }
                     }
@@ -467,7 +491,9 @@ impl App {
                         self.active_skill = Some(skill.name.clone());
                         self.push_log(format!("[SKILLS] Activated skill: {}", skill.name));
                         if skill.is_suspicious {
-                            self.push_log("[SKILLS] WARNING: This skill contains suspicious patterns!");
+                            self.push_log(
+                                "[SKILLS] WARNING: This skill contains suspicious patterns!",
+                            );
                         }
                     } else {
                         self.push_log(format!("[SKILLS] Skill '{}' not found.", arg));
@@ -483,16 +509,23 @@ impl App {
                 } else {
                     let mut history_text = String::new();
                     for msg in self.history.iter().filter(|m| m.role != "system") {
-                        history_text.push_str(&format!("{}: {}\n", msg.role, msg.content.as_deref().unwrap_or("")));
+                        history_text.push_str(&format!(
+                            "{}: {}\n",
+                            msg.role,
+                            msg.content.as_deref().unwrap_or("")
+                        ));
                     }
-                    
+
                     if history_text.trim().is_empty() {
                         self.push_log("[SKILLS] No history to extract from.");
                         return true;
                     }
-                    
-                    self.push_log(format!("[SKILLS] Extracting skill '{}' from session history...", arg));
-                    
+
+                    self.push_log(format!(
+                        "[SKILLS] Extracting skill '{}' from session history...",
+                        arg
+                    ));
+
                     let prompt = format!(
                         "You are a skill curator. The user wants to extract a reusable skill from the following session history.\n\
                          Generate a valid SKILL.md file with the following headers: Name, Description, Triggers, Tools Needed, Procedure, Safety Notes, Verification.\n\
@@ -504,29 +537,43 @@ impl App {
                          Session History:\n{}",
                         arg, history_text
                     );
-                    
+
                     let messages = vec![crate::llm::Message {
                         role: "user".to_string(),
                         content: Some(prompt),
                         tool_calls: None,
                         tool_call_id: None,
                     }];
-                    
-                    match self.llm_router.completion_with_fallback(&self.model_chain, messages, None).await {
+
+                    match self
+                        .llm_router
+                        .completion_with_fallback(&self.model_chain, messages, None)
+                        .await
+                    {
                         Ok((resp, _)) => {
                             let content = resp.content.unwrap_or_default();
-                            let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+                            let skill_manager = crate::skills::SkillManager::new(
+                                self.paths.clone(),
+                                self.config.skills.clone(),
+                            );
                             let skill_dir = skill_manager.skills_dir().join(&arg);
                             let _ = std::fs::create_dir_all(&skill_dir);
                             let skill_file = skill_dir.join("SKILL.md");
                             if let Err(e) = std::fs::write(&skill_file, content) {
                                 self.push_log(format!("[SKILLS] Error writing skill file: {}", e));
                             } else {
-                                self.push_log(format!("[SKILLS] Extracted and saved skill '{}' to {}", arg, skill_file.display()));
+                                self.push_log(format!(
+                                    "[SKILLS] Extracted and saved skill '{}' to {}",
+                                    arg,
+                                    skill_file.display()
+                                ));
                             }
                         }
                         Err(e) => {
-                            self.push_log(format!("[SKILLS] Failed to extract skill from LLM: {}", e));
+                            self.push_log(format!(
+                                "[SKILLS] Failed to extract skill from LLM: {}",
+                                e
+                            ));
                         }
                     }
                 }
@@ -1016,13 +1063,15 @@ impl App {
             self.status = AppStatus::Thinking;
 
             let mut sys_prompt = route.profile.system_prompt.to_string();
-            let memory_manager = crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+            let memory_manager =
+                crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
             let memory_context = memory_manager.build_context(self.brain.as_ref());
             if !memory_context.is_empty() {
                 sys_prompt.push_str("\n\n");
                 sys_prompt.push_str(&memory_context);
             }
-            let skill_manager = crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
+            let skill_manager =
+                crate::skills::SkillManager::new(self.paths.clone(), self.config.skills.clone());
             let skill_context = skill_manager.build_context(self.active_skill.as_deref());
             if !skill_context.is_empty() {
                 sys_prompt.push_str("\n\n");
@@ -1185,7 +1234,38 @@ fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalReque
         "write_file" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            Some(write_file_approval_request(path, content))
+
+            // Generate diff preview before building the approval request.
+            let preview = crate::repo_map::generate_diff_preview(path, content);
+            let diff_lines = crate::repo_map::format_diff_preview(&preview);
+
+            let risk = crate::approval::assess_write_risk(path);
+
+            let mut explanation = format!(
+                "{} file: {} line(s) added, {} line(s) removed",
+                if preview.is_new_file {
+                    "New"
+                } else {
+                    "Modified"
+                },
+                preview.added_lines,
+                preview.removed_lines
+            );
+            if preview.has_secret_warning {
+                explanation.push_str(
+                    " | \u{26a0} SECRET-LIKE CONTENT DETECTED — values redacted in preview",
+                );
+            }
+            explanation.push('\n');
+            explanation.push_str(&diff_lines.join("\n"));
+
+            Some(ApprovalRequest {
+                tool_name: "write_file".to_string(),
+                action_summary: format!("Write to: {}", path),
+                risk_level: risk,
+                explanation: Some(explanation),
+                working_directory: None,
+            })
         }
         "call_subagent" => {
             let agent_cli = args.get("agent_cli").and_then(|v| v.as_str()).unwrap_or("");
