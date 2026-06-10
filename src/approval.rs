@@ -272,10 +272,21 @@ pub struct PendingApproval {
     pub source: String,
 }
 
+#[derive(Clone, serde::Serialize)]
+pub struct ApprovalHistoryEntry {
+    pub id: String,
+    pub created_at: u64,
+    pub resolved_at: u64,
+    pub request: ApprovalRequest,
+    pub source: String,
+    pub decision: char,
+}
+
 pub struct ApprovalQueue {
     pending: std::sync::Arc<
         tokio::sync::Mutex<HashMap<String, (PendingApproval, tokio::sync::oneshot::Sender<char>)>>,
     >,
+    history: std::sync::Arc<tokio::sync::Mutex<Vec<ApprovalHistoryEntry>>>,
 }
 
 impl Default for ApprovalQueue {
@@ -288,6 +299,7 @@ impl ApprovalQueue {
     pub fn new() -> Self {
         Self {
             pending: std::sync::Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            history: std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -326,11 +338,27 @@ impl ApprovalQueue {
     }
 
     pub async fn resolve(&self, id: &str, decision: char) -> bool {
-        if let Some((_, tx)) = self.pending.lock().await.remove(id) {
+        if let Some((p, tx)) = self.pending.lock().await.remove(id) {
+            let history_entry = ApprovalHistoryEntry {
+                id: p.id,
+                created_at: p.created_at,
+                resolved_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                request: p.request,
+                source: p.source,
+                decision,
+            };
+            self.history.lock().await.push(history_entry);
             tx.send(decision).is_ok()
         } else {
             false
         }
+    }
+
+    pub async fn history(&self) -> Vec<ApprovalHistoryEntry> {
+        self.history.lock().await.clone()
     }
 }
 

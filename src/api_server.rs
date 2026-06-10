@@ -49,11 +49,15 @@ pub async fn start_server(
         .route("/v1/logs/recent", get(logs_handler))
         .route("/v1/events/stream", get(events_stream_handler))
         .route("/v1/approvals", get(approvals_list_handler))
+        .route("/v1/approvals/history", get(approvals_history_handler))
         .route("/v1/approvals/:id", get(approval_detail_handler))
         .route("/v1/approvals/:id/approve", post(approval_approve_handler))
         .route("/v1/approvals/:id/deny", post(approval_deny_handler))
         .route("/v1/chat", post(chat_handler))
-        .route("/v1/sessions", get(sessions_list_handler).post(session_create_handler))
+        .route(
+            "/v1/sessions",
+            get(sessions_list_handler).post(session_create_handler),
+        )
         .route("/v1/sessions/:id", get(session_detail_handler))
         .route("/v1/repo/tree", get(repo_tree_handler))
         .route("/v1/repo/file", get(repo_file_handler))
@@ -62,6 +66,8 @@ pub async fn start_server(
         .route("/v1/context/add", post(context_add_handler))
         .route("/v1/context/remove", post(context_remove_handler))
         .route("/v1/context/clear", post(context_clear_handler))
+        .route("/v1/audit", get(audit_handler))
+        .route("/v1/audit/recent", get(audit_recent_handler))
         .layer(cors)
         .with_state(state);
 
@@ -205,25 +211,107 @@ async fn command_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
 
-    // Minimal safe command handling
     let cmd = req.command.trim();
-    if cmd == "/status" {
-        return status_handler(headers, State(state)).await;
-    } else if cmd == "/jobs" {
-        return jobs_list_handler(headers, State(state)).await;
-    } else if cmd == "/schedule" {
-        return schedule_list_handler(headers, State(state)).await;
-    } else if cmd == "/hooks" {
-        return hooks_list_handler(headers, State(state)).await;
+
+    // Safe read-only commands
+    let safe_commands = [
+        "/status",
+        "/jobs",
+        "/jobs list",
+        "/schedule",
+        "/schedule list",
+        "/hooks",
+        "/hooks list",
+        "/mcp status",
+        "/mcp list",
+        "/repo",
+        "/changes",
+        "/context show",
+        "/checkpoint list",
+        "/logs recent",
+    ];
+
+    if safe_commands.contains(&cmd) || cmd.starts_with("/commands search") {
+        if cmd == "/status" {
+            return status_handler(headers, State(state)).await;
+        }
+        if cmd == "/jobs" || cmd == "/jobs list" {
+            return jobs_list_handler(headers, State(state)).await;
+        }
+        if cmd == "/schedule" || cmd == "/schedule list" {
+            return schedule_list_handler(headers, State(state)).await;
+        }
+        if cmd == "/hooks" || cmd == "/hooks list" {
+            return hooks_list_handler(headers, State(state)).await;
+        }
+        if cmd == "/mcp status" || cmd == "/mcp list" {
+            return mcp_status_handler(headers, State(state)).await;
+        }
+        if cmd == "/repo" {
+            return repo_tree_handler(headers, State(state)).await;
+        }
+        if cmd == "/changes" {
+            return diffs_handler(headers, State(state)).await;
+        }
+        if cmd == "/context show" {
+            return context_get_handler(headers, State(state)).await;
+        }
+        if cmd == "/logs recent" {
+            return logs_handler(headers, State(state)).await;
+        }
+        return Ok(Json(
+            json!({ "message": format!("Safe command executed: {}", cmd) }),
+        ));
     }
 
-    // Risky command handling -> defer to approval queue in future
+    // Attempt to parse as risky command
+    let rt = state.runtime.lock().await;
+
+    // Check if it's unknown/unsupported
+    let known_risky = [
+        "/bash",
+        "/write",
+        "/git",
+        "/commit",
+        "/mcp start",
+        "/rollback",
+    ];
+    if !known_risky.iter().any(|r| cmd.starts_with(r)) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Unknown or unsupported command" })),
+        ));
+    }
+
+    // Create approval request for risky command
+    let req_obj = crate::approval::ApprovalRequest {
+        tool_name: "dashboard_command".to_string(),
+        action_summary: cmd.to_string(),
+        risk_level: crate::approval::RiskLevel::High,
+        explanation: Some("Risky command initiated from dashboard".to_string()),
+        working_directory: None,
+    };
+
+    let (pending, _) = rt.approval_queue.add(req_obj, "dashboard").await;
+
+    // Broadcast event
+    let _ = rt
+        .event_bus
+        .push(crate::events::GoatEvent::new(
+            "approval_requested",
+            crate::events::EventSeverity::Warning,
+            &format!("Dashboard command requires approval: {}", cmd),
+            Some(json!({ "id": pending.id, "source": pending.source })),
+        ))
+        .await;
+
     Err((
         StatusCode::FORBIDDEN,
         Json(json!({
             "approval_required": true,
-            "risk": "High",
-            "message": "Use TUI/headless to approve, API approval workflow planned.",
+            "approval_id": pending.id,
+            "risk": "high",
+            "message": "Approval required to execute this command.",
         })),
     ))
 }
@@ -322,6 +410,19 @@ async fn approval_approve_handler(
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     let ok = rt.approval_queue.resolve(&id, 'y').await;
+
+    if ok {
+        let _ = rt
+            .event_bus
+            .push(crate::events::GoatEvent::new(
+                "approval_resolved",
+                crate::events::EventSeverity::Info,
+                &format!("Approval {} resolved (approved)", id),
+                Some(json!({ "id": id, "decision": "y" })),
+            ))
+            .await;
+    }
+
     Ok(Json(json!({ "success": ok })))
 }
 
@@ -333,6 +434,19 @@ async fn approval_deny_handler(
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     let ok = rt.approval_queue.resolve(&id, 'n').await;
+
+    if ok {
+        let _ = rt
+            .event_bus
+            .push(crate::events::GoatEvent::new(
+                "approval_resolved",
+                crate::events::EventSeverity::Info,
+                &format!("Approval {} resolved (denied)", id),
+                Some(json!({ "id": id, "decision": "n" })),
+            ))
+            .await;
+    }
+
     Ok(Json(json!({ "success": ok })))
 }
 
@@ -379,12 +493,17 @@ async fn sessions_list_handler(
     let rt = state.runtime.lock().await;
     if let Some(brain) = &rt.brain {
         if let Ok(records) = brain.get_session_records() {
-            let sessions: Vec<_> = records.into_iter().map(|s| json!({
-                "id": s.id,
-                "title": s.title,
-                "created_at": s.created_at,
-                "updated_at": s.updated_at
-            })).collect();
+            let sessions: Vec<_> = records
+                .into_iter()
+                .map(|s| {
+                    json!({
+                        "id": s.id,
+                        "title": s.title,
+                        "created_at": s.created_at,
+                        "updated_at": s.updated_at
+                    })
+                })
+                .collect();
             return Ok(Json(json!({ "sessions": sessions })));
         }
     }
@@ -400,14 +519,22 @@ async fn session_detail_handler(
     let rt = state.runtime.lock().await;
     if let Some(brain) = &rt.brain {
         if let Ok(history) = brain.load_session_history(&id) {
-            let messages: Vec<_> = history.into_iter().map(|(r, c)| json!({
-                "role": r,
-                "content": c
-            })).collect();
+            let messages: Vec<_> = history
+                .into_iter()
+                .map(|(r, c)| {
+                    json!({
+                        "role": r,
+                        "content": c
+                    })
+                })
+                .collect();
             return Ok(Json(json!({ "id": id, "history": messages })));
         }
     }
-    Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Session not found" }))))
+    Err((
+        StatusCode::NOT_FOUND,
+        Json(json!({ "error": "Session not found" })),
+    ))
 }
 
 async fn session_create_handler(
@@ -419,9 +546,14 @@ async fn session_create_handler(
     let new_id = uuid::Uuid::new_v4().to_string();
     if let Some(brain) = &rt.brain {
         let _ = brain.create_session(&new_id, "New Dashboard Session");
-        return Ok(Json(json!({ "id": new_id, "title": "New Dashboard Session" })));
+        return Ok(Json(
+            json!({ "id": new_id, "title": "New Dashboard Session" }),
+        ));
     }
-    Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "Brain disabled" }))))
+    Err((
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": "Brain disabled" })),
+    ))
 }
 
 // ── Phase 4.3 Repo Explorer ───────────────────────────────────────────────
@@ -436,7 +568,10 @@ async fn repo_tree_handler(
     if let Ok(repo_map) = scanner.scan() {
         return Ok(Json(json!(repo_map)));
     }
-    Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "Failed to scan repo" }))))
+    Err((
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(json!({ "error": "Failed to scan repo" })),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -452,20 +587,29 @@ async fn repo_file_handler(
     check_auth(&headers, &state)?;
     let root_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let p = root_dir.join(&query.path);
-    
+
     // Safety check: must be inside project and not look like a secret
     if !p.starts_with(&root_dir) {
-        return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Path outside project" }))));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Path outside project" })),
+        ));
     }
     if crate::repo_map::looks_like_secret_file(&p) {
-        return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Refusing to read potential secret file" }))));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Refusing to read potential secret file" })),
+        ));
     }
-    
+
     if let Ok(content) = std::fs::read_to_string(&p) {
         let redacted = crate::approval::redact_secrets(&content);
         Ok(Json(json!({ "path": query.path, "content": redacted })))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "File not found or not UTF-8" }))))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "File not found or not UTF-8" })),
+        ))
     }
 }
 
@@ -477,12 +621,12 @@ async fn diffs_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let root_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    
+
     // Attempt git diff
     let out = std::process::Command::new("git")
         .args(["-C", &root_dir.to_string_lossy(), "diff"])
         .output();
-        
+
     if let Ok(o) = out {
         let diff_str = String::from_utf8_lossy(&o.stdout);
         // Truncate if too huge
@@ -493,7 +637,10 @@ async fn diffs_handler(
         };
         Ok(Json(json!({ "diff": truncated })))
     } else {
-        Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "Git diff failed" }))))
+        Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Git diff failed" })),
+        ))
     }
 }
 
@@ -523,12 +670,17 @@ async fn context_add_handler(
     let root_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let p = root_dir.join(&req.path);
     if crate::repo_map::looks_like_secret_file(&p) {
-        return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Cannot add secret files to context" }))));
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Cannot add secret files to context" })),
+        ));
     }
     if !rt.selected_files.contains(&req.path) {
         rt.selected_files.push(req.path.clone());
     }
-    Ok(Json(json!({ "status": "added", "selected_files": rt.selected_files })))
+    Ok(Json(
+        json!({ "status": "added", "selected_files": rt.selected_files }),
+    ))
 }
 
 async fn context_remove_handler(
@@ -539,7 +691,9 @@ async fn context_remove_handler(
     check_auth(&headers, &state)?;
     let mut rt = state.runtime.lock().await;
     rt.selected_files.retain(|f| f != &req.path);
-    Ok(Json(json!({ "status": "removed", "selected_files": rt.selected_files })))
+    Ok(Json(
+        json!({ "status": "removed", "selected_files": rt.selected_files }),
+    ))
 }
 
 async fn context_clear_handler(
@@ -550,4 +704,62 @@ async fn context_clear_handler(
     let mut rt = state.runtime.lock().await;
     rt.selected_files.clear();
     Ok(Json(json!({ "status": "cleared" })))
+}
+
+async fn approvals_history_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let history = rt.approval_queue.history().await;
+    Ok(Json(json!({ "history": history })))
+}
+
+#[derive(Deserialize)]
+struct AuditQuery {
+    category: Option<String>,
+}
+
+async fn audit_handler(
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<AuditQuery>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+
+    let target_file = match query.category.as_deref() {
+        Some("tool") => rt.paths.tool_audit_log_file.clone(),
+        Some("scheduler") => rt.paths.data_dir.join("scheduler-audit.log"),
+        _ => rt.paths.tool_audit_log_file.clone(), // Default to tool audit
+    };
+
+    if let Ok(content) = std::fs::read_to_string(&target_file) {
+        let safe_content = crate::approval::redact_secrets(&content);
+        let safe_content = safe_content.replace(&state.token, "[REDACTED]");
+        let lines: Vec<&str> = safe_content.lines().rev().take(500).collect();
+        Ok(Json(json!({ "audit": lines })))
+    } else {
+        Ok(Json(json!({ "audit": [] })))
+    }
+}
+
+async fn audit_recent_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+
+    let mut recent_lines = Vec::new();
+
+    // Read tool audit
+    if let Ok(content) = std::fs::read_to_string(&rt.paths.tool_audit_log_file) {
+        let safe_content = crate::approval::redact_secrets(&content);
+        let safe_content = safe_content.replace(&state.token, "[REDACTED]");
+        recent_lines.extend(safe_content.lines().rev().take(50).map(|s| s.to_string()));
+    }
+
+    Ok(Json(json!({ "audit": recent_lines })))
 }

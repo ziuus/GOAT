@@ -1055,3 +1055,8 @@ cargo run -- --db <PATH>      → custom database file
 - Added `/diffs` page for displaying current workspace git diffs in real-time.
 - Updated Dashboard Sidebar.
 - Improved Daemon routes (`/v1/chat`, `/v1/sessions`, `/v1/repo/tree`, `/v1/repo/file`, `/v1/diffs`, `/v1/context`).
+
+### Added
+- **Dashboard Safe Commands**: `/commands` center with read-only execution.
+- **Dashboard Approval History**: Tracks `ApprovalQueue` history with `GET /v1/approvals/history`.
+- **Dashboard Audit Explorer**: Visual view of system logs (`/audit`), respecting secret redaction.

@@ -1976,14 +1976,58 @@ impl App {
                                 "Missing"
                             }
                         ));
+                    } else if arg == "chat"
+                        || arg == "repo"
+                        || arg == "diffs"
+                        || arg == "commands"
+                        || arg == "audit"
+                        || arg == "approvals"
+                    {
+                        self.push_log(format!(
+                            "[DASHBOARD] Open http://127.0.0.1:3000/{} in your browser to view.",
+                            arg
+                        ));
                     } else {
                         self.push_log(format!(
-                            "[DASHBOARD] Unknown action '{}'. Use path, doctor.",
+                            "[DASHBOARD] Unknown action '{}'. Use path, doctor, chat, repo, diffs, commands, audit, approvals.",
                             arg
                         ));
                     }
                 } else {
                     self.push_log("[DASHBOARD] Not found. Run `goat dashboard dev` outside TUI to bootstrap or locate it.".to_string());
+                }
+                true
+            }
+
+            "/audit" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                if arg == "recent" || arg.is_empty() {
+                    self.push_log("[AUDIT] Fetching recent audit logs...".to_string());
+                    if let Ok(content) = std::fs::read_to_string(&self.paths.tool_audit_log_file) {
+                        let lines: Vec<&str> = content.lines().rev().take(10).collect();
+                        for line in lines.into_iter().rev() {
+                            self.push_log(format!("  {}", line));
+                        }
+                    } else {
+                        self.push_log("[AUDIT] No tool audit logs found.".to_string());
+                    }
+                } else {
+                    self.push_log("[AUDIT] Unknown action. Try: /audit recent".to_string());
+                }
+                true
+            }
+
+            "/approvals" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                if arg == "history" {
+                    self.push_log(
+                        "[APPROVALS] Run 'goat dashboard' to view complete history in the browser."
+                            .to_string(),
+                    );
+                } else {
+                    self.push_log(
+                        "[APPROVALS] Unknown action. Try: /approvals history".to_string(),
+                    );
                 }
                 true
             }

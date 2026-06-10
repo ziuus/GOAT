@@ -1434,8 +1434,22 @@ async fn handle_slash_command(
                             "Missing"
                         }
                     );
+                } else if arg == "chat"
+                    || arg == "repo"
+                    || arg == "diffs"
+                    || arg == "commands"
+                    || arg == "audit"
+                    || arg == "approvals"
+                {
+                    println!(
+                        "[DASHBOARD] Open http://127.0.0.1:3000/{} in your browser to view.",
+                        arg
+                    );
                 } else {
-                    println!("[DASHBOARD] Unknown action '{}'. Use path, doctor.", arg);
+                    println!(
+                        "[DASHBOARD] Unknown action '{}'. Use path, doctor, chat, repo, diffs, commands, audit, approvals.",
+                        arg
+                    );
                 }
             } else {
                 println!(
@@ -1445,6 +1459,35 @@ async fn handle_slash_command(
             true
         }
 
+        "/audit" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg == "recent" || arg.is_empty() {
+                println!("[AUDIT] Fetching recent audit logs...");
+                if let Ok(content) = std::fs::read_to_string(&rt.paths.tool_audit_log_file) {
+                    let lines: Vec<&str> = content.lines().rev().take(10).collect();
+                    for line in lines.into_iter().rev() {
+                        println!("  {}", line);
+                    }
+                } else {
+                    println!("[AUDIT] No tool audit logs found.");
+                }
+            } else {
+                println!("[AUDIT] Unknown action. Try: /audit recent");
+            }
+            true
+        }
+
+        "/approvals" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg == "history" {
+                println!(
+                    "[APPROVALS] Run 'goat dashboard' to view complete history in the browser."
+                );
+            } else {
+                println!("[APPROVALS] Unknown action. Try: /approvals history");
+            }
+            true
+        }
         "/recall" => {
             let query = parts.get(1..).map(|p| p.join(" ")).unwrap_or_default();
             if query.is_empty() {

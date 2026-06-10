@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getGoatConfig, setGoatConfig, goatApi } from '@/lib/goat-api';
-import { ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Shield, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
@@ -35,11 +35,28 @@ export default function SettingsPage() {
     }
   };
 
+  const clearToken = () => {
+    setToken('');
+    setGoatConfig(url, '');
+    setStatus('idle');
+    router.refresh();
+  };
+
+  const isLocalhost = url.includes('127.0.0.1') || url.includes('localhost');
+
   return (
     <div className="max-w-2xl mx-auto mt-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Connection Settings</h1>
-        <p className="text-muted-foreground">Connect dashboard to your local GOAT Daemon.</p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">Connection Settings</h1>
+          <p className="text-muted-foreground">Connect dashboard to your local GOAT Daemon.</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <span className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded-full text-xs font-medium">
+            <Shield className="w-3.5 h-3.5" />
+            Local Daemon Only
+          </span>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 bg-card border border-border p-6 rounded-xl shadow-sm">
@@ -52,10 +69,27 @@ export default function SettingsPage() {
             className="w-full bg-input border border-border rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             required
           />
+          {!isLocalhost && (
+            <p className="text-xs text-amber-500 flex items-center gap-1 mt-1">
+              <ShieldAlert className="w-3 h-3" />
+              Warning: Connecting to non-localhost URLs is not recommended for security.
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Daemon Token</label>
+          <div className="flex justify-between items-end">
+            <label className="text-sm font-medium">Daemon Token</label>
+            {token && (
+              <button 
+                type="button" 
+                onClick={clearToken}
+                className="text-xs text-destructive hover:text-destructive/80 flex items-center gap-1"
+              >
+                <LogOut className="w-3 h-3" /> Clear Token
+              </button>
+            )}
+          </div>
           <input 
             type="password" 
             value={token}
@@ -64,8 +98,8 @@ export default function SettingsPage() {
             className="w-full bg-input border border-border rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             required
           />
-          <p className="text-xs text-muted-foreground">
-            Run <code>cat ~/.local/share/goat/daemon.token</code> in your terminal to view your secure token.
+          <p className="text-xs text-muted-foreground mt-2">
+            Run <code>cat ~/.local/share/goat/daemon.token</code> in your terminal to view your secure token. Token is never displayed after entry.
           </p>
         </div>
 
