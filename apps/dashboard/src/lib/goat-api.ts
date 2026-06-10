@@ -83,3 +83,19 @@ export async function daemonFetch(path: string, options: RequestInit = {}): Prom
     },
   });
 }
+
+// Chat API Additions
+export const chatApi = {
+  getSessions: () => fetchGoat<any>('/v1/chat/sessions').catch(() => ({ sessions: [] })),
+  createSession: (title?: string) => 
+    daemonFetch('/v1/chat/sessions', { 
+      method: 'POST', 
+      body: JSON.stringify({ title }) 
+    }).then(res => res.json()),
+  getSessionMessages: (id: string) => fetchGoat<any>(`/v1/chat/sessions/${id}/messages`).catch(() => ({ messages: [] })),
+  sendMessage: (sessionId: string, message: string, mode: string, contextFiles: string[]) => 
+    daemonFetch(`/v1/chat/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message, mode, context_files: contextFiles })
+    }).then(res => res.json()),
+};

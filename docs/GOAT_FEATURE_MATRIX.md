@@ -270,6 +270,8 @@ Status legend:
 | Repo Explorer | `working` | Phase 4.3 |
 | Diff Viewer | `working` | Phase 4.3 |
 | Context Management API | `working` | Phase 4.3 |
+| Safe Command Execution UI | `working` | Phase 4.4 |
+| Async Agent Chat & Jobs | `working` | Phase 4.5 |
 
 ---
 

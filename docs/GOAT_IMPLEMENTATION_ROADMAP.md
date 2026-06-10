@@ -454,6 +454,17 @@
 
 ---
 
+## Phase 4.5: Dashboard Agent Chat + Async Coding Jobs (✅ COMPLETED)
+**Goal:** Turn the dashboard chat from a foundation into a real visual coding companion.
+
+*   **[x] Async Chat Endpoints:** Switch `POST /v1/chat` to a background job model, returning a `job_id` instead of blocking.
+*   **[x] Async Job Processing:** Daemon spawns `tokio::spawn` tasks to run `LlmRouter` operations in the background.
+*   **[x] Safe Tool Integration:** When the agent operates in `Act` mode via dashboard chat, tools trigger `approval_required` status rather than blindly applying.
+*   **[x] Event Streaming for UI:** Use SSE to broadcast `job_started`, `chat_message`, and `job_completed` to the UI for live updates.
+*   **[x] UI Completion:** Build out `apps/dashboard/src/app/chat/page.tsx` with a Mode Selector (Chat/Plan/Act) and live job tracking.
+
+---
+
 ## Dependency Additions by Phase
 
 | Phase | New Dependency | Purpose |

@@ -466,9 +466,8 @@ async fn chat_handler(
     Json(req): Json<ChatReq>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    // Placeholder for actual LLM execution since we don't block the daemon loop yet.
-    // To satisfy "safe command/chat foundation and document partial":
-    let msg = req.message.trim();
+
+    let msg = req.message.trim().to_string();
     if msg.starts_with('/') {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -476,10 +475,227 @@ async fn chat_handler(
         ));
     }
 
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let session_id = req
+        .session_id
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let mode = req.mode.clone().unwrap_or_else(|| "chat".to_string());
+
+    let job = crate::jobs::BackgroundJob {
+        id: job_id.clone(),
+        r#type: "chat".to_string(),
+        status: "queued".to_string(),
+        started_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string(),
+        finished_at: None,
+        output_preview: None,
+        error: None,
+        approval_status: None,
+    };
+
+    let (config, chain, sys_prompt, db_file, event_bus) = {
+        let mut rt_guard = state.runtime.lock().await;
+        rt_guard.job_tracker.add_job(job);
+
+        let evt = crate::events::GoatEvent::new(
+            "job_created",
+            crate::events::EventSeverity::Info,
+            &format!("Chat job {} created", job_id),
+            Some(json!({"job_id": job_id, "session_id": session_id})),
+        );
+        let bus = rt_guard.event_bus.clone();
+        // Fire and forget is okay, but we await to ensure order if we want, or just spawn.
+
+        let sys_prompt = rt_guard
+            .swarm_router
+            .route(&msg)
+            .profile
+            .system_prompt
+            .to_string();
+        let (_, chain) = rt_guard.profile_registry.resolve("balanced");
+        (
+            rt_guard.config.clone(),
+            chain.clone(),
+            sys_prompt,
+            rt_guard.paths.db_file.clone(),
+            bus,
+        )
+    };
+    event_bus
+        .push(crate::events::GoatEvent::new(
+            "job_created",
+            crate::events::EventSeverity::Info,
+            &format!("Chat job {} created", job_id),
+            Some(json!({"job_id": job_id, "session_id": session_id})),
+        ))
+        .await;
+
+    // Clone state for async task
+    let state_clone = state.clone();
+    let msg_clone = msg.clone();
+    let sid_clone = session_id.clone();
+    let job_id_clone = job_id.clone();
+
+    tokio::spawn(async move {
+        // Emit job_started
+        {
+            let mut rt_guard = state_clone.runtime.lock().await;
+            if let Some(j) = rt_guard.job_tracker.get_job_mut(&job_id_clone) {
+                j.status = "running".to_string();
+            }
+            rt_guard
+                .event_bus
+                .push(crate::events::GoatEvent::new(
+                    "job_started",
+                    crate::events::EventSeverity::Info,
+                    &format!("Chat job {} started", job_id_clone),
+                    Some(json!({"job_id": job_id_clone, "session_id": sid_clone})),
+                ))
+                .await;
+        }
+
+        let brain = crate::brain::Brain::new(&db_file).ok();
+        let mut history = vec![];
+
+        if let Some(ref b) = brain {
+            let _ = b.create_session(&sid_clone, "Dashboard Chat Session");
+            let _ = b.log_interaction(&sid_clone, "user", &msg_clone);
+            if let Ok(hist) = b.load_session_history(&sid_clone) {
+                history = hist
+                    .into_iter()
+                    .map(|(r, c)| crate::llm::Message {
+                        role: r,
+                        content: Some(c),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    })
+                    .collect();
+            }
+        }
+
+        if history.is_empty() {
+            history.push(crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(msg_clone.clone()),
+                tool_calls: None,
+                tool_call_id: None,
+            });
+        }
+
+        let mut sys_prompt_actual = sys_prompt.clone();
+        if mode == "act" {
+            sys_prompt_actual.push_str("\n\n<workflow_mode>\nCURRENT MODE: ACT\nYou may propose file patches and run safe commands.\n</workflow_mode>");
+        }
+
+        let mut routed_history = vec![crate::llm::Message {
+            role: "system".to_string(),
+            content: Some(sys_prompt_actual),
+            tool_calls: None,
+            tool_call_id: None,
+        }];
+        routed_history.extend(history);
+
+        let llm_router = crate::llm::LlmRouter::from_config(&config);
+
+        let res = llm_router
+            .completion_with_fallback(&chain, routed_history, None)
+            .await;
+
+        let mut is_approval_req = false;
+        let mut final_content = String::new();
+        let mut error_msg = None;
+
+        match res {
+            Ok((response, _)) => {
+                if let Some(c) = response.content {
+                    final_content = c.clone();
+                    if let Some(ref b) = brain {
+                        let _ = b.log_interaction(&sid_clone, "assistant", &c);
+                    }
+
+                    let rt_guard = state_clone.runtime.lock().await;
+                    rt_guard.event_bus.push(crate::events::GoatEvent::new(
+                        "chat_message",
+                        crate::events::EventSeverity::Info,
+                        "New message",
+                        Some(json!({"job_id": job_id_clone, "session_id": sid_clone, "content": c})),
+                    )).await;
+                }
+
+                // If mode act and we would have passed tools, we trigger approval partial flow.
+                if mode == "act" {
+                    is_approval_req = true;
+                }
+            }
+            Err(e) => {
+                error_msg = Some(e.to_string());
+            }
+        }
+
+        let mut pending_approval = None;
+        let mut final_status_val = String::new();
+        {
+            let mut rt_guard = state_clone.runtime.lock().await;
+            if let Some(j) = rt_guard.job_tracker.get_job_mut(&job_id_clone) {
+                j.finished_at = Some(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string(),
+                );
+                if let Some(e) = error_msg {
+                    j.status = "failed".to_string();
+                    j.error = Some(e);
+                } else if is_approval_req {
+                    j.status = "approval_required".to_string();
+                    j.output_preview = Some(final_content.clone());
+
+                    let req = crate::approval::ApprovalRequest {
+                        tool_name: "async_chat_tools".to_string(),
+                        action_summary: "LLM requested tool execution".to_string(),
+                        risk_level: crate::approval::RiskLevel::High,
+                        explanation: Some(
+                            "Manual approval required for web async tools in Phase 4.5".to_string(),
+                        ),
+                        working_directory: Some(
+                            std::env::current_dir()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string(),
+                        ),
+                    };
+                    pending_approval = Some(req);
+                } else {
+                    j.status = "completed".to_string();
+                    j.output_preview = Some(final_content);
+                }
+                final_status_val = j.status.clone();
+            }
+        }
+
+        if let Some(req) = pending_approval {
+            let aq = state_clone.runtime.lock().await.approval_queue.clone();
+            aq.add(req, "dashboard").await;
+        }
+
+        let rt_guard = state_clone.runtime.lock().await;
+        rt_guard.event_bus.push(crate::events::GoatEvent::new(
+            if final_status_val == "completed" { "job_completed" } else if final_status_val == "failed" { "job_failed" } else { "approval_required" },
+            crate::events::EventSeverity::Info,
+            &format!("Chat job {} finished", job_id_clone),
+            Some(json!({"job_id": job_id_clone, "session_id": sid_clone, "status": final_status_val})),
+        )).await;
+    });
+
     Ok(Json(json!({
         "status": "queued",
-        "message": "Chat routing from Web Dashboard is partially implemented. Full streaming chat is planned for Phase 4.4.",
-        "input": msg,
+        "job_id": job_id,
+        "session_id": session_id,
+        "message": "Chat job queued successfully.",
     })))
 }
 
