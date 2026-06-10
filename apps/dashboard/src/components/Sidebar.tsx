@@ -21,6 +21,7 @@ const navItems = [
   { name: 'Jobs', href: '/jobs', icon: TerminalSquare },
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Hooks', href: '/hooks', icon: Clock },
+  { name: 'GitHub Workflow', href: '/github', icon: GitBranch },
   { name: 'MCP & Tools', href: '/mcp', icon: TerminalSquare },
   { name: 'Logs', href: '/logs', icon: ScrollText },
   { name: 'Settings', href: '/settings', icon: Settings },

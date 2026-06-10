@@ -98,6 +98,9 @@ pub struct Config {
     /// Brain index config.
     #[serde(default)]
     pub brain_index: BrainIndexConfig,
+    /// GitHub Workflow config.
+    #[serde(default)]
+    pub github: crate::github_workflow::GitHubWorkflowConfig,
     /// Embeddings config.
     #[serde(default)]
     pub embeddings: EmbeddingsConfig,

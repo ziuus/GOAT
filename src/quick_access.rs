@@ -77,6 +77,7 @@ impl QuickAccessParser {
                     "context" => format!("/context {}", args),
                     "quota" => format!("/quota {}", args),
                     "history" | "timeline" => format!("/timeline {}", args),
+                    "gh" | "github" => format!("/github {}", args),
                     _ => format!("/session {}", rest)
                 }
             }

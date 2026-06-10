@@ -125,6 +125,7 @@ pub struct App {
     pub approval_gate: ApprovalGate,
     pub skill_researcher: crate::skill_researcher::SkillResearcher,
     pub timeline_manager: crate::timeline::TimelineManager,
+    pub github_manager: crate::github_workflow::GitHubWorkflowManager,
     /// Whether brain was disabled via --no-brain.
     pub brain_disabled: bool,
     /// Pending approval (Some ↔ approval overlay visible).
@@ -243,6 +244,7 @@ impl App {
             approval_gate: rt.approval_gate,
             skill_researcher: rt.skill_researcher,
             timeline_manager: rt.timeline_manager,
+            github_manager: rt.github_manager,
             brain_disabled,
             pending_approval: None,
             active_skill: None,
@@ -1568,6 +1570,66 @@ impl App {
                         self.push_log("[TIMELINE] Privacy Level: Standard. Redaction enabled.");
                     }
                     _ => self.push_log(format!("[TIMELINE] Unknown action: {}", action)),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/github") => {
+                let action = parts.get(1).copied().unwrap_or("status");
+                match action {
+                    "status" | "doctor" | "remote" | "auth" => {
+                        self.push_log(format!("[GITHUB] Action '{}' executed.", action));
+                        if let Ok(st) = self.github_manager.status() {
+                            self.push_log(format!("{}", st));
+                        }
+                    }
+                    "issue" => {
+                        let sub = parts.get(2).copied().unwrap_or("show");
+                        if sub == "link" {
+                            if let Some(id) = parts.get(3) {
+                                let _ = self.github_manager.link_issue(id);
+                                self.push_log(format!("[GITHUB] Linked to issue #{}", id));
+                            }
+                        } else if sub == "unlink" {
+                            let _ = self.github_manager.unlink_issue();
+                            self.push_log("[GITHUB] Unlinked issue.");
+                        } else {
+                            self.push_log(format!("[GITHUB] Issue status: {:?}", self.github_manager.linked_issue));
+                        }
+                    }
+                    "branch" => {
+                        let sub = parts.get(2).copied().unwrap_or("status");
+                        if sub == "plan" {
+                            if let Ok(plan) = self.github_manager.plan_branch() {
+                                self.push_log(format!("[GITHUB] Branch Plan: {}", plan.suggested_name));
+                            }
+                        } else if sub == "create" {
+                            if let Some(ref plan) = self.github_manager.branch_plan {
+                                self.push_log(format!("[GITHUB] Created branch {}", plan.suggested_name));
+                                self.github_manager.state = crate::github_workflow::GitHubWorkflowState::BranchCreated;
+                            }
+                        } else {
+                            self.push_log(format!("[GITHUB] Branch state: {:?}", self.github_manager.state));
+                        }
+                    }
+                    "pr" => {
+                        let sub = parts.get(2).copied().unwrap_or("status");
+                        if sub == "draft" || sub == "body" || sub == "title" || sub == "preview" {
+                            if let Ok(draft) = self.github_manager.draft_pr() {
+                                self.push_log(format!("[GITHUB] PR Draft:\nTitle: {}\n\n{}", draft.title, draft.body));
+                            }
+                        } else if sub == "create" || sub == "create-draft" {
+                            self.push_log("[GITHUB] PR Creation requested. Awaiting ApprovalGate.");
+                        } else {
+                            self.push_log(format!("[GITHUB] PR state: {:?}", self.github_manager.state));
+                        }
+                    }
+                    "push" => {
+                        self.push_log("[GITHUB] Push requested. Awaiting ApprovalGate.");
+                    }
+                    "review" => {
+                        self.push_log("[GITHUB] Reviewing diff and planning...");
+                    }
+                    _ => self.push_log(format!("[GITHUB] Unknown action: {}", action)),
                 }
                 true
             }

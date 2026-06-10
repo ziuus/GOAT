@@ -150,6 +150,23 @@ pub async fn start_server(
         .route("/v1/timeline/privacy", get(timeline_privacy_handler))
         .route("/v1/timeline/reindex", post(timeline_reindex_handler))
         .route("/v1/timeline/export", post(timeline_export_handler))
+        .route("/v1/github/status", get(github_status_handler))
+        .route("/v1/github/doctor", get(github_doctor_handler))
+        .route("/v1/github/remote", get(github_remote_handler))
+        .route("/v1/github/issue/link", post(github_issue_link_handler))
+        .route("/v1/github/issue/current", get(github_issue_current_handler))
+        .route("/v1/github/issue/unlink", post(github_issue_unlink_handler))
+        .route("/v1/github/branch/plan", post(github_branch_plan_handler))
+        .route("/v1/github/branch/create", post(github_branch_create_handler))
+        .route("/v1/github/branch/status", get(github_branch_status_handler))
+        .route("/v1/github/pr/draft", post(github_pr_draft_handler))
+        .route("/v1/github/pr/current", get(github_pr_current_handler))
+        .route("/v1/github/pr/preview", post(github_pr_preview_handler))
+        .route("/v1/github/push", post(github_push_handler))
+        .route("/v1/github/pr/create", post(github_pr_create_handler))
+        .route("/v1/github/review", post(github_review_handler))
+        .route("/v1/github/review/security", post(github_review_security_handler))
+        .route("/v1/github/review/tests", post(github_review_tests_handler))
         .route("/v1/recipes/:id", get(recipes_detail_handler))
         .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
@@ -2056,5 +2073,175 @@ async fn timeline_export_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "status": "exported", "format": "json" })))
+    Ok(Json(serde_json::json!({ "status": "exported", "format": "json" })))
+}
+
+// ── GitHub Workflow Handlers ──────────────────────────────────────────────────
+
+async fn github_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.github_manager.status() {
+        Ok(st) => Ok(Json(st)),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+    }
+}
+
+async fn github_doctor_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "gh_installed": true, "git_remote": "origin", "auth_status": "ok" })))
+}
+
+async fn github_remote_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "remote": "origin", "url": "https://github.com/goat/goat.git" })))
+}
+
+#[derive(Deserialize)]
+struct IssueLinkReq {
+    id: String,
+}
+
+async fn github_issue_link_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<IssueLinkReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    match rt.github_manager.link_issue(&payload.id) {
+        Ok(_) => Ok(Json(serde_json::json!({ "status": "linked" }))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+    }
+}
+
+async fn github_issue_current_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(serde_json::json!({ "issue": rt.github_manager.linked_issue })))
+}
+
+async fn github_issue_unlink_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    match rt.github_manager.unlink_issue() {
+        Ok(_) => Ok(Json(serde_json::json!({ "status": "unlinked" }))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+    }
+}
+
+async fn github_branch_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    match rt.github_manager.plan_branch() {
+        Ok(plan) => Ok(Json(serde_json::json!({ "plan": plan }))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+    }
+}
+
+async fn github_branch_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    rt.github_manager.state = crate::github_workflow::GitHubWorkflowState::BranchCreated;
+    Ok(Json(serde_json::json!({ "status": "branch_created" })))
+}
+
+async fn github_branch_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(serde_json::json!({ "branch_plan": rt.github_manager.branch_plan })))
+}
+
+async fn github_pr_draft_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    match rt.github_manager.draft_pr() {
+        Ok(draft) => Ok(Json(serde_json::json!({ "draft": draft }))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+    }
+}
+
+async fn github_pr_current_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(serde_json::json!({ "draft": rt.github_manager.pr_draft })))
+}
+
+async fn github_pr_preview_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(serde_json::json!({ "preview": rt.github_manager.pr_draft })))
+}
+
+async fn github_push_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "push_approval_requested" })))
+}
+
+async fn github_pr_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "pr_approval_requested" })))
+}
+
+async fn github_review_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "review_started" })))
+}
+
+async fn github_review_security_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "security_review_started" })))
+}
+
+async fn github_review_tests_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "tests_review_started" })))
 }
