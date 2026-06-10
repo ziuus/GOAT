@@ -129,3 +129,42 @@ impl SkillResearcher {
             .collect()
     }
 }
+
+impl SkillResearcher {
+    pub fn save_pack(&self, paths: &crate::paths::GoatPaths, name: &str) -> Result<()> {
+        let active = self.get_active_skills();
+        if active.is_empty() {
+            anyhow::bail!("No active skills to save");
+        }
+
+        let pack_dir = paths.skill_packs_dir.join(name);
+        std::fs::create_dir_all(&pack_dir)?;
+
+        let mut items = Vec::new();
+        let mut md_content = format!("# Skill Pack: {}\n\n", name);
+        for skill in active {
+            items.push(SkillPackItem {
+                skill_id: skill.id.clone(),
+                source_ref: skill.source.clone(),
+                trust_level: skill.trust_level.clone(),
+            });
+            md_content.push_str(&format!("- **{}** ({})\n", skill.title, skill.source));
+        }
+
+        let manifest = SkillPackManifest {
+            name: name.to_string(),
+            description: "Saved from session".to_string(),
+            tags: vec![],
+            skills: items,
+            created_from_session: Some(self.session_id.clone()),
+            created_from_task: None,
+            created_at: chrono::Utc::now().timestamp(),
+            updated_at: chrono::Utc::now().timestamp(),
+        };
+
+        std::fs::write(pack_dir.join("PACK.md"), md_content)?;
+        std::fs::write(pack_dir.join("pack.meta.json"), serde_json::to_string_pretty(&manifest)?)?;
+
+        Ok(())
+    }
+}

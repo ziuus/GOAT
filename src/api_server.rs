@@ -133,6 +133,11 @@ pub async fn start_server(
         .route("/v1/recipes/built-in", get(recipes_builtin_handler))
         .route("/v1/recipes/installed", get(recipes_installed_handler))
         .route("/v1/recipes/drafts", get(recipes_drafts_handler))
+        .route("/v1/skill-research/status", get(skill_research_status_handler))
+        .route("/v1/skill-research/toggle", post(skill_research_toggle_handler))
+        .route("/v1/skill-packs", get(skill_packs_list_handler))
+        .route("/v1/skill-packs/:name/use", post(skill_packs_use_handler))
+        .route("/v1/skill-packs/:name/save-from-session", post(skill_packs_save_handler))
         .route("/v1/recipes/:id", get(recipes_detail_handler))
         .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
@@ -1833,6 +1838,71 @@ async fn brain_embeddings_rebuild_handler(
         Ok(_) => Ok(Json(json!({ "status": "rebuilt" }))),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+// ── Skill Researcher Handlers ────────────────────────────────────────────────
+
+async fn skill_research_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(json!({
+        "enabled": rt.skill_researcher.enabled,
+        "active_skills": rt.skill_researcher.get_active_skills()
+    })))
+}
+
+#[derive(Deserialize)]
+struct ToggleReq {
+    enabled: bool,
+}
+
+async fn skill_research_toggle_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<ToggleReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    rt.skill_researcher.toggle(payload.enabled);
+    Ok(Json(json!({ "status": "ok", "enabled": rt.skill_researcher.enabled })))
+}
+
+async fn skill_packs_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    // Mock for now, return empty or scanned dir
+    Ok(Json(json!({ "packs": [] })))
+}
+
+async fn skill_packs_use_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    // Mock pack use
+    Ok(Json(json!({ "status": "ok", "pack": name })))
+}
+
+async fn skill_packs_save_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.skill_researcher.save_pack(&rt.paths, &name) {
+        Ok(_) => Ok(Json(json!({ "status": "ok", "pack": name }))),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
             Json(json!({ "error": e.to_string() })),
         )),
     }
