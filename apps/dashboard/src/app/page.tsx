@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { goatApi, getGoatConfig, daemonFetch } from '@/lib/goat-api';
-import { Activity, Server, Box, Cpu, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Activity, Server, Box, Cpu, ShieldAlert, ShieldCheck, BrainCircuit } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function OverviewPage() {
@@ -11,6 +11,7 @@ export default function OverviewPage() {
   const [approvals, setApprovals] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [learning, setLearning] = useState<any>({ pending_count: 0 });
+  const [brainStats, setBrainStats] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -27,13 +28,15 @@ export default function OverviewPage() {
           goatApi.getStatus(),
           goatApi.getApprovals(),
           daemonFetch('/v1/approvals/history').then(res => res.ok ? res.json() : { history: [] }).catch(() => ({ history: [] })),
-          daemonFetch('/v1/learning/candidates').then(res => res.ok ? res.json() : { candidates: [] }).catch(() => ({ candidates: [] }))
+          daemonFetch('/v1/learning/candidates').then(res => res.ok ? res.json() : { candidates: [] }).catch(() => ({ candidates: [] })),
+          goatApi.getBrainStatus()
         ]);
         setHealth(h);
         setStatus(s);
         setApprovals(a.approvals || []);
         setHistory(hRes.history || []);
         setLearning({ pending_count: lRes.candidates?.length || 0 });
+        setBrainStats(arguments[0][5] || { total_documents: 0 });
       } catch (e: any) {
         setError(e.message);
       }
@@ -130,6 +133,14 @@ export default function OverviewPage() {
                <span className="text-sm text-muted-foreground">Pending Memories</span>
                <button onClick={() => router.push('/memory')} className="w-full text-xs py-1.5 bg-indigo-500/10 text-indigo-400 rounded-md hover:bg-indigo-500/20 transition-colors">
                  Go to Memory Galaxy
+               </button>
+            </div>
+            
+            <div className="bg-muted rounded-md p-4 border border-border flex flex-col items-center justify-center space-y-2 mt-4">
+               <span className="text-2xl font-bold text-fuchsia-400">{brainStats?.total_documents || 0}</span>
+               <span className="text-sm text-muted-foreground flex items-center gap-1"><BrainCircuit className="w-4 h-4"/> Docs Indexed</span>
+               <button onClick={() => router.push('/brain')} className="w-full text-xs py-1.5 bg-fuchsia-500/10 text-fuchsia-400 rounded-md hover:bg-fuchsia-500/20 transition-colors">
+                 Search Brain
                </button>
             </div>
           </div>

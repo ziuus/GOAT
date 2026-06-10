@@ -68,6 +68,18 @@ export const goatApi = {
     });
     return res.json();
   },
+  getBrainStatus: () => fetchGoat<any>('/v1/brain/status').catch(() => ({ total_documents: 0 })),
+  searchBrain: (q: string) => fetchGoat<any>(`/v1/brain/search?q=${encodeURIComponent(q)}`).catch(() => ({ results: [] })),
+  recallBrain: (q: string) => fetchGoat<any>(`/v1/brain/recall?q=${encodeURIComponent(q)}`).catch(() => ({ recall: {} })),
+  reindexBrain: async () => {
+    const config = getGoatConfig();
+    if (!config) throw new Error('Not configured');
+    const res = await fetch(`${config.baseUrl}/v1/brain/reindex`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+    return res.json();
+  },
 };
 
 export async function daemonFetch(path: string, options: RequestInit = {}): Promise<Response> {

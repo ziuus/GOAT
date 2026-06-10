@@ -164,7 +164,10 @@ export default function StudioPage() {
                           className="w-full h-full bg-transparent resize-none outline-none p-4 text-sm leading-relaxed"
                         />
                       </div>
-                      <div className="flex justify-end">
+                      <div className="flex justify-between items-center">
+                        <button onClick={() => {}} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 border border-fuchsia-500/20 transition-colors">
+                          <BrainCircuit className="w-3.5 h-3.5" /> Attach Brain Context
+                        </button>
                         <button 
                           onClick={runPrompt}
                           disabled={isProcessing || !promptText}
@@ -175,7 +178,7 @@ export default function StudioPage() {
                           ) : (
                             <Play className="w-4 h-4 fill-current" />
                           )}
-                          <span>Run Prompt</span>
+                          <span>{isProcessing ? "Running..." : "Run Prompt"}</span>
                         </button>
                       </div>
                     </div>

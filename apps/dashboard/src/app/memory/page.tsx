@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Brain, Star, Sparkles, Check, X, Shield, Activity, Globe, Workflow, Library } from "lucide-react";
+import { Brain, Star, Sparkles, Check, X, Shield, Activity, Globe, Workflow, Library, Search, BrainCircuit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function MemoryGalaxyPage() {
+  const router = useRouter();
   const [candidates, setCandidates] = useState<any[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,9 +119,17 @@ export default function MemoryGalaxyPage() {
 
         {/* Existing Memories Section */}
         <section>
-          <div className="flex items-center space-x-2 mb-4">
-            <Star className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-semibold">Accepted Memories</h2>
+          <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center space-x-2">
+                <Star className="w-5 h-5 text-purple-400" />
+                <h2 className="text-lg font-semibold">Accepted Memories</h2>
+             </div>
+             <button
+                onClick={() => router.push('/brain')}
+                className="px-4 py-2 flex items-center gap-2 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-400 rounded-lg text-sm transition-colors border border-fuchsia-500/20"
+             >
+                <BrainCircuit className="w-4 h-4" /> Search All Brain
+             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -135,9 +145,12 @@ export default function MemoryGalaxyPage() {
                 </div>
                 <p className="text-sm text-zinc-300">{m.summary}</p>
                 {m.type === "skill_candidate" && (
-                   <div className="mt-4 flex gap-2">
+                   <div className="mt-4 flex flex-wrap gap-2">
                      <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
                         <Globe className="w-3.5 h-3.5" /> Search Marketplace
+                     </button>
+                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
+                        <Search className="w-3.5 h-3.5" /> Find Related
                      </button>
                    </div>
                 )}
@@ -149,11 +162,12 @@ export default function MemoryGalaxyPage() {
                      <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
                         <Globe className="w-3.5 h-3.5" /> Find Matching Recipe
                      </button>
-                     <button className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
-                        <Library className="w-3.5 h-3.5" /> Install Built-In
+                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
+                        <Search className="w-3.5 h-3.5" /> Find Related
                      </button>
                    </div>
                 )}
+
               </div>
             ))}
           </div>

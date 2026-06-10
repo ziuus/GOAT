@@ -2,6 +2,7 @@ pub mod api_server;
 mod app;
 mod approval;
 mod brain;
+pub mod brain_index;
 pub mod brain_learning;
 pub mod checkpoint;
 mod cli;

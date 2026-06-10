@@ -160,6 +160,14 @@ pub async fn start_server(
         .route("/v1/recipes/runs", get(recipes_runs_list_handler))
         .route("/v1/recipes/:name/runs", get(recipes_runs_handler))
         .route("/v1/recipes/:name/status", get(recipes_status_handler))
+        .route("/v1/brain/status", get(brain_status_handler))
+        .route("/v1/brain/index", post(brain_index_handler))
+        .route("/v1/brain/reindex", post(brain_index_handler))
+        .route("/v1/brain/search", get(brain_search_handler))
+        .route("/v1/brain/recall", get(brain_recall_handler))
+        .route("/v1/brain/related/:id", get(brain_related_handler))
+        .route("/v1/brain/sources", get(brain_sources_handler))
+        .route("/v1/brain/privacy", get(brain_privacy_handler))
         .route("/v1/agent-templates", get(agent_templates_list_handler))
         .route(
             "/v1/agent-templates/:id/draft",
@@ -1629,4 +1637,121 @@ async fn agent_templates_draft_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     Ok(Json(json!({ "id": id, "status": "draft_created" })))
+}
+
+// ── Brain Index ──────────────────────────────────────────────────────────────
+
+async fn brain_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager =
+        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+    match manager.status() {
+        Ok(stats) => Ok(Json(json!(stats))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn brain_index_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager =
+        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+    // In a real app, do this asynchronously.
+    match manager.index_all() {
+        Ok(_) => Ok(Json(json!({ "status": "indexed" }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct BrainSearchQueryArgs {
+    q: String,
+}
+
+async fn brain_search_handler(
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<BrainSearchQueryArgs>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager =
+        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+
+    let sq = crate::brain_index::BrainSearchQuery {
+        q: query.q,
+        limit: 50,
+        kind_filter: None,
+    };
+
+    match manager.search(&sq) {
+        Ok(res) => Ok(Json(json!({ "results": res }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn brain_recall_handler(
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<BrainSearchQueryArgs>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager =
+        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+    match manager.recall(&query.q) {
+        Ok(res) => Ok(Json(json!({ "recall": res }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn brain_related_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "related": [] })))
+}
+
+async fn brain_sources_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(
+        json!({ "sources": ["memory", "skills", "recipes", "studio_drafts"] }),
+    ))
+}
+
+async fn brain_privacy_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({
+        "status": "active",
+        "redaction": "enabled",
+        "semantic_embeddings": "local_only",
+        "skipped": [".env", "tokens", "private_keys"]
+    })))
 }

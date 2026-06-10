@@ -98,9 +98,12 @@ pub struct Config {
     /// Skill marketplace config.
     #[serde(default)]
     pub skill_marketplace: SkillMarketplaceConfig,
-    /// Recipes execution config.
+    /// Recipe marketplace and automation config.
     #[serde(default)]
-    pub recipes: RecipeConfig,
+    pub recipe_marketplace: RecipeConfig,
+    /// Brain search and semantic index config.
+    #[serde(default)]
+    pub brain_index: BrainIndexConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -1081,4 +1084,57 @@ fn default_recipe_max_steps() -> u32 {
 }
 fn default_recipe_min_interval() -> u32 {
     15
+}
+
+// ── Brain Index Config ────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct BrainIndexConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub auto_index: bool,
+    #[serde(default = "default_true")]
+    pub index_audit_logs: bool,
+    #[serde(default = "default_true")]
+    pub index_approvals: bool,
+    #[serde(default = "default_true")]
+    pub index_jobs: bool,
+    #[serde(default = "default_true")]
+    pub index_skills: bool,
+    #[serde(default = "default_true")]
+    pub index_recipes: bool,
+    #[serde(default = "default_true")]
+    pub index_studio_drafts: bool,
+    #[serde(default = "default_false")]
+    pub allow_semantic_embeddings: bool,
+    #[serde(default = "default_none_str")]
+    pub embedding_provider: String,
+    #[serde(default = "default_max_document_chars")]
+    pub max_document_chars: usize,
+}
+
+impl Default for BrainIndexConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_index: true,
+            index_audit_logs: true,
+            index_approvals: true,
+            index_jobs: true,
+            index_skills: true,
+            index_recipes: true,
+            index_studio_drafts: true,
+            allow_semantic_embeddings: false,
+            embedding_provider: "none".to_string(),
+            max_document_chars: 12000,
+        }
+    }
+}
+
+fn default_none_str() -> String {
+    "none".to_string()
+}
+fn default_max_document_chars() -> usize {
+    12000
 }

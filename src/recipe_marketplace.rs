@@ -444,6 +444,7 @@ mod tests {
             mcp_json_file: base.join("mcp.json"),
             mcp_toml_file: base.join("mcp.toml"),
             tool_catalog_file: base.join("tool.toml"),
+            brain_index_dir: base.join("brain-index"),
         }
     }
 
