@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root, .theme-goat-dark {
     --background: 240 10% 4%;
     --foreground: 0 0% 98%;
     --card: 240 10% 6%;
@@ -18,6 +18,40 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
+  }
+
+  .theme-minimal-dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 3%;
+    --card-foreground: 0 0% 100%;
+    --border: 0 0% 10%;
+    --input: 0 0% 10%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 100% 40%;
+    --destructive-foreground: 0 0% 100%;
+  }
+
+  .theme-high-contrast {
+    --background: 240 100% 2%;
+    --foreground: 50 100% 90%;
+    --card: 240 100% 4%;
+    --card-foreground: 50 100% 90%;
+    --border: 50 100% 40%;
+    --input: 50 100% 40%;
+    --primary: 50 100% 60%;
+    --primary-foreground: 240 100% 2%;
+    --muted: 240 50% 10%;
+    --muted-foreground: 50 100% 70%;
+    --accent: 50 100% 30%;
+    --accent-foreground: 50 100% 90%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
   }
 }
 

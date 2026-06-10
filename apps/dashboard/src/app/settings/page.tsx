@@ -59,6 +59,29 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="space-y-6 mb-8 bg-card border border-border p-6 rounded-xl shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight mb-4">Appearance</h2>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium">Theme</label>
+            <select
+              className="bg-input border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(e) => {
+                const root = document.documentElement;
+                root.classList.remove('theme-goat-dark', 'theme-minimal-dark', 'theme-high-contrast');
+                root.classList.add(`theme-${e.target.value}`);
+                localStorage.setItem('goat-theme', e.target.value);
+              }}
+              defaultValue={typeof window !== 'undefined' ? localStorage.getItem('goat-theme') || 'goat-dark' : 'goat-dark'}
+            >
+              <option value="goat-dark">GOAT Dark (Default)</option>
+              <option value="minimal-dark">Minimal Dark</option>
+              <option value="high-contrast">High Contrast</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSave} className="space-y-6 bg-card border border-border p-6 rounded-xl shadow-sm">
         <div className="space-y-2">
           <label className="text-sm font-medium">Daemon API URL</label>

@@ -626,3 +626,13 @@
 - [ ] Whisper.cpp local STT (or Whisper API)
 - [ ] Optional TTS output
 - [ ] Visual listening indicator always visible
+
+---
+
+## Phase 4.6: Dashboard UX Polish + Theme System (✅ COMPLETED)
+**Goal:** Make the dashboard feel like a premium developer tool.
+
+*   **[x] Dashboard Design System:** Implementation of high-end Tailwind primitive components (cards, buttons, input, badges).
+*   **[x] Theme System:** `goat-dark`, `minimal-dark`, and `high-contrast` CSS variable themes with `ThemeProvider` and Settings toggle.
+*   **[x] Code/Diff Viewer Graceful Fallback:** Custom line-numbered syntax viewer and git diff viewer (since Monaco was restricted by offline environment).
+*   **[x] Global Command Palette:** `cmdk` based `Ctrl+K` modal for navigating across dashboard workspaces securely.

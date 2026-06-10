@@ -272,6 +272,8 @@ Status legend:
 | Context Management API | `working` | Phase 4.3 |
 | Safe Command Execution UI | `working` | Phase 4.4 |
 | Async Agent Chat & Jobs | `working` | Phase 4.5 |
+| Theme System & UX Polish | `working` | Phase 4.6 |
+| Command Palette | `working` | Phase 4.6 |
 
 ---
 

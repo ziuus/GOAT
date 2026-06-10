@@ -138,13 +138,24 @@ export default function RepoPage() {
                   <Plus className="w-3 h-3" /> Add to Context
                 </button>
               </div>
-              <div className="flex-1 overflow-auto p-4 text-sm font-mono whitespace-pre text-muted-foreground">
+              <div className="flex-1 overflow-auto p-0 text-sm font-mono whitespace-pre text-muted-foreground bg-zinc-950">
                 {fileLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="w-5 h-5 animate-spin" />
                   </div>
                 ) : (
-                  fileContent || 'Empty file'
+                  <div className="flex">
+                    <div className="flex flex-col text-right px-4 py-4 select-none border-r border-border text-zinc-600 bg-zinc-900/50">
+                      {fileContent ? fileContent.split('\n').map((_, i) => (
+                        <span key={i} className="leading-6">{i + 1}</span>
+                      )) : '1'}
+                    </div>
+                    <div className="px-4 py-4 flex-1 overflow-x-auto text-zinc-300">
+                      {fileContent ? fileContent.split('\n').map((line, i) => (
+                        <div key={i} className="leading-6">{line || ' '}</div>
+                      )) : 'Empty file'}
+                    </div>
+                  </div>
                 )}
               </div>
             </>

@@ -354,7 +354,7 @@ export default function ChatPage() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     handleSend();
                   }
@@ -383,7 +383,7 @@ export default function ChatPage() {
               </div>
             </div>
             <div className="text-center mt-2">
-              <span className="text-[10px] text-muted-foreground/60">Press Enter to send, Shift + Enter for new line. Mode: {mode}.</span>
+              <span className="text-[10px] text-muted-foreground/60">Press Ctrl+Enter or Cmd+Enter to send, Enter for new line. Mode: {mode}.</span>
             </div>
           </div>
         </div>

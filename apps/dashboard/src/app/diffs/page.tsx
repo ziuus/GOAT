@@ -41,15 +41,18 @@ export default function DiffsPage() {
           <div className="flex items-center gap-2">
             <GitBranch className="w-4 h-4" />
             Workspace Git Diff
+            <span className="text-xs bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-full ml-2">
+              Large diffs truncated for safety
+            </span>
           </div>
           <button
             onClick={fetchDiff}
-            className="text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded-md text-foreground border border-border"
+            className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-md"
           >
             Refresh
           </button>
         </div>
-        <div className="flex-1 overflow-auto p-4 bg-[#0d1117] text-[#c9d1d9] font-mono text-sm whitespace-pre">
+        <div className="flex-1 overflow-auto p-0 bg-zinc-950 text-zinc-300 font-mono text-sm whitespace-pre">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-5 h-5 animate-spin" />
