@@ -170,9 +170,11 @@ pub enum Command {
     /// MCP server integration management.
     #[command(name = "mcp")]
     Mcp {
-        /// Action to perform: status, list.
+        /// Action to perform: status, list, show, doctor, start, stop, restart.
         #[arg(default_value = "status")]
         action: String,
+        /// Target server name for 'show', 'start', 'stop', 'restart'.
+        arg: Option<String>,
     },
 
     /// Show project awareness status or scan the current directory.
@@ -580,8 +582,8 @@ pub async fn handle_subcommand(
             handle_delegate_external_command(rt, &agent, &task).await;
             Ok(true)
         }
-        Command::Mcp { action } => {
-            handle_mcp_command(paths, config, action)?;
+        Command::Mcp { action, arg } => {
+            handle_mcp_command(paths, config, action, arg)?;
             Ok(true)
         }
     }
@@ -776,9 +778,40 @@ fn handle_tools_command(
                 );
             }
         }
+        "catalog" => {
+            println!("GOAT Tool Catalog (Phase 3.7 Foundation)");
+            println!("Status: Informational only. No automatic installation yet.");
+            if paths.tool_catalog_file.exists() {
+                println!("Catalog loaded from: {}", paths.tool_catalog_file.display());
+            } else {
+                println!("Catalog not found at {}. Using default docs catalog.", paths.tool_catalog_file.display());
+            }
+            if let Some(a) = arg {
+                let parts: Vec<&str> = a.splitn(2, ' ').collect();
+                if parts[0] == "search" {
+                    println!("Searching catalog for: {}", parts.get(1).unwrap_or(&""));
+                } else if parts[0] == "show" {
+                    println!("Showing catalog entry for: {}", parts.get(1).unwrap_or(&""));
+                } else {
+                    println!("Unknown catalog action: {}", parts[0]);
+                }
+            } else {
+                println!("Available Planned Categories:");
+                println!("- filesystem MCP, git tools, browser automation, web search,");
+                println!("  Playwright/browser-use, image generation, TTS/STT,");
+                println!("  database tools, GitHub tools, calendar/email tools, local shell");
+            }
+        }
+        "install" | "enable" | "disable" | "remove" => {
+            println!("Tool/MCP {} is planned for Phase 3.8.", action);
+            println!("No automatic installation yet. Future installs require approval and sandbox checks.");
+            if let Some(a) = arg {
+                println!("Target: {}", a);
+            }
+        }
         _ => {
             println!(
-                "Unknown action '{}'. Expected: list, show, categories, doctor, audit.",
+                "Unknown action '{}'. Expected: list, show, categories, doctor, audit, catalog, install, enable, disable.",
                 action
             );
         }
@@ -790,23 +823,73 @@ fn handle_tools_command(
 // ── mcp command ───────────────────────────────────────────────────────────────
 
 fn handle_mcp_command(
-    _paths: &crate::paths::GoatPaths,
+    paths: &crate::paths::GoatPaths,
     config: &crate::config::Config,
-    action: &str,
+    action: &String,
+    arg: &Option<String>,
 ) -> anyhow::Result<()> {
-    match action {
+    match action.as_str() {
         "status" => {
-            println!("MCP Expansion Foundation (Phase 2.6)");
-            println!("Configured MCP Servers: {}", config.mcp_servers.len());
-            for (name, srv) in &config.mcp_servers {
-                println!("- {}: {} args={:?}", name, srv.command, srv.args);
-            }
+            println!("MCP Status (Phase 3.7 Foundation)");
+            let mcp_conf_exists = paths.mcp_json_file.exists() || paths.mcp_toml_file.exists();
+            println!("MCP config paths: {} / {}", paths.mcp_json_file.display(), paths.mcp_toml_file.display());
+            println!("MCP config exists: {}", if mcp_conf_exists { "yes" } else { "no" });
+            let enabled_count = config.mcp_servers.values().filter(|s| s.enabled).count();
+            let risky_count = config.mcp_servers.values().filter(|s| s.risk == "ask" || s.risk == "deny").count();
+            println!("Configured servers: {}", config.mcp_servers.len());
+            println!("Enabled servers: {}", enabled_count);
+            println!("Risky servers: {}", risky_count);
+            println!("Execution status: allowed (requires ApprovalGate)");
         }
         "list" => {
-            println!("MCP list is managed through tool registry. Use 'goat tools list'.");
+            if config.mcp_servers.is_empty() {
+                println!("No MCP servers configured.");
+                return Ok(());
+            }
+            println!("{:-<80}", "");
+            println!("{:<15} | {:<8} | {:<10} | {:<8} | {}", "Server Name", "Enabled", "Transport", "Risk", "Command");
+            println!("{:-<80}", "");
+            for (name, srv) in &config.mcp_servers {
+                println!("{:<15} | {:<8} | {:<10} | {:<8} | {}", name, srv.enabled, srv.transport, srv.risk, srv.command);
+            }
+            println!("{:-<80}", "");
+        }
+        "show" => {
+            let Some(name) = arg else {
+                println!("Usage: goat mcp show <name>");
+                return Ok(());
+            };
+            if let Some(srv) = config.mcp_servers.get(name) {
+                println!("MCP Server: {}", name);
+                println!("Enabled: {}", srv.enabled);
+                println!("Transport: {}", srv.transport);
+                println!("Risk Policy: {}", srv.risk);
+                println!("Command: {}", srv.command);
+                println!("Args: {:?}", srv.args);
+                println!("Env Vars Configured: {:?}", srv.env.keys().collect::<Vec<_>>());
+            } else {
+                println!("MCP server '{}' not found in config.", name);
+            }
+        }
+        "start" | "stop" | "restart" => {
+            let Some(name) = arg else {
+                println!("Usage: goat mcp {} <name>", action);
+                return Ok(());
+            };
+            println!("Lifecycle action '{}' for MCP server '{}' is planned/partial.", action, name);
+            println!("Currently waiting for full MCP client lifecycle + ApprovalGate integration in Phase 3.8.");
+        }
+        "doctor" => {
+            println!("MCP Doctor (Phase 3.7)");
+            let mcp_conf_exists = paths.mcp_json_file.exists() || paths.mcp_toml_file.exists();
+            println!("[*] Config paths checked: {} / {}", paths.mcp_json_file.display(), paths.mcp_toml_file.display());
+            println!("[*] Config exists: {}", if mcp_conf_exists { "yes" } else { "no" });
+            println!("[*] Configured servers: {}", config.mcp_servers.len());
+            println!("[*] Tool catalog path: {}", paths.tool_catalog_file.display());
+            println!("[*] Tool catalog exists: {}", if paths.tool_catalog_file.exists() { "yes" } else { "no" });
         }
         _ => {
-            println!("Unknown action '{}'. Expected: status, list.", action);
+            println!("Unknown action '{}'. Expected: status, list, show, start, stop, restart, doctor.", action);
         }
     }
 

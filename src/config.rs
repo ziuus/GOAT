@@ -465,11 +465,20 @@ impl Config {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct McpServerConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_transport")]
+    pub transport: String,
     pub command: String,
     pub args: Vec<String>,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default = "default_risk")]
+    pub risk: String,
 }
+
+fn default_transport() -> String { "stdio".to_string() }
+fn default_risk() -> String { "ask".to_string() }
 
 // ── ConfigLoadResult ──────────────────────────────────────────────────────────
 
@@ -551,7 +560,42 @@ impl Config {
         }
 
         // Attempt to read OpenCode fallback key if no keys configured.
-        let config = maybe_apply_fallback_key(config);
+        let mut config = maybe_apply_fallback_key(config);
+
+        // Load external mcp.json or mcp.toml if present
+        if let Some(parent) = path.parent() {
+            let mcp_json = parent.join("mcp.json");
+            let mcp_toml = parent.join("mcp.toml");
+
+            #[derive(Deserialize)]
+            #[allow(non_snake_case)]
+            struct McpFile {
+                #[serde(default)]
+                mcpServers: HashMap<String, McpServerConfig>,
+                #[serde(default)]
+                servers: HashMap<String, McpServerConfig>,
+            }
+
+            if mcp_json.exists() {
+                if let Ok(content) = fs::read_to_string(&mcp_json) {
+                    if let Ok(parsed) = serde_json::from_str::<McpFile>(&content) {
+                        for (k, v) in parsed.mcpServers { config.mcp_servers.insert(k, v); }
+                        for (k, v) in parsed.servers { config.mcp_servers.insert(k, v); }
+                    } else {
+                        warnings.push(format!("[CONFIG] Failed to parse {}", mcp_json.display()));
+                    }
+                }
+            } else if mcp_toml.exists() {
+                if let Ok(content) = fs::read_to_string(&mcp_toml) {
+                    if let Ok(parsed) = toml::from_str::<McpFile>(&content) {
+                        for (k, v) in parsed.mcpServers { config.mcp_servers.insert(k, v); }
+                        for (k, v) in parsed.servers { config.mcp_servers.insert(k, v); }
+                    } else {
+                        warnings.push(format!("[CONFIG] Failed to parse {}", mcp_toml.display()));
+                    }
+                }
+            }
+        }
 
         Ok(ConfigLoadResult { config, warnings })
     }

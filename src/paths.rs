@@ -36,6 +36,12 @@ pub struct GoatPaths {
     pub external_agent_audit_log_file: PathBuf,
     /// `~/.config/goat/skills/`
     pub skills_dir: PathBuf,
+    /// `~/.config/goat/mcp.json`
+    pub mcp_json_file: PathBuf,
+    /// `~/.config/goat/mcp.toml`
+    pub mcp_toml_file: PathBuf,
+    /// `~/.config/goat/tool-catalog.toml`
+    pub tool_catalog_file: PathBuf,
 }
 
 impl GoatPaths {
@@ -75,6 +81,9 @@ impl GoatPaths {
         let subagent_audit_log_file = data_dir.join("subagent-audit.log");
         let external_agent_audit_log_file = data_dir.join("external-agent-audit.log");
         let skills_dir = config_dir.join("skills");
+        let mcp_json_file = config_dir.join("mcp.json");
+        let mcp_toml_file = config_dir.join("mcp.toml");
+        let tool_catalog_file = config_dir.join("tool-catalog.toml");
 
         Ok(Self {
             config_file,
@@ -88,6 +97,9 @@ impl GoatPaths {
             subagent_audit_log_file,
             external_agent_audit_log_file,
             skills_dir,
+            mcp_json_file,
+            mcp_toml_file,
+            tool_catalog_file,
         })
     }
 

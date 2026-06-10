@@ -437,6 +437,26 @@ async fn handle_slash_command(
                         println!("[TOOLS] No audit log found.");
                     }
                 }
+                "catalog" | "catalog search" | "catalog show" => {
+                    println!("[TOOLS] Tool Catalog (Phase 3.7 Foundation)");
+                    println!("[TOOLS] Status: Informational only. No automatic installation yet.");
+                    let parts: Vec<&str> = subcommand.splitn(3, ' ').collect();
+                    if parts.len() > 1 {
+                        let action = parts[1];
+                        let arg = parts.get(2).unwrap_or(&"");
+                        println!("[TOOLS] Catalog action '{}' on '{}'", action, arg);
+                    } else {
+                        println!("[TOOLS] Available Planned Categories:");
+                        println!("[TOOLS] - filesystem MCP, git tools, browser automation, web search,");
+                        println!("[TOOLS]   Playwright/browser-use, image generation, TTS/STT,");
+                        println!("[TOOLS]   database tools, GitHub tools, calendar/email tools, local shell");
+                    }
+                }
+                cmd if cmd.starts_with("install") || cmd.starts_with("enable") || cmd.starts_with("disable") => {
+                    let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
+                    println!("[TOOLS] Action '{}' is planned for Phase 3.8.", parts[0]);
+                    println!("[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks.");
+                }
                 name => {
                     if let Some(tool) = rt.tool_registry.get(name) {
                         println!("[TOOLS] Tool: {}", tool.name);
@@ -476,24 +496,40 @@ async fn handle_slash_command(
             let subcommand = parts.get(1).copied().unwrap_or("status");
             match subcommand {
                 "status" => {
-                    println!(
-                        "[MCP] Configured MCP Servers: {}",
-                        rt.config.mcp_servers.len()
-                    );
-                    for (name, srv) in &rt.config.mcp_servers {
-                        println!("[MCP] - {}: {}", name, srv.command);
-                    }
+                    println!("[MCP] Status (Phase 3.7 Foundation)");
+                    let enabled_count = rt.config.mcp_servers.values().filter(|s| s.enabled).count();
+                    println!("[MCP] Configured servers: {}", rt.config.mcp_servers.len());
+                    println!("[MCP] Enabled servers: {}", enabled_count);
                 }
                 "list" => {
-                    let mcp_tools = rt.mcp_manager.all_tools();
-                    println!("[MCP] {} MCP tools:", mcp_tools.len());
-                    for t in &mcp_tools {
-                        if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
-                            println!("[MCP]   {}", name);
+                    if rt.config.mcp_servers.is_empty() {
+                        println!("[MCP] No MCP servers configured.");
+                    } else {
+                        println!("[MCP] Configured MCP Servers:");
+                        for (name, srv) in &rt.config.mcp_servers {
+                            println!("[MCP] - {} (Enabled: {}, Risk: {})", name, srv.enabled, srv.risk);
                         }
                     }
                 }
-                _ => println!("[MCP] Unknown command. Use /mcp status or /mcp list."),
+                "show" => {
+                    let name = parts.get(2).copied().unwrap_or("");
+                    if let Some(srv) = rt.config.mcp_servers.get(name) {
+                        println!("[MCP] Server: {}", name);
+                        println!("[MCP] Enabled: {}", srv.enabled);
+                        println!("[MCP] Transport: {}", srv.transport);
+                        println!("[MCP] Risk Policy: {}", srv.risk);
+                        println!("[MCP] Command: {} {:?}", srv.command, srv.args);
+                    } else {
+                        println!("[MCP] Server '{}' not found.", name);
+                    }
+                }
+                "start" | "stop" | "restart" => {
+                    println!("[MCP] Lifecycle action '{}' is planned/partial for Phase 3.8.", subcommand);
+                }
+                "doctor" => {
+                    println!("[MCP] Doctor: {} configured servers.", rt.config.mcp_servers.len());
+                }
+                _ => println!("[MCP] Unknown command. Use /mcp status, list, show, start, stop, restart, doctor."),
             }
             true
         }

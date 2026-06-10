@@ -780,37 +780,47 @@ impl App {
             }
 
             "/mcp" => {
-                let subcommand = _args;
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcommand = parts.get(0).copied().unwrap_or("status");
                 match subcommand {
                     "status" | "" => {
-                        let count = self.config.mcp_servers.len();
-                        self.push_log(format!("[MCP] Configured MCP Servers: {}", count));
-                        let srvs: Vec<_> = self
-                            .config
-                            .mcp_servers
-                            .iter()
-                            .map(|(n, s)| (n.clone(), s.command.clone()))
-                            .collect();
-                        for (name, cmd) in srvs {
-                            self.push_log(format!("[MCP] - {}: {}", name, cmd));
-                        }
+                        self.push_log("[MCP] Status (Phase 3.7 Foundation)".to_string());
+                        let enabled_count = self.config.mcp_servers.values().filter(|s| s.enabled).count();
+                        self.push_log(format!("[MCP] Configured servers: {}", self.config.mcp_servers.len()));
+                        self.push_log(format!("[MCP] Enabled servers: {}", enabled_count));
                     }
                     "list" => {
-                        let mcp_tools = self.mcp_manager.all_tools();
-                        self.push_log(format!("[MCP] {} MCP tools:", mcp_tools.len()));
-                        for t in &mcp_tools {
-                            if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
-                                self.push_log(format!("[MCP]   {}", name));
+                        if self.config.mcp_servers.is_empty() {
+                            self.push_log("[MCP] No MCP servers configured.".to_string());
+                        } else {
+                            self.push_log("[MCP] Configured MCP Servers:".to_string());
+                            let srvs: Vec<_> = self.config.mcp_servers.iter().map(|(n, s)| (n.clone(), s.enabled, s.risk.clone())).collect();
+                            for (name, enabled, risk) in srvs {
+                                self.push_log(format!("[MCP] - {} (Enabled: {}, Risk: {})", name, enabled, risk));
                             }
                         }
                     }
-                    "start" => {
-                        self.push_log("[MCP] Starting configured MCP servers...");
-                        info!("starting configured MCP servers via slash command");
-                        self.start_configured_mcp_servers().await;
+                    "show" => {
+                        let name = parts.get(1).copied().unwrap_or("");
+                        let srv_opt = self.config.mcp_servers.get(name).cloned();
+                        if let Some(srv) = srv_opt {
+                            self.push_log(format!("[MCP] Server: {}", name));
+                            self.push_log(format!("[MCP] Enabled: {}", srv.enabled));
+                            self.push_log(format!("[MCP] Transport: {}", srv.transport));
+                            self.push_log(format!("[MCP] Risk Policy: {}", srv.risk));
+                            self.push_log(format!("[MCP] Command: {} {:?}", srv.command, srv.args));
+                        } else {
+                            self.push_log(format!("[MCP] Server '{}' not found.", name));
+                        }
+                    }
+                    "doctor" => {
+                        self.push_log(format!("[MCP] Doctor: {} configured servers.", self.config.mcp_servers.len()));
+                    }
+                    "start" | "stop" | "restart" => {
+                        self.push_log(format!("[MCP] Lifecycle action '{}' is planned/partial for Phase 3.8.", subcommand));
                     }
                     _ => self.push_log(
-                        "[MCP] Unknown command. Use /mcp status, /mcp list, or /mcp start.",
+                        "[MCP] Unknown command. Use /mcp status, list, show, start, stop, restart, doctor.".to_string(),
                     ),
                 }
                 true
@@ -873,8 +883,28 @@ impl App {
                                 }
                             }
                         } else {
-                            self.push_log("[TOOLS] No audit log found.");
+                            self.push_log("[TOOLS] No audit log found.".to_string());
                         }
+                    }
+                    cmd if cmd.starts_with("catalog") => {
+                        self.push_log("[TOOLS] Tool Catalog (Phase 3.7 Foundation)".to_string());
+                        self.push_log("[TOOLS] Status: Informational only. No automatic installation yet.".to_string());
+                        let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
+                        if parts.len() > 1 {
+                            let action = parts[1];
+                            let arg = parts.get(2).unwrap_or(&"");
+                            self.push_log(format!("[TOOLS] Catalog action '{}' on '{}'", action, arg));
+                        } else {
+                            self.push_log("[TOOLS] Available Planned Categories:".to_string());
+                            self.push_log("[TOOLS] - filesystem MCP, git tools, browser automation, web search,".to_string());
+                            self.push_log("[TOOLS]   Playwright/browser-use, image generation, TTS/STT,".to_string());
+                            self.push_log("[TOOLS]   database tools, GitHub tools, calendar/email tools, local shell".to_string());
+                        }
+                    }
+                    cmd if cmd.starts_with("install") || cmd.starts_with("enable") || cmd.starts_with("disable") => {
+                        let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
+                        self.push_log(format!("[TOOLS] Action '{}' is planned for Phase 3.8.", parts[0]));
+                        self.push_log("[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks.".to_string());
                     }
                     name => {
                         let tool_opt = self.tool_registry.get(name).cloned();
