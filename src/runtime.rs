@@ -88,6 +88,8 @@ pub struct GoatRuntime {
     pub tool_registry: crate::tool_registry::ToolRegistry,
     /// Phase 2.7 Subagent Manager.
     pub subagent_manager: crate::subagents::SubagentManager,
+    /// Phase 3.6 Selected file context
+    pub selected_files: Vec<String>,
     /// Phase 2.8 External Agent Manager.
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
 }
@@ -263,6 +265,7 @@ impl GoatRuntime {
             mcp_server_count: 0,
             workflow: WorkflowState::default(),
             tool_registry: crate::tool_registry::ToolRegistry::new(),
+            selected_files: Vec::new(),
         };
 
         (runtime, boot_log)

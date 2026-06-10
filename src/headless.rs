@@ -1120,6 +1120,89 @@ async fn handle_slash_command(
             true
         }
 
+        // ── Context files ──────────────────────────────────────────────────────
+        cmd if cmd.starts_with("/context") => {
+            let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+            let action = args.get(1).copied().unwrap_or("show");
+            match action {
+                "add" => {
+                    if let Some(path) = args.get(2) {
+                        let root = std::env::current_dir().unwrap_or_default();
+                        let full_path = root.join(path);
+                        if full_path.exists() && full_path.is_file() {
+                            if crate::repo_map::looks_like_secret_file(&full_path) {
+                                println!("[CONTEXT] Rejected: {} looks like a secret file.", path);
+                            } else {
+                                if !rt.selected_files.contains(&path.to_string()) {
+                                    rt.selected_files.push(path.to_string());
+                                    println!("[CONTEXT] Added {}", path);
+                                } else {
+                                    println!("[CONTEXT] {} is already in context.", path);
+                                }
+                            }
+                        } else {
+                            println!("[CONTEXT] File not found: {}", path);
+                        }
+                    } else {
+                        println!("[CONTEXT] Usage: /context add <path>");
+                    }
+                }
+                "remove" => {
+                    if let Some(path) = args.get(2) {
+                        rt.selected_files.retain(|p| p != path);
+                        println!("[CONTEXT] Removed {}", path);
+                    } else {
+                        println!("[CONTEXT] Usage: /context remove <path>");
+                    }
+                }
+                "clear" => {
+                    rt.selected_files.clear();
+                    println!("[CONTEXT] Cleared all selected files.");
+                }
+                "show" => {
+                    println!("[CONTEXT] Selected files:");
+                    if rt.selected_files.is_empty() {
+                        println!("  (None)");
+                    } else {
+                        for file in &rt.selected_files {
+                            println!("  • {}", file);
+                        }
+                    }
+                }
+                "budget" => {
+                    println!("[CONTEXT] Context Budget:");
+                    let mut total_chars = 0;
+                    let root = std::env::current_dir().unwrap_or_default();
+                    for file in &rt.selected_files {
+                        let content = std::fs::read_to_string(root.join(file)).unwrap_or_default();
+                        let chars = content.chars().count();
+                        total_chars += chars;
+                        println!("  • {} ({} chars)", file, chars);
+                    }
+                    println!("  Total: {} chars", total_chars);
+                }
+                "suggest" => {
+                    println!("[CONTEXT] Suggestions based on recent edits / current task (planned).");
+                }
+                _ => println!("[CONTEXT] Usage: /context [add|remove|clear|show|budget|suggest]"),
+            }
+            true
+        }
+
+        cmd if cmd.starts_with("/files") => {
+            let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+            if args.get(1).copied() == Some("relevant") {
+                if let Some(query) = args.get(2) {
+                    println!("[FILES] Finding files relevant to '{}' (planned)...", query);
+                } else {
+                    println!("[FILES] Usage: /files relevant <query>");
+                }
+            } else {
+                println!("[FILES] Usage: /files relevant <query>");
+            }
+            true
+        }
+
         // ── Repo map ──────────────────────────────────────────────────────────
         cmd if cmd.starts_with("/repo-map") => {
             let sub = name.split_whitespace().nth(1).unwrap_or("show");

@@ -8,6 +8,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.12.0] — Phase 3.4 & 3.5: Checkpoints, Git Branch/Commit, and Safety Hardening (2026-06-09)
 
+## [0.13.0] — Phase 3.6: Context-Aware Multi-File Coding + AI Commit Messages
+
+### Added
+
+- **Selected File Context**: `/context add <path>`, `/context remove <path>`, `/context clear`, `/context show`, `/context budget`.
+
+- **Context Injection**: AI system prompts now intelligently incorporate the repository map summary and selected files bounded by a smart token budget limit.
+
+- **AI Commit Messages**: `/commit message ai` calls the LLM with Git status and diffs to generate comprehensive, conventional commit messages.
+
+- **Context UI**: A new dedicated Context View showing the currently loaded files and budget usage, fully accessible from the sidebar and `/view context`.
+
+- **Headless Context Parity**: Added full support for `/context` and `/files` management inside headless mode.
+
+
+---
 ### Added
 - **Checkpoint System**: `/checkpoint create`, `/checkpoint list`, `/checkpoint show`, `/checkpoint diff`.
 - **Auto-checkpoints**: Automatically create a safety checkpoint before applying patches or using write_file (if enabled in config).

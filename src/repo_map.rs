@@ -85,7 +85,7 @@ fn is_ignored_dir(name: &str) -> bool {
     IGNORED_DIRS.iter().any(|d| d.eq_ignore_ascii_case(name))
 }
 
-fn looks_like_secret_file(path: &Path) -> bool {
+pub fn looks_like_secret_file(path: &Path) -> bool {
     let name = path
         .file_name()
         .and_then(|n| n.to_str())

@@ -68,6 +68,8 @@ pub enum ActiveView {
     Logs,
     /// Agent & subagent selector modal (Phase 3.2)
     AgentSelector,
+    /// File context view (Phase 3.6)
+    Context,
 }
 
 /// TUI layout mode — controls how panels are arranged.
@@ -157,6 +159,8 @@ pub struct App {
     pub context_visible: bool,
     /// Checkpoint manager
     pub checkpoint_manager: crate::checkpoint::CheckpointManager,
+    /// Selected file context for AI prompting (Phase 3.6)
+    pub selected_files: Vec<String>,
 }
 
 impl App {
@@ -248,6 +252,7 @@ impl App {
             sidebar_visible: true,
             context_visible: true,
             checkpoint_manager,
+            selected_files: rt.selected_files.clone(),
         }
     }
 
@@ -2190,21 +2195,46 @@ impl App {
                             );
                         } else {
                             if is_ai {
-                                self.push_log("[COMMIT] AI commit generation is planned. For now, here is a deterministic summary:".to_string());
+                                self.push_log("[COMMIT] Generating AI commit message...".to_string());
+                                let prompt = format!(
+                                    "Generate a conventional commit message based on the following git status and diff stat. Do NOT include any intro/outro text, just the commit message.\n\nStatus:\n{}\n\nDiff Stat:\n{}",
+                                    status_out.trim(),
+                                    diff_out.trim()
+                                );
+                                let history = vec![Message {
+                                    role: "user".to_string(),
+                                    content: Some(prompt),
+                                    tool_calls: None,
+                                    tool_call_id: None,
+                                }];
+                                match self.llm_router.completion_with_fallback(&self.model_chain, history, None).await {
+                                    Ok((response, _)) => {
+                                        self.push_log("[COMMIT] Proposed AI commit message:".to_string());
+                                        self.push_log("".to_string());
+                                        let text = response.content.clone().unwrap_or_default();
+                                        for line in text.lines() {
+                                            self.push_log(line.to_string());
+                                        }
+                                        self.push_log("".to_string());
+                                    }
+                                    Err(e) => {
+                                        self.push_log(format!("[COMMIT] AI generation failed: {}", e));
+                                    }
+                                }
                             } else {
                                 self.push_log(
                                     "[COMMIT] Proposed deterministic commit message:".to_string(),
                                 );
-                            }
-                            self.push_log("".to_string());
-                            self.push_log("feat: Update project files".to_string());
-                            self.push_log("".to_string());
-                            for line in status_out.lines().filter(|l| !l.trim().is_empty()) {
-                                self.push_log(format!("- {}", line.trim()));
-                            }
-                            if !diff_out.trim().is_empty() {
                                 self.push_log("".to_string());
-                                self.push_log(format!("Diff stat:\n{}", diff_out.trim()));
+                                self.push_log("feat: Update project files".to_string());
+                                self.push_log("".to_string());
+                                for line in status_out.lines().filter(|l| !l.trim().is_empty()) {
+                                    self.push_log(format!("- {}", line.trim()));
+                                }
+                                if !diff_out.trim().is_empty() {
+                                    self.push_log("".to_string());
+                                    self.push_log(format!("Diff stat:\n{}", diff_out.trim()));
+                                }
                             }
                         }
                     }
@@ -2411,6 +2441,83 @@ impl App {
                 let logs = crate::task::handle_task_command(&mut self.workflow, &parts[1..]);
                 for l in logs {
                     self.push_log(l);
+                }
+                true
+            }
+
+            "/context" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                let action = args.get(1).copied().unwrap_or("show");
+                match action {
+                    "add" => {
+                        if let Some(path) = args.get(2) {
+                            let root = std::env::current_dir().unwrap_or_default();
+                            let full_path = root.join(path);
+                            if full_path.exists() && full_path.is_file() {
+                                if crate::repo_map::looks_like_secret_file(&full_path) {
+                                    self.push_log(format!("[CONTEXT] Rejected: {} looks like a secret file.", path));
+                                } else {
+                                    if !self.selected_files.contains(&path.to_string()) {
+                                        self.selected_files.push(path.to_string());
+                                        self.push_log(format!("[CONTEXT] Added {}", path));
+                                    } else {
+                                        self.push_log(format!("[CONTEXT] {} is already in context.", path));
+                                    }
+                                }
+                            } else {
+                                self.push_log(format!("[CONTEXT] File not found: {}", path));
+                            }
+                        } else {
+                            self.push_log("[CONTEXT] Usage: /context add <path>".to_string());
+                        }
+                    }
+                    "remove" => {
+                        if let Some(path) = args.get(2) {
+                            self.selected_files.retain(|p| p != path);
+                            self.push_log(format!("[CONTEXT] Removed {}", path));
+                        } else {
+                            self.push_log("[CONTEXT] Usage: /context remove <path>".to_string());
+                        }
+                    }
+                    "clear" => {
+                        self.selected_files.clear();
+                        self.push_log("[CONTEXT] Cleared all selected files.".to_string());
+                    }
+                    "show" => {
+                        self.active_view = ActiveView::Context;
+                        self.push_log("[CONTEXT] Viewing context — /view chat to return to chat.");
+                    }
+                    "budget" => {
+                        self.push_log("[CONTEXT] Context Budget:".to_string());
+                        let mut total_chars = 0;
+                        let root = std::env::current_dir().unwrap_or_default();
+                        let files = self.selected_files.clone();
+                        for file in files {
+                            let content = std::fs::read_to_string(root.join(&file)).unwrap_or_default();
+                            let chars = content.chars().count();
+                            total_chars += chars;
+                            self.push_log(format!("  • {} ({} chars)", file, chars));
+                        }
+                        self.push_log(format!("  Total: {} chars", total_chars));
+                    }
+                    "suggest" => {
+                        self.push_log("[CONTEXT] Suggestions based on recent edits / current task (planned).".to_string());
+                    }
+                    _ => self.push_log("[CONTEXT] Usage: /context [add|remove|clear|show|budget|suggest]".to_string()),
+                }
+                true
+            }
+
+            "/files" => {
+                let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
+                if args.get(1).copied() == Some("relevant") {
+                    if let Some(query) = args.get(2) {
+                        self.push_log(format!("[FILES] Finding files relevant to '{}' (planned)...", query));
+                    } else {
+                        self.push_log("[FILES] Usage: /files relevant <query>".to_string());
+                    }
+                } else {
+                    self.push_log("[FILES] Usage: /files relevant <query>".to_string());
                 }
                 true
             }
@@ -2791,6 +2898,40 @@ impl App {
             if !skill_context.is_empty() {
                 sys_prompt.push_str("\n\n");
                 sys_prompt.push_str(&skill_context);
+            }
+
+            // Phase 3.6: Inject Repo Map
+            if let Some(map) = &self.repo_map {
+                sys_prompt.push_str("\n\n<repo_map>\n");
+                sys_prompt.push_str(&map.to_compact_string(5000, true));
+                sys_prompt.push_str("\n</repo_map>");
+            }
+
+            // Phase 3.6: Inject Selected Context Files
+            if !self.selected_files.is_empty() {
+                sys_prompt.push_str("\n\n<selected_files>\n");
+                sys_prompt.push_str("The user has explicitly added the following files to your context budget:\n");
+                let root = std::env::current_dir().unwrap_or_default();
+                let mut current_budget = 0;
+                let max_budget = 20000;
+                for file in &self.selected_files {
+                    let path = root.join(file);
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        sys_prompt.push_str(&format!("\n--- {} ---\n", file));
+                        let char_count = content.chars().count();
+                        if current_budget + char_count > max_budget {
+                            let available = max_budget - current_budget;
+                            let truncated: String = content.chars().take(available).collect();
+                            sys_prompt.push_str(&truncated);
+                            sys_prompt.push_str("\n[TRUNCATED due to context budget limits]\n");
+                            break;
+                        } else {
+                            sys_prompt.push_str(&content);
+                            current_budget += char_count;
+                        }
+                    }
+                }
+                sys_prompt.push_str("\n</selected_files>");
             }
 
             let mut routed_history = vec![Message {

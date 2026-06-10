@@ -136,6 +136,7 @@ fn render_focus_layout(f: &mut Frame, app: &App, area: Rect) {
             // Modals rendered separately after main layout
             render_log(f, app, area)
         }
+        ActiveView::Context => render_view(f, app, area),
         _ => render_view(f, app, area),
     }
 }
@@ -415,6 +416,7 @@ fn render_sidebar(f: &mut Frame, app: &App, area: Rect) {
         view_item(ActiveView::Skills, "🎯", "Skills"),
         view_item(ActiveView::Subagents, "🤖", "Subagents"),
         view_item(ActiveView::ExternalAgents, "🔗", "External"),
+        view_item(ActiveView::Context, "📁", "Context"),
         view_item(ActiveView::Logs, "📜", "Logs"),
         view_item(ActiveView::Help, "❓", "Help"),
         Line::from(""),
@@ -1141,6 +1143,37 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
                 Style::default().fg(COLOR_HELP),
             )));
             (" 🔗 External Agents ", lines)
+        }
+
+        ActiveView::Context => {
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    " 📁  Selected File Context",
+                    Style::default()
+                        .fg(COLOR_HEADER_ACCENT)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+            ];
+
+            if app.selected_files.is_empty() {
+                lines.push(Line::from("  No files selected."));
+                lines.push(Line::from(
+                    "  Use /context add <path> to add files to the AI's coding context.",
+                ));
+            } else {
+                for file in &app.selected_files {
+                    lines.push(Line::from(format!("  • {}", file)));
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    "  (These files will be read and injected into prompts during /code or /plan)",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            }
+
+            (" 📁 File Context ", lines)
         }
 
         ActiveView::Help => {
