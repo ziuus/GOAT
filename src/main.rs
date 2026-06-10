@@ -26,6 +26,7 @@ pub mod repo_map;
 pub mod runtime;
 pub mod scheduler;
 mod skills;
+pub mod studio;
 pub mod subagents;
 pub mod swarm;
 pub mod task;

@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings, ShieldCheck, MessageSquare, FolderTree, GitBranch, Command, FileText, Sparkles } from 'lucide-react';
+import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings, ShieldCheck, MessageSquare, FolderTree, GitBranch, Command, FileText, Sparkles, Wand2 } from 'lucide-react';
 
 const navItems = [
   { name: 'Overview', href: '/', icon: Activity },
   { name: 'Commands', href: '/commands', icon: Command },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
+  { name: 'AI Studio', href: '/studio', icon: Wand2 },
   { name: 'Repo Explorer', href: '/repo', icon: FolderTree },
   { name: 'Diffs', href: '/diffs', icon: GitBranch },
   { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
