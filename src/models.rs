@@ -118,6 +118,21 @@ pub struct ProfilesConfig {
     #[serde(default = "default_profile_name")]
     pub default: String,
 
+    #[serde(default = "default_mode_name")]
+    pub default_mode: String,
+
+    #[serde(default = "default_mode_name")]
+    pub last_mode: String,
+
+    #[serde(default = "default_true")]
+    pub auto_suggest_profile: bool,
+
+    #[serde(default = "default_true")]
+    pub project_profile_enabled: bool,
+
+    #[serde(default)]
+    pub require_approval_for_profile_changes: bool,
+
     /// Per-profile configuration keyed by profile name.
     #[serde(flatten)]
     pub profiles: HashMap<String, ProfileEntry>,
@@ -127,10 +142,23 @@ fn default_profile_name() -> String {
     "balanced".to_string()
 }
 
+fn default_mode_name() -> String {
+    "coding-assistant".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
 impl Default for ProfilesConfig {
     fn default() -> Self {
         Self {
             default: default_profile_name(),
+            default_mode: default_mode_name(),
+            last_mode: default_mode_name(),
+            auto_suggest_profile: true,
+            project_profile_enabled: true,
+            require_approval_for_profile_changes: false,
             profiles: HashMap::new(),
         }
     }
@@ -370,7 +398,7 @@ mod tests {
     fn test_registry_user_config_overrides_default() {
         let mut config = ProfilesConfig {
             default: "myprofile".to_string(),
-            profiles: HashMap::new(),
+            ..Default::default()
         };
         config.profiles.insert(
             "myprofile".to_string(),

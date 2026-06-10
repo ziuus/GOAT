@@ -90,6 +90,20 @@ export const goatApi = {
     });
     return res.json();
   },
+  get: (path: string) => fetchGoat<any>(path),
+  post: async (path: string, body: any) => {
+    const config = getGoatConfig();
+    if (!config) throw new Error('Not configured');
+    const res = await fetch(`${config.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    return res.json();
+  },
 };
 
 export async function daemonFetch(path: string, options: RequestInit = {}): Promise<Response> {

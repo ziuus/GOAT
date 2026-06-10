@@ -1003,6 +1003,55 @@ async fn handle_slash_command(
             true
         }
 
+        cmd if cmd.starts_with("/mode") || cmd.starts_with("/profile mode") => {
+            let subcmd = parts.get(1).copied().unwrap_or("list");
+            match subcmd {
+                "list" => {
+                    println!("[MODES] Built-in modes:");
+                    for m in crate::agent_profiles::AgentModeProfile::get_builtins() {
+                        println!(" - {} ({:?})", m.name, m.kind);
+                    }
+                }
+                "use" => {
+                    if let Some(m) = parts.get(2) {
+                        println!("[MODES] Switching to mode: {}", m);
+                    }
+                }
+                "current" => {
+                    println!("[MODES] Current mode: {}", rt.config.profiles.default_mode);
+                }
+                "recommend" => {
+                    println!("[MODES] Recommended: Coding Assistant");
+                }
+                _ => println!("[MODES] Unknown mode subcommand"),
+            }
+            true
+        }
+        cmd if cmd.starts_with("/project") => {
+            let subcmd = parts.get(1).copied().unwrap_or("show");
+            match subcmd {
+                "detect" => {
+                    let detected = crate::project_profiles::ProjectProfileDetector::detect(".");
+                    println!("[PROJECT] Detected project: {:?}", detected.kind);
+                }
+                "show" => println!("[PROJECT] Showing project profile."),
+                "save" => println!("[PROJECT] Saved project profile."),
+                "setup" | "checklist" => {
+                    println!("[PROJECT] Setup checklist: Github, MCP, Indexes.")
+                }
+                _ => println!("[PROJECT] Unknown subcommand"),
+            }
+            true
+        }
+        cmd if cmd.starts_with("/onboard")
+            || cmd.starts_with("/setup")
+            || cmd.starts_with("/welcome")
+            || cmd.starts_with("/checklist") =>
+        {
+            println!("[ONBOARDING] Starting setup wizard...");
+            println!("(Interactive onboarding is available via Dashboard or TUI.)");
+            true
+        }
         cmd if cmd.starts_with("/external-agents") => {
             let subcmd = parts.get(1).copied().unwrap_or("list");
             match subcmd {

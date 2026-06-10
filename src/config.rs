@@ -122,6 +122,9 @@ pub struct Config {
     /// Voice config.
     #[serde(default)]
     pub voice: VoiceConfig,
+    /// Onboarding config.
+    #[serde(default)]
+    pub onboarding: crate::onboarding::OnboardingStatus,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────

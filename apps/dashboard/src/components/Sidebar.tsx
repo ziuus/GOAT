@@ -11,6 +11,8 @@ const navItems = [
   { name: 'Skill Directory', href: '/skills', icon: Library },
   { name: 'AI Studio', href: '/studio', icon: Wand2 },
   { name: 'Recipes', href: '/recipes', icon: Workflow },
+  { name: 'Onboarding', href: '/onboarding', icon: Activity },
+  { name: 'Project Profile', href: '/project', icon: FolderTree },
   { name: 'Repo Explorer', href: '/repo', icon: FolderTree },
   { name: 'Diffs', href: '/diffs', icon: GitBranch },
   { name: 'Approvals', href: '/approvals', icon: ShieldCheck },

@@ -1,3 +1,4 @@
+pub mod agent_profiles;
 pub mod api_server;
 mod app;
 mod approval;
@@ -23,8 +24,10 @@ pub mod mcp;
 pub mod mcp_runtime;
 pub mod memory;
 pub mod models;
+pub mod onboarding;
 pub mod paths;
 pub mod project;
+pub mod project_profiles;
 pub mod provider;
 pub mod quick_access;
 pub mod recipe_marketplace;

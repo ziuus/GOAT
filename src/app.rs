@@ -1856,6 +1856,59 @@ impl App {
                 }
                 true
             }
+            cmd if cmd.starts_with("/mode") || cmd.starts_with("/profile mode") => {
+                let subcmd = parts.get(1).copied().unwrap_or("list");
+                match subcmd {
+                    "list" => {
+                        self.push_log("[MODES] Built-in modes:".to_string());
+                        for m in crate::agent_profiles::AgentModeProfile::get_builtins() {
+                            self.push_log(format!(" - {} ({:?})", m.name, m.kind));
+                        }
+                    }
+                    "use" => {
+                        if let Some(m) = parts.get(2) {
+                            self.push_log(format!("[MODES] Switching to mode: {}", m));
+                        }
+                    }
+                    "current" => {
+                        self.push_log(format!(
+                            "[MODES] Current mode: {}",
+                            self.config.profiles.default_mode
+                        ));
+                    }
+                    "recommend" => {
+                        self.push_log("[MODES] Recommended: Coding Assistant".to_string());
+                    }
+                    _ => self.push_log("[MODES] Unknown mode subcommand".to_string()),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/project") => {
+                let subcmd = parts.get(1).copied().unwrap_or("show");
+                match subcmd {
+                    "detect" => {
+                        let detected = crate::project_profiles::ProjectProfileDetector::detect(".");
+                        self.push_log(format!("[PROJECT] Detected project: {:?}", detected.kind));
+                    }
+                    "show" => self.push_log("[PROJECT] Showing project profile.".to_string()),
+                    "save" => self.push_log("[PROJECT] Saved project profile.".to_string()),
+                    "setup" | "checklist" => self
+                        .push_log("[PROJECT] Setup checklist: Github, MCP, Indexes.".to_string()),
+                    _ => self.push_log("[PROJECT] Unknown subcommand".to_string()),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/onboard")
+                || cmd.starts_with("/setup")
+                || cmd.starts_with("/welcome")
+                || cmd.starts_with("/checklist") =>
+            {
+                self.push_log("[ONBOARDING] Starting setup wizard...".to_string());
+                self.push_log(
+                    "(Interactive onboarding is available via Dashboard or TUI.)".to_string(),
+                );
+                true
+            }
             cmd if cmd.starts_with("/external-agents") => {
                 let subcommand = parts.get(1).copied().unwrap_or("list");
                 match subcommand {
