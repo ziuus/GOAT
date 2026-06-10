@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.18.0] — Phase 5.8: True Semantic Search + Deep Brain Ingestion (2026-06-10)
+
+### Added
+- **Embedding Provider Layer**: Integrated local semantic embeddings (`Mock` and `Ollama`) with `Box<dyn EmbeddingProvider>` trait replacement.
+- **Deep Brain Ingestion**: The indexer now ingests Recipes, Studio Drafts, Jobs, Approvals, Audit Logs, and Checkpoints.
+- **Hybrid Search Mode**: Search now supports `keyword`, `fuzzy`, `semantic`, and `hybrid` modes.
+- **Embedding CLI/API**: Added `getEmbeddingsStatus` and `rebuildEmbeddings` APIs, along with `/brain status` and `/search-brain --mode hybrid` CLI arguments.
+- **Memory Galaxy & AI Studio Integration**: Upgraded UI to trigger hybrid recall out-of-the-box and select contexts seamlessly.
+
+
 ## [0.12.0] — Phase 3.4 & 3.5: Checkpoints, Git Branch/Commit, and Safety Hardening (2026-06-09)
 
 ## [0.15.0] — Phase 5.1: Desktop Daemon Lifecycle & Native Notifications (2026-06-10)

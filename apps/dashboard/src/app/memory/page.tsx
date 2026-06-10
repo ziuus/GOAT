@@ -149,7 +149,7 @@ export default function MemoryGalaxyPage() {
                      <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
                         <Globe className="w-3.5 h-3.5" /> Search Marketplace
                      </button>
-                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
+                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}&mode=hybrid`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
                         <Search className="w-3.5 h-3.5" /> Find Related
                      </button>
                    </div>
@@ -162,7 +162,7 @@ export default function MemoryGalaxyPage() {
                      <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
                         <Globe className="w-3.5 h-3.5" /> Find Matching Recipe
                      </button>
-                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
+                     <button onClick={() => router.push(`/brain?q=${encodeURIComponent(m.summary)}&mode=hybrid`)} className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
                         <Search className="w-3.5 h-3.5" /> Find Related
                      </button>
                    </div>

@@ -21,8 +21,10 @@ import {
   Globe,
   LayoutTemplate,
   Library,
-  UserCheck
+  UserCheck,
+  X
 } from "lucide-react";
+import { goatApi } from "@/lib/goat-api";
 
 const tabs = [
   { id: "prompt", label: "Prompt Lab", icon: TerminalSquare },
@@ -44,6 +46,31 @@ export default function StudioPage() {
   const [promptText, setPromptText] = useState("");
   const [output, setOutput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Brain Context Modal State
+  const [isBrainModalOpen, setIsBrainModalOpen] = useState(false);
+  const [brainQuery, setBrainQuery] = useState("");
+  const [brainSearchMode, setBrainSearchMode] = useState("hybrid");
+  const [brainResults, setBrainResults] = useState<any[]>([]);
+  const [isBrainSearching, setIsBrainSearching] = useState(false);
+
+  const handleBrainSearch = async () => {
+    if (!brainQuery) return;
+    setIsBrainSearching(true);
+    try {
+      const res = await goatApi.searchBrain(brainQuery, brainSearchMode);
+      setBrainResults(res.results || []);
+    } catch (e) {
+      console.error("Search failed", e);
+    } finally {
+      setIsBrainSearching(false);
+    }
+  };
+
+  const insertContext = (body: string, kind: string) => {
+    setPromptText(prev => `${prev}\n\n[Context: ${kind}]\n${body}`);
+    setIsBrainModalOpen(false);
+  };
 
   const runPrompt = () => {
     setIsProcessing(true);
@@ -164,10 +191,67 @@ export default function StudioPage() {
                           className="w-full h-full bg-transparent resize-none outline-none p-4 text-sm leading-relaxed"
                         />
                       </div>
-                      <div className="flex justify-between items-center">
-                        <button onClick={() => {}} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 border border-fuchsia-500/20 transition-colors">
+                      <div className="flex justify-between items-center relative">
+                        <button onClick={() => setIsBrainModalOpen(true)} className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 border border-fuchsia-500/20 transition-colors">
                           <BrainCircuit className="w-3.5 h-3.5" /> Attach Brain Context
                         </button>
+                        
+                        {/* Brain Context Modal Popup */}
+                        <AnimatePresence>
+                          {isBrainModalOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute top-10 left-0 w-96 bg-black/90 border border-white/20 rounded-xl shadow-2xl z-50 p-4 backdrop-blur-xl"
+                            >
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-semibold text-white">Search Brain</h4>
+                                <button onClick={() => setIsBrainModalOpen(false)} className="text-slate-400 hover:text-white">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <div className="flex gap-2 mb-3">
+                                <input
+                                  type="text"
+                                  placeholder="Query..."
+                                  value={brainQuery}
+                                  onChange={(e) => setBrainQuery(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleBrainSearch()}
+                                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50"
+                                />
+                                <select 
+                                  value={brainSearchMode}
+                                  onChange={(e) => setBrainSearchMode(e.target.value)}
+                                  className="bg-white/5 border border-white/10 rounded-lg px-2 text-xs text-white"
+                                >
+                                  <option value="hybrid">Hybrid</option>
+                                  <option value="semantic">Semantic</option>
+                                  <option value="keyword">Keyword</option>
+                                </select>
+                                <button onClick={handleBrainSearch} disabled={isBrainSearching} className="px-3 bg-indigo-500 text-white rounded-lg text-xs hover:bg-indigo-400 disabled:opacity-50">
+                                  {isBrainSearching ? "..." : <Search className="w-3 h-3" />}
+                                </button>
+                              </div>
+                              <div className="max-h-64 overflow-y-auto space-y-2 custom-scrollbar">
+                                {brainResults.map((res: any) => (
+                                  <div key={res.document.id} className="bg-white/5 p-2 rounded-lg border border-white/5">
+                                    <div className="flex justify-between items-start mb-1">
+                                      <div className="text-xs font-medium text-indigo-300 truncate max-w-[200px]">{res.document.title}</div>
+                                      <button onClick={() => insertContext(res.document.body, res.document.kind)} className="text-[10px] px-2 py-0.5 bg-fuchsia-500/20 text-fuchsia-300 rounded hover:bg-fuchsia-500/40">
+                                        Inject
+                                      </button>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 line-clamp-2">{res.document.summary}</div>
+                                  </div>
+                                ))}
+                                {brainResults.length === 0 && !isBrainSearching && brainQuery && (
+                                  <div className="text-xs text-slate-500 text-center py-4">No context found.</div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                         <button 
                           onClick={runPrompt}
                           disabled={isProcessing || !promptText}

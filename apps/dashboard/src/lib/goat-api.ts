@@ -69,12 +69,22 @@ export const goatApi = {
     return res.json();
   },
   getBrainStatus: () => fetchGoat<any>('/v1/brain/status').catch(() => ({ total_documents: 0 })),
-  searchBrain: (q: string) => fetchGoat<any>(`/v1/brain/search?q=${encodeURIComponent(q)}`).catch(() => ({ results: [] })),
-  recallBrain: (q: string) => fetchGoat<any>(`/v1/brain/recall?q=${encodeURIComponent(q)}`).catch(() => ({ recall: {} })),
+  searchBrain: (q: string, mode: string = 'keyword') => fetchGoat<any>(`/v1/brain/search?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`).catch(() => ({ results: [] })),
+  recallBrain: (q: string, mode: string = 'keyword') => fetchGoat<any>(`/v1/brain/recall?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(mode)}`).catch(() => ({ recall: {} })),
   reindexBrain: async () => {
     const config = getGoatConfig();
     if (!config) throw new Error('Not configured');
     const res = await fetch(`${config.baseUrl}/v1/brain/reindex`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+    return res.json();
+  },
+  getEmbeddingsStatus: () => fetchGoat<any>('/v1/brain/embeddings/status').catch(() => ({ enabled: false, total_vectors: 0, provider: 'none' })),
+  rebuildEmbeddings: async () => {
+    const config = getGoatConfig();
+    if (!config) throw new Error('Not configured');
+    const res = await fetch(`${config.baseUrl}/v1/brain/embeddings/rebuild`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.token}` },
     });

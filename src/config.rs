@@ -95,15 +95,18 @@ pub struct Config {
     /// Brain learning and memory galaxy config.
     #[serde(default)]
     pub learning: LearningConfig,
+    /// Brain index config.
+    #[serde(default)]
+    pub brain_index: BrainIndexConfig,
+    /// Embeddings config.
+    #[serde(default)]
+    pub embeddings: EmbeddingsConfig,
     /// Skill marketplace config.
     #[serde(default)]
     pub skill_marketplace: SkillMarketplaceConfig,
     /// Recipe marketplace and automation config.
     #[serde(default)]
     pub recipe_marketplace: RecipeConfig,
-    /// Brain search and semantic index config.
-    #[serde(default)]
-    pub brain_index: BrainIndexConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -1106,6 +1109,14 @@ pub struct BrainIndexConfig {
     pub index_recipes: bool,
     #[serde(default = "default_true")]
     pub index_studio_drafts: bool,
+    #[serde(default = "default_true")]
+    pub index_checkpoints: bool,
+    #[serde(default = "default_true")]
+    pub index_mcp_tools: bool,
+    #[serde(default = "default_true")]
+    pub index_external_agents: bool,
+    #[serde(default = "default_true")]
+    pub deep_ingestion: bool,
     #[serde(default = "default_false")]
     pub allow_semantic_embeddings: bool,
     #[serde(default = "default_none_str")]
@@ -1125,6 +1136,10 @@ impl Default for BrainIndexConfig {
             index_skills: true,
             index_recipes: true,
             index_studio_drafts: true,
+            index_checkpoints: true,
+            index_mcp_tools: true,
+            index_external_agents: true,
+            deep_ingestion: true,
             allow_semantic_embeddings: false,
             embedding_provider: "none".to_string(),
             max_document_chars: 12000,
@@ -1137,4 +1152,60 @@ fn default_none_str() -> String {
 }
 fn default_max_document_chars() -> usize {
     12000
+}
+
+// ── Embeddings Config ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct EmbeddingsConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_none_str")]
+    pub provider: String,
+    #[serde(default = "default_embedding_model")]
+    pub model: String,
+    #[serde(default = "default_ollama_base_url")]
+    pub base_url: String,
+    #[serde(default = "default_dimensions")]
+    pub dimensions: usize,
+    #[serde(default = "default_embedding_timeout")]
+    pub timeout_seconds: u64,
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
+    #[serde(default = "default_true")]
+    pub store_vectors: bool,
+    #[serde(default = "default_false")]
+    pub rebuild_on_index: bool,
+}
+
+impl Default for EmbeddingsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: "none".to_string(),
+            model: "nomic-embed-text".to_string(),
+            base_url: "http://127.0.0.1:11434".to_string(),
+            dimensions: 768,
+            timeout_seconds: 15,
+            batch_size: 16,
+            store_vectors: true,
+            rebuild_on_index: false,
+        }
+    }
+}
+
+fn default_embedding_model() -> String {
+    "nomic-embed-text".to_string()
+}
+fn default_ollama_base_url() -> String {
+    "http://127.0.0.1:11434".to_string()
+}
+fn default_dimensions() -> usize {
+    768
+}
+fn default_embedding_timeout() -> u64 {
+    15
+}
+fn default_batch_size() -> usize {
+    16
 }

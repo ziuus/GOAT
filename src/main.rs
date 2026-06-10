@@ -9,6 +9,7 @@ mod cli;
 pub mod command_registry;
 pub mod config;
 pub mod daemon;
+pub mod embeddings;
 pub mod error;
 pub mod events;
 pub mod external_agents;

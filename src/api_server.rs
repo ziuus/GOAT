@@ -168,6 +168,14 @@ pub async fn start_server(
         .route("/v1/brain/related/:id", get(brain_related_handler))
         .route("/v1/brain/sources", get(brain_sources_handler))
         .route("/v1/brain/privacy", get(brain_privacy_handler))
+        .route(
+            "/v1/brain/embeddings/status",
+            get(brain_embeddings_status_handler),
+        )
+        .route(
+            "/v1/brain/embeddings/rebuild",
+            post(brain_embeddings_rebuild_handler),
+        )
         .route("/v1/agent-templates", get(agent_templates_list_handler))
         .route(
             "/v1/agent-templates/:id/draft",
@@ -1647,8 +1655,11 @@ async fn brain_status_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let manager =
-        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
     match manager.status() {
         Ok(stats) => Ok(Json(json!(stats))),
         Err(e) => Err((
@@ -1664,10 +1675,12 @@ async fn brain_index_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let manager =
-        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
-    // In a real app, do this asynchronously.
-    match manager.index_all() {
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    match manager.index_all().await {
         Ok(_) => Ok(Json(json!({ "status": "indexed" }))),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1679,6 +1692,7 @@ async fn brain_index_handler(
 #[derive(serde::Deserialize)]
 struct BrainSearchQueryArgs {
     q: String,
+    mode: Option<String>,
 }
 
 async fn brain_search_handler(
@@ -1688,16 +1702,27 @@ async fn brain_search_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let manager =
-        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+
+    let mode = match query.mode.as_deref() {
+        Some("semantic") => crate::brain_index::BrainSearchMode::Semantic,
+        Some("hybrid") => crate::brain_index::BrainSearchMode::Hybrid,
+        Some("fuzzy") => crate::brain_index::BrainSearchMode::Fuzzy,
+        _ => crate::brain_index::BrainSearchMode::Keyword,
+    };
 
     let sq = crate::brain_index::BrainSearchQuery {
         q: query.q,
         limit: 50,
         kind_filter: None,
+        mode,
     };
 
-    match manager.search(&sq) {
+    match manager.search(&sq).await {
         Ok(res) => Ok(Json(json!({ "results": res }))),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1713,9 +1738,20 @@ async fn brain_recall_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let manager =
-        crate::brain_index::BrainIndexManager::new(rt.paths.clone(), rt.config.brain_index.clone());
-    match manager.recall(&query.q) {
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+
+    let mode = match query.mode.as_deref() {
+        Some("semantic") => crate::brain_index::BrainSearchMode::Semantic,
+        Some("hybrid") => crate::brain_index::BrainSearchMode::Hybrid,
+        Some("fuzzy") => crate::brain_index::BrainSearchMode::Fuzzy,
+        _ => crate::brain_index::BrainSearchMode::Keyword,
+    };
+
+    match manager.recall(&query.q, mode).await {
         Ok(res) => Ok(Json(json!({ "recall": res }))),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1754,4 +1790,49 @@ async fn brain_privacy_handler(
         "semantic_embeddings": "local_only",
         "skipped": [".env", "tokens", "private_keys"]
     })))
+}
+
+async fn brain_embeddings_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    match manager.status() {
+        Ok(stats) => Ok(Json(json!({
+            "provider": stats.embedding_provider,
+            "total_vectors": stats.total_vectors,
+            "enabled": rt.config.embeddings.enabled
+        }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn brain_embeddings_rebuild_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let manager = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    // In a real app, this should be a background task
+    match manager.index_all().await {
+        Ok(_) => Ok(Json(json!({ "status": "rebuilt" }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
 }

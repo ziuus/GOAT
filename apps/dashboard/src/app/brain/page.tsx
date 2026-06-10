@@ -22,26 +22,34 @@ export default function BrainSearchPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [status, setStatus] = useState<any>(null);
+  const [embedStatus, setEmbedStatus] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [searchMode, setSearchMode] = useState("keyword");
 
   useEffect(() => {
     fetchStatus();
+    
+    // Check for query in URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q');
+      const m = params.get('mode');
+      if (q) {
+        setQuery(q);
+        if (m) setSearchMode(m);
+        // We delay the search slightly to let state update
+        setTimeout(() => {
+          triggerSearch(q, m || 'keyword');
+        }, 100);
+      }
+    }
   }, []);
 
-  const fetchStatus = async () => {
-    try {
-      const res = await goatApi.getBrainStatus();
-      setStatus(res);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!query) return;
+  const triggerSearch = async (q: string, mode: string) => {
+    if (!q) return;
     setIsSearching(true);
     try {
-      const res = await goatApi.searchBrain(query);
+      const res = await goatApi.searchBrain(q, mode);
       setResults(res.results || []);
     } catch (e) {
       console.error(e);
@@ -50,9 +58,33 @@ export default function BrainSearchPage() {
     }
   };
 
+  const fetchStatus = async () => {
+    try {
+      const res = await goatApi.getBrainStatus();
+      setStatus(res);
+      const eres = await goatApi.getEmbeddingsStatus();
+      setEmbedStatus(eres);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSearch = () => {
+    triggerSearch(query, searchMode);
+  };
+
   const handleReindex = async () => {
     try {
       await goatApi.reindexBrain();
+      fetchStatus();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRebuildEmbeddings = async () => {
+    try {
+      await goatApi.rebuildEmbeddings();
       fetchStatus();
     } catch (e) {
       console.error(e);
@@ -93,10 +125,20 @@ export default function BrainSearchPage() {
             <div className="text-xs text-slate-400 flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-emerald-400" /> Local Only
             </div>
+            {embedStatus?.enabled && (
+              <div className="text-xs text-violet-400 mt-1">
+                {embedStatus.total_vectors} Vectors ({embedStatus.provider})
+              </div>
+            )}
           </div>
-          <button onClick={handleReindex} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors group">
-            <RefreshCw className="w-5 h-5 text-slate-400 group-hover:text-white" />
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleRebuildEmbeddings} title="Rebuild Embeddings" className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors group">
+              <Database className="w-5 h-5 text-slate-400 group-hover:text-violet-400" />
+            </button>
+            <button onClick={handleReindex} title="Deep Reindex" className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors group">
+              <RefreshCw className="w-5 h-5 text-slate-400 group-hover:text-white" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -119,7 +161,17 @@ export default function BrainSearchPage() {
                 className="w-full bg-black/40 border-2 border-white/10 rounded-2xl py-4 pl-14 pr-6 text-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500/50 transition-colors shadow-inner"
               />
             </div>
-            <button 
+            <select
+              value={searchMode}
+              onChange={(e) => setSearchMode(e.target.value)}
+              className="bg-black/40 border-2 border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:border-violet-500/50 appearance-none"
+            >
+              <option value="keyword">Keyword</option>
+              <option value="fuzzy">Fuzzy</option>
+              {embedStatus?.enabled && <option value="semantic">Semantic</option>}
+              {embedStatus?.enabled && <option value="hybrid">Hybrid</option>}
+            </select>
+            <button  
               onClick={handleSearch}
               disabled={isSearching}
               className="px-8 py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-medium text-lg shadow-lg shadow-violet-500/20 disabled:opacity-50 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
@@ -156,7 +208,9 @@ export default function BrainSearchPage() {
                           {res.document.kind}
                         </span>
                       </h3>
-                      <div className="text-xs text-slate-400">Score: {res.score} • {res.match_reason}</div>
+                      <div className="text-xs text-slate-400">
+                        Score: {res.score.toFixed(2)} (Kw: {res.keyword_score?.toFixed(1) || 0}, Sem: {res.semantic_score?.toFixed(2) || 0}) • {res.match_reason}
+                      </div>
                     </div>
                   </div>
                   <div className="text-xs text-slate-500">{new Date(res.document.created_at).toLocaleString()}</div>
