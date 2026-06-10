@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getGoatConfig, setGoatConfig, goatApi } from '@/lib/goat-api';
-import { ShieldCheck, ShieldAlert, Shield, LogOut } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Shield, LogOut, Play, FolderOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
@@ -11,13 +11,36 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [isDesktop, setIsDesktop] = useState(false);
+  const [daemonStatus, setDaemonStatus] = useState(false);
+  const [desktopTokenPath, setDesktopTokenPath] = useState('');
+  const [startingDaemon, setStartingDaemon] = useState(false);
+  
   const router = useRouter();
 
   useEffect(() => {
     // Check if running in Tauri
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      setIsDesktop(true);
-    }
+    const checkDesktop = async () => {
+      if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+        setIsDesktop(true);
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          
+          const isRunning = await invoke<boolean>('get_daemon_status');
+          setDaemonStatus(isRunning);
+          
+          const tPath = await invoke<string>('get_daemon_token_path');
+          setDesktopTokenPath(tPath);
+          
+          if (!url || url === 'http://127.0.0.1:47647') {
+             const defUrl = await invoke<string>('get_default_api_url');
+             setUrl(defUrl);
+          }
+        } catch (e) {
+          console.error("Failed to call Tauri invoke", e);
+        }
+      }
+    };
+    checkDesktop();
     
     const conf = getGoatConfig();
     if (conf) {
@@ -34,6 +57,11 @@ export default function SettingsPage() {
     try {
       await goatApi.getHealth();
       setStatus('success');
+      if (isDesktop) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const isRunning = await invoke<boolean>('get_daemon_status');
+        setDaemonStatus(isRunning);
+      }
       setTimeout(() => router.push('/'), 1000);
     } catch (e: any) {
       setStatus('error');
@@ -46,6 +74,25 @@ export default function SettingsPage() {
     setGoatConfig(url, '');
     setStatus('idle');
     router.refresh();
+  };
+  
+  const startDaemon = async () => {
+    if (!isDesktop) return;
+    setStartingDaemon(true);
+    try {
+       const { invoke } = await import('@tauri-apps/api/core');
+       await invoke('start_daemon');
+       // wait a sec and check status
+       setTimeout(async () => {
+           const isRunning = await invoke<boolean>('get_daemon_status');
+           setDaemonStatus(isRunning);
+           setStartingDaemon(false);
+       }, 2000);
+    } catch (e: any) {
+       console.error(e);
+       setErrorMsg(String(e));
+       setStartingDaemon(false);
+    }
   };
 
   const isLocalhost = url.includes('127.0.0.1') || url.includes('localhost');
@@ -93,6 +140,32 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {isDesktop && (
+        <div className="space-y-6 mb-8 bg-card border border-border p-6 rounded-xl shadow-sm">
+           <h2 className="text-lg font-semibold tracking-tight mb-4">Desktop Status</h2>
+           <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                 <div className={`w-3 h-3 rounded-full ${daemonStatus ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                 <div>
+                    <div className="text-sm font-medium">Local Daemon</div>
+                    <div className="text-xs text-muted-foreground">{daemonStatus ? 'Running on 127.0.0.1:47647' : 'Stopped or Unreachable'}</div>
+                 </div>
+              </div>
+              
+              {!daemonStatus && (
+                 <button 
+                   onClick={startDaemon}
+                   disabled={startingDaemon}
+                   className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-md text-sm font-medium transition-colors"
+                 >
+                    <Play className="w-4 h-4" />
+                    {startingDaemon ? 'Starting...' : 'Start Daemon'}
+                 </button>
+              )}
+           </div>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-6 bg-card border border-border p-6 rounded-xl shadow-sm">
         <div className="space-y-2">
           <label className="text-sm font-medium">Daemon API URL</label>
@@ -128,12 +201,12 @@ export default function SettingsPage() {
             type="password" 
             value={token}
             onChange={e => setToken(e.target.value)}
-            placeholder="Paste token from ~/.local/share/goat/daemon.token"
+            placeholder={isDesktop ? `Paste token from ${desktopTokenPath || '~/.local/share/goat/daemon.token'}` : "Paste token from ~/.local/share/goat/daemon.token"}
             className="w-full bg-input border border-border rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             required
           />
           <p className="text-xs text-muted-foreground mt-2">
-            Run <code>cat ~/.local/share/goat/daemon.token</code> in your terminal to view your secure token. Token is never displayed after entry.
+            Run <code>cat {isDesktop && desktopTokenPath ? desktopTokenPath : '~/.local/share/goat/daemon.token'}</code> in your terminal to view your secure token. Token is never displayed after entry.
           </p>
         </div>
 

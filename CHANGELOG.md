@@ -8,6 +8,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.12.0] — Phase 3.4 & 3.5: Checkpoints, Git Branch/Commit, and Safety Hardening (2026-06-09)
 
+## [0.15.0] — Phase 5.1: Desktop Daemon Lifecycle & Native Notifications (2026-06-10)
+
+### Added
+- **Desktop Daemon Lifecycle**: The desktop app can now check the local daemon's status and start it safely using `goat daemon start` via the Tauri `start_daemon` command.
+- **Native Notifications**: Integrated `@tauri-apps/plugin-notification`. The Next.js dashboard now intercepts `approval_requested` SSE events and converts them to native OS notifications. The notification content is securely redacted (e.g. "GOAT needs approval") to prevent leaking secret-like content or critical commands.
+- **System Tray/Menu Scaffold**: Created a foundation in `src-tauri/src/lib.rs` for a system tray with basic menu items (Show GOAT, Daemon Status, Quit) utilizing Tauri's v2 tray API.
+- **Desktop Doctor Updates**: `/desktop doctor` and `goat desktop doctor` checks the dashboard build and reports on the native desktop scaffolding correctly.
+- **Documentation**: Added `docs/GOAT_DESKTOP_DAEMON_LIFECYCLE.md` detailing the interaction between the Tauri frontend and the daemon backend.
+
+---
+
 ## [0.14.0] — Phase 5.0: Tauri Desktop Shell Foundation (2026-06-10)
 
 ### Added

@@ -78,6 +78,8 @@ You can inspect the desktop environment using the GOAT CLI:
 - `goat desktop path` -> Prints the absolute path to the desktop code
 - `goat desktop doctor` -> Checks desktop scaffolding readiness
 
-## Current Status (Phase 5.0)
+## Current Status (Phase 5.1)
 - **Implemented:** Tauri scaffold, config, CLI integration, secure CSP, basic IPC commands, and dashboard awareness ("Desktop Mode" badge).
-- **Pending (Phase 5.1):** Auto-launching the daemon from Tauri if stopped, native OS notifications for Approval requests, deep OS file system integration via Tauri rather than proxying through the daemon.
+- **Implemented (Phase 5.1):** Desktop Daemon Lifecycle Manager (start daemon native command), Native Notifications (via `@tauri-apps/plugin-notification` reacting to SSE events), and Tray/Menu Foundation scaffold.
+- **Security:** The daemon token is not exposed. Approval notifications are redacted to not show sensitive commands.
+- **Pending (Phase 5.2):** Brain Learning Loop, Memory Galaxy.
