@@ -412,7 +412,9 @@ impl Default for LearningConfig {
     }
 }
 
-fn default_max_candidates_per_session() -> usize { 10 }
+fn default_max_candidates_per_session() -> usize {
+    10
+}
 
 // ── Custom Providers ──────────────────────────────────────────────────────────
 

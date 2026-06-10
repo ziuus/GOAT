@@ -70,9 +70,18 @@ pub async fn start_server(
         .route("/v1/audit/recent", get(audit_recent_handler))
         .route("/v1/learning/status", get(learning_status_handler))
         .route("/v1/learning/candidates", get(learning_candidates_handler))
-        .route("/v1/learning/candidates/:id", get(learning_candidate_detail_handler))
-        .route("/v1/learning/candidates/:id/accept", post(learning_candidate_accept_handler))
-        .route("/v1/learning/candidates/:id/reject", post(learning_candidate_reject_handler))
+        .route(
+            "/v1/learning/candidates/:id",
+            get(learning_candidate_detail_handler),
+        )
+        .route(
+            "/v1/learning/candidates/:id/accept",
+            post(learning_candidate_accept_handler),
+        )
+        .route(
+            "/v1/learning/candidates/:id/reject",
+            post(learning_candidate_reject_handler),
+        )
         .route("/v1/learning/extract", post(learning_extract_handler))
         .route("/v1/learning/summary", get(learning_summary_handler))
         .route("/v1/memory/galaxy", get(memory_galaxy_handler))

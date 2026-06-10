@@ -140,6 +140,43 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <div className="space-y-6 mb-8 bg-card border border-border p-6 rounded-xl shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-400" /> Brain Learning & Privacy
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            GOAT learns from your interactions to improve its performance. Learning happens entirely locally and NO secrets are ever saved.
+          </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Enable Learning Loop</div>
+                <div className="text-xs text-muted-foreground">Allow GOAT to extract memory candidates</div>
+              </div>
+              <input type="checkbox" className="toggle" defaultChecked disabled title="Configured in goat.toml" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Require Review (Recommended)</div>
+                <div className="text-xs text-muted-foreground">Manually accept memories in Memory Galaxy before saving</div>
+              </div>
+              <input type="checkbox" className="toggle" defaultChecked disabled title="Configured in goat.toml" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Allow LLM Summarization</div>
+                <div className="text-xs text-muted-foreground">Use external LLMs to build better memory summaries</div>
+              </div>
+              <input type="checkbox" className="toggle" disabled title="Configured in goat.toml" />
+            </div>
+          </div>
+          <div className="mt-4 text-xs text-muted-foreground border-t border-border pt-4">
+            To change these settings, edit <code className="bg-muted px-1 rounded">~/.config/goat/goat.toml</code> under the <code>[learning]</code> section.
+          </div>
+        </div>
+      </div>
+
       {isDesktop && (
         <div className="space-y-6 mb-8 bg-card border border-border p-6 rounded-xl shadow-sm">
            <h2 className="text-lg font-semibold tracking-tight mb-4">Desktop Status</h2>

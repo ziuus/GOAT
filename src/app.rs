@@ -2427,10 +2427,17 @@ impl App {
                 match subcommand {
                     "status" => {
                         self.push_log("[LEARN] Brain Learning Loop is ACTIVE.");
-                        self.push_log(format!("[LEARN] Config: enabled={}, auto_extract={}, require_review={}", self.config.learning.enabled, self.config.learning.auto_extract, self.config.learning.require_review));
+                        self.push_log(format!(
+                            "[LEARN] Config: enabled={}, auto_extract={}, require_review={}",
+                            self.config.learning.enabled,
+                            self.config.learning.auto_extract,
+                            self.config.learning.require_review
+                        ));
                     }
                     "extract" => {
-                        self.push_log("[LEARN] Extraction triggered. Scanning recent interactions...");
+                        self.push_log(
+                            "[LEARN] Extraction triggered. Scanning recent interactions...",
+                        );
                         self.push_log("[LEARN] Extracted 0 candidates (Mock).");
                     }
                     "candidates" => {
@@ -2440,7 +2447,9 @@ impl App {
                     "accept" => {
                         let id = parts.get(2).copied().unwrap_or("");
                         if id.is_empty() {
-                            self.push_log("[LEARN] Please provide candidate ID: /learn accept <id>");
+                            self.push_log(
+                                "[LEARN] Please provide candidate ID: /learn accept <id>",
+                            );
                         } else {
                             self.push_log(format!("[LEARN] Accepted candidate: {}", id));
                         }
@@ -2448,7 +2457,9 @@ impl App {
                     "reject" => {
                         let id = parts.get(2).copied().unwrap_or("");
                         if id.is_empty() {
-                            self.push_log("[LEARN] Please provide candidate ID: /learn reject <id>");
+                            self.push_log(
+                                "[LEARN] Please provide candidate ID: /learn reject <id>",
+                            );
                         } else {
                             self.push_log(format!("[LEARN] Rejected candidate: {}", id));
                         }

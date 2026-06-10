@@ -41,8 +41,19 @@ pub struct MemoryCandidate {
 }
 
 impl MemoryCandidate {
-    pub fn new(source: String, candidate_type: CandidateType, title: String, summary: String, confidence: f32, suggested_destination: String, raw_data: String) -> Self {
-        let created_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    pub fn new(
+        source: String,
+        candidate_type: CandidateType,
+        title: String,
+        summary: String,
+        confidence: f32,
+        suggested_destination: String,
+        raw_data: String,
+    ) -> Self {
+        let created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         Self {
             id: Uuid::new_v4().to_string(),
             created_at,
@@ -127,7 +138,11 @@ impl BrainLearningManager {
         self.candidates.iter().find(|c| c.id == id).cloned()
     }
 
-    pub fn handle_decision(&mut self, candidate_id: &str, decision: LearningDecision) -> Result<(), String> {
+    pub fn handle_decision(
+        &mut self,
+        candidate_id: &str,
+        decision: LearningDecision,
+    ) -> Result<(), String> {
         let mut idx = None;
         for (i, c) in self.candidates.iter().enumerate() {
             if c.id == candidate_id {
@@ -164,7 +179,10 @@ impl BrainLearningManager {
             return Err("Cannot write unredacted candidate".to_string());
         }
         // Mocking safe write
-        println!("Safely wrote candidate {} to {}", candidate.id, candidate.suggested_destination);
+        println!(
+            "Safely wrote candidate {} to {}",
+            candidate.id, candidate.suggested_destination
+        );
         Ok(())
     }
 

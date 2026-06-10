@@ -10,6 +10,7 @@ export default function OverviewPage() {
   const [health, setHealth] = useState<any>(null);
   const [approvals, setApprovals] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
+  const [learning, setLearning] = useState<any>({ pending_count: 0 });
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -21,16 +22,18 @@ export default function OverviewPage() {
 
     const load = async () => {
       try {
-        const [h, s, a, hRes] = await Promise.all([
+        const [h, s, a, hRes, lRes] = await Promise.all([
           goatApi.getHealth(),
           goatApi.getStatus(),
           goatApi.getApprovals(),
-          daemonFetch('/v1/approvals/history').then(res => res.ok ? res.json() : { history: [] }).catch(() => ({ history: [] }))
+          daemonFetch('/v1/approvals/history').then(res => res.ok ? res.json() : { history: [] }).catch(() => ({ history: [] })),
+          daemonFetch('/v1/learning/candidates').then(res => res.ok ? res.json() : { candidates: [] }).catch(() => ({ candidates: [] }))
         ]);
         setHealth(h);
         setStatus(s);
         setApprovals(a.approvals || []);
         setHistory(hRes.history || []);
+        setLearning({ pending_count: lRes.candidates?.length || 0 });
       } catch (e: any) {
         setError(e.message);
       }
@@ -122,6 +125,13 @@ export default function OverviewPage() {
             >
               View Approvals
             </button>
+            <div className="bg-muted rounded-md p-4 border border-border flex flex-col items-center justify-center space-y-2 mt-4">
+               <span className="text-2xl font-bold text-indigo-400">{learning.pending_count}</span>
+               <span className="text-sm text-muted-foreground">Pending Memories</span>
+               <button onClick={() => router.push('/memory')} className="w-full text-xs py-1.5 bg-indigo-500/10 text-indigo-400 rounded-md hover:bg-indigo-500/20 transition-colors">
+                 Go to Memory Galaxy
+               </button>
+            </div>
           </div>
         </div>
       </div>
