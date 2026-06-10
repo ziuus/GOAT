@@ -17,7 +17,8 @@ import {
   Code2,
   Sparkles,
   Search,
-  LayoutDashboard
+  LayoutDashboard,
+  Globe
 } from "lucide-react";
 
 const tabs = [
@@ -229,7 +230,16 @@ export default function StudioPage() {
                     </motion.div>
                   )}
 
-                  {activeTab !== "memory" && (
+                  {activeTab === "skill" && (
+                     <motion.div variants={itemVariants} className="w-full flex justify-center mt-4">
+                        <button className="px-6 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 transition-colors flex items-center gap-2 text-sm shadow-lg shadow-indigo-500/10">
+                           <Globe className="w-4 h-4" />
+                           Import from Marketplace
+                        </button>
+                     </motion.div>
+                  )}
+
+                  {activeTab !== "memory" && activeTab !== "skill" && (
                     <motion.div variants={itemVariants} className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200/80 text-sm flex items-start gap-3 text-left">
                       <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-amber-400" />
                       <p>

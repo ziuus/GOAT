@@ -95,6 +95,9 @@ pub struct Config {
     /// Brain learning and memory galaxy config.
     #[serde(default)]
     pub learning: LearningConfig,
+    /// Skill marketplace config.
+    #[serde(default)]
+    pub skill_marketplace: SkillMarketplaceConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -988,3 +991,45 @@ fn default_daemon_port() -> u16 {
 fn default_false() -> bool {
     false
 }
+
+// ── Skill Marketplace ────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SkillMarketplaceConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_marketplace_provider")]
+    pub provider: String,
+    #[serde(default = "default_marketplace_base_url")]
+    pub base_url: String,
+    #[serde(default = "default_auth_mode")]
+    pub auth_mode: String,
+    #[serde(default = "default_true")]
+    pub cache_enabled: bool,
+    #[serde(default = "default_cache_ttl_minutes")]
+    pub cache_ttl_minutes: u64,
+    #[serde(default = "default_true")]
+    pub require_audit_before_install: bool,
+    #[serde(default = "default_true")]
+    pub require_approval_before_install: bool,
+}
+
+impl Default for SkillMarketplaceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_marketplace_provider(),
+            base_url: default_marketplace_base_url(),
+            auth_mode: default_auth_mode(),
+            cache_enabled: true,
+            cache_ttl_minutes: default_cache_ttl_minutes(),
+            require_audit_before_install: true,
+            require_approval_before_install: true,
+        }
+    }
+}
+
+fn default_marketplace_provider() -> String { "skills.sh".to_string() }
+fn default_marketplace_base_url() -> String { "https://api.skills.sh".to_string() }
+fn default_auth_mode() -> String { "vercel_oidc".to_string() }
+fn default_cache_ttl_minutes() -> u64 { 1440 }

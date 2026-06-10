@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Brain, Star, Sparkles, Check, X, Shield, Activity } from "lucide-react";
+import { Brain, Star, Sparkles, Check, X, Shield, Activity, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function MemoryGalaxyPage() {
@@ -134,6 +134,13 @@ export default function MemoryGalaxyPage() {
                   </span>
                 </div>
                 <p className="text-sm text-zinc-300">{m.summary}</p>
+                {m.type === "skill_candidate" && (
+                   <div className="mt-4 flex">
+                     <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
+                        <Globe className="w-3.5 h-3.5" /> Search Marketplace
+                     </button>
+                   </div>
+                )}
               </div>
             ))}
           </div>

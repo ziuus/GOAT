@@ -25,6 +25,7 @@ pub mod provider;
 pub mod repo_map;
 pub mod runtime;
 pub mod scheduler;
+pub mod skill_marketplace;
 mod skills;
 pub mod studio;
 pub mod subagents;

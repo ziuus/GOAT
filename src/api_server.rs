@@ -97,6 +97,15 @@ pub async fn start_server(
         .route("/v1/studio/agents/create", post(studio_agents_create_handler))
         .route("/v1/studio/workflows/draft", post(studio_workflows_draft_handler))
         .route("/v1/studio/workflows/create", post(studio_workflows_create_handler))
+        .route("/v1/skills/sources", get(skills_sources_handler))
+        .route("/v1/skills/installed", get(skills_installed_handler))
+        .route("/v1/skills/provenance/:name", get(skills_provenance_handler))
+        .route("/v1/skills/remote/search", get(skills_remote_search_handler))
+        .route("/v1/skills/remote/:id", get(skills_remote_detail_handler))
+        .route("/v1/skills/remote/:id/audit", post(skills_remote_audit_handler))
+        .route("/v1/skills/remote/:id/install", post(skills_remote_install_handler))
+        .route("/v1/skills/:name/update", post(skills_update_handler))
+        .route("/v1/skills/:name/uninstall", post(skills_uninstall_handler))
         .layer(cors)
         .with_state(state);
 
@@ -1214,4 +1223,84 @@ async fn studio_workflows_create_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     Ok(Json(json!({ "status": "created" })))
+}
+
+// ── Skills Marketplace Handlers ──────────────────────────────────────────────
+
+async fn skills_sources_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "sources": ["local", "learned", "studio_draft", "remote_marketplace"] })))
+}
+
+async fn skills_installed_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "installed": [] })))
+}
+
+async fn skills_provenance_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "provenance": "local" })))
+}
+
+async fn skills_remote_search_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "results": [] })))
+}
+
+async fn skills_remote_detail_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "name": "dummy_skill" })))
+}
+
+async fn skills_remote_audit_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } })))
+}
+
+async fn skills_remote_install_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "status": "approval_required" })))
+}
+
+async fn skills_update_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "status": "updated" })))
+}
+
+async fn skills_uninstall_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "status": "uninstalled" })))
 }
