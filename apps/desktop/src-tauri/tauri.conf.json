@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/2.0.0/tauri.schema.json",
+  "productName": "GOAT",
+  "version": "0.13.0",
+  "identifier": "com.goat.dev",
+  "build": {
+    "beforeDevCommand": "cd ../dashboard && npm run dev",
+    "beforeBuildCommand": "cd ../dashboard && npm run build",
+    "devUrl": "http://127.0.0.1:3000",
+    "frontendDist": "../../dashboard/out"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "GOAT - Agentic Coding Assistant",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    }
+  }
+}

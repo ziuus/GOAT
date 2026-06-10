@@ -1,0 +1,13 @@
+{
+  "name": "goat-desktop",
+  "version": "0.13.0",
+  "description": "GOAT Desktop App",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

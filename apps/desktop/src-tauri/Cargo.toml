@@ -1,0 +1,20 @@
+[package]
+name = "goat-desktop"
+version = "0.13.0"
+description = "GOAT Desktop App"
+authors = ["you"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri-plugin-shell = "2.0.0"
+dirs = "5.0"
+tauri = { version = "2.0.0", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

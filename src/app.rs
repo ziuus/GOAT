@@ -1999,6 +1999,49 @@ impl App {
                 true
             }
 
+            "/desktop" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                let root = std::env::current_dir().unwrap_or_default();
+                let desktop_dir = root.join("apps").join("desktop");
+
+                if desktop_dir.exists() {
+                    if arg == "path" || arg.is_empty() {
+                        self.push_log(format!("[DESKTOP] Located at: {}", desktop_dir.display()));
+                    } else if arg == "doctor" {
+                        self.push_log(format!("[DESKTOP DOCTOR] Path: {}", desktop_dir.display()));
+                        let pkg_json = desktop_dir.join("package.json");
+                        self.push_log(format!(
+                            "[DESKTOP DOCTOR] package.json: {}",
+                            if pkg_json.exists() {
+                                "Found"
+                            } else {
+                                "Missing"
+                            }
+                        ));
+                        let tauri_conf = desktop_dir.join("src-tauri").join("tauri.conf.json");
+                        self.push_log(format!(
+                            "[DESKTOP DOCTOR] tauri.conf.json: {}",
+                            if tauri_conf.exists() {
+                                "Found"
+                            } else {
+                                "Missing"
+                            }
+                        ));
+                    } else {
+                        self.push_log(format!(
+                            "[DESKTOP] Unknown action '{}'. Use path or doctor.",
+                            arg
+                        ));
+                    }
+                } else {
+                    self.push_log(
+                        "[DESKTOP] Not found. Run `goat desktop` outside TUI to view info."
+                            .to_string(),
+                    );
+                }
+                true
+            }
+
             "/audit" => {
                 let arg = parts.get(1..).unwrap_or(&[]).join(" ");
                 if arg == "recent" || arg.is_empty() {

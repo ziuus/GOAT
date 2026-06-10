@@ -8,6 +8,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.12.0] — Phase 3.4 & 3.5: Checkpoints, Git Branch/Commit, and Safety Hardening (2026-06-09)
 
+## [0.14.0] — Phase 5.0: Tauri Desktop Shell Foundation (2026-06-10)
+
+### Added
+- **Tauri Desktop App (`apps/desktop`)**: Created the native desktop shell wrapper for GOAT.
+- **IPC Commands**: Exposed safe native functions (`get_app_version`, `get_default_api_url`, `get_daemon_status`, `get_daemon_token_path`).
+- **Desktop Settings UI**: The dashboard now detects if it's running inside Tauri (`__TAURI_INTERNALS__`) and displays a "Desktop Mode" badge in the connection settings.
+- **Desktop CLI**: Added `goat desktop [path|doctor|run|dev]` and headless `/desktop` slash command for managing the local desktop shell.
+- **Documentation**: Created `docs/GOAT_TAURI_DESKTOP.md` detailing the architecture, build instructions, and security model.
+
+---
+
 ## [0.13.0] — Phase 3.6: Context-Aware Multi-File Coding + AI Commit Messages
 
 ### Added

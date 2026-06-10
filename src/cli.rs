@@ -223,6 +223,14 @@ pub enum Command {
         action: String,
     },
 
+    /// Manage GOAT Desktop App
+    #[command(name = "desktop")]
+    Desktop {
+        /// Action to perform: run, dev, path, doctor
+        #[arg(default_value = "run")]
+        action: String,
+    },
+
     /// Show project awareness status or scan the current directory.
     #[command(name = "project")]
     Project {
@@ -463,6 +471,11 @@ pub async fn handle_subcommand(
 
         Command::Dashboard { action } => {
             handle_dashboard_command(action);
+            Ok(true)
+        }
+
+        Command::Desktop { action } => {
+            handle_desktop_command(action);
             Ok(true)
         }
 
@@ -2061,6 +2074,63 @@ fn handle_dashboard_command(action: &str) {
         _ => {
             println!(
                 "[DASHBOARD] Unknown action '{}'. Use dev, path, or doctor.",
+                action
+            );
+        }
+    }
+}
+
+fn handle_desktop_command(action: &str) {
+    let root = std::env::current_dir().unwrap_or_default();
+    let desktop_dir = root.join("apps").join("desktop");
+
+    if !desktop_dir.exists() {
+        println!("[DESKTOP] Cannot find apps/desktop/ directory.");
+        return;
+    }
+
+    match action {
+        "path" => {
+            println!("{}", desktop_dir.display());
+        }
+        "doctor" => {
+            println!("[DESKTOP DOCTOR]");
+            println!("  Desktop Path: {}", desktop_dir.display());
+            let pkg_json = desktop_dir.join("package.json");
+            println!(
+                "  package.json: {}",
+                if pkg_json.exists() {
+                    "Found"
+                } else {
+                    "Missing"
+                }
+            );
+            let tauri_conf = desktop_dir.join("src-tauri").join("tauri.conf.json");
+            println!(
+                "  tauri.conf.json: {}",
+                if tauri_conf.exists() {
+                    "Found"
+                } else {
+                    "Missing"
+                }
+            );
+            println!(
+                "  To run the desktop app, navigate to the path, run `npm install`, then `npm run tauri dev`."
+            );
+        }
+        "run" | "dev" => {
+            println!(
+                "[DESKTOP] Desktop app code is at: {}",
+                desktop_dir.display()
+            );
+            println!("  Please run the following in a new terminal:");
+            println!("    cd {}", desktop_dir.display());
+            println!("    npm install");
+            println!("    npm run dev");
+        }
+        _ => {
+            println!(
+                "[DESKTOP] Unknown action '{}'. Use dev, run, path, or doctor.",
                 action
             );
         }

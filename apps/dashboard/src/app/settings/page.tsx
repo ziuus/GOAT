@@ -10,9 +10,15 @@ export default function SettingsPage() {
   const [token, setToken] = useState('');
   const [status, setStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isDesktop, setIsDesktop] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    // Check if running in Tauri
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      setIsDesktop(true);
+    }
+    
     const conf = getGoatConfig();
     if (conf) {
       setUrl(conf.baseUrl);
@@ -52,6 +58,11 @@ export default function SettingsPage() {
           <p className="text-muted-foreground">Connect dashboard to your local GOAT Daemon.</p>
         </div>
         <div className="flex flex-col items-end gap-2">
+          {isDesktop && (
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full text-xs font-medium">
+              Desktop Mode
+            </span>
+          )}
           <span className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded-full text-xs font-medium">
             <Shield className="w-3.5 h-3.5" />
             Local Daemon Only
