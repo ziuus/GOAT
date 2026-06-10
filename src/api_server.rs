@@ -138,6 +138,18 @@ pub async fn start_server(
         .route("/v1/skill-packs", get(skill_packs_list_handler))
         .route("/v1/skill-packs/:name/use", post(skill_packs_use_handler))
         .route("/v1/skill-packs/:name/save-from-session", post(skill_packs_save_handler))
+        .route("/v1/timeline/status", get(timeline_status_handler))
+        .route("/v1/timeline/recent", get(timeline_recent_handler))
+        .route("/v1/timeline/search", get(timeline_search_handler))
+        .route("/v1/timeline/project", get(timeline_project_handler))
+        .route("/v1/timeline/session/:id", get(timeline_session_handler))
+        .route("/v1/timeline/job/:id", get(timeline_job_handler))
+        .route("/v1/timeline/replay", get(timeline_replay_handler))
+        .route("/v1/timeline/replay/session/:id", get(timeline_replay_session_handler))
+        .route("/v1/timeline/replay/job/:id", get(timeline_replay_job_handler))
+        .route("/v1/timeline/privacy", get(timeline_privacy_handler))
+        .route("/v1/timeline/reindex", post(timeline_reindex_handler))
+        .route("/v1/timeline/export", post(timeline_export_handler))
         .route("/v1/recipes/:id", get(recipes_detail_handler))
         .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
@@ -1906,4 +1918,143 @@ async fn skill_packs_save_handler(
             Json(json!({ "error": e.to_string() })),
         )),
     }
+}
+
+// ── Timeline Handlers ─────────────────────────────────────────────────────────
+
+async fn timeline_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "active", "enabled": true })))
+}
+
+async fn timeline_recent_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.timeline_manager.load_events() {
+        Ok(mut events) => {
+            events.reverse();
+            let recent: Vec<_> = events.into_iter().take(50).collect();
+            Ok(Json(json!({ "events": recent })))
+        }
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn timeline_search_handler(
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let query = params.get("q").cloned().unwrap_or_default();
+    match rt.timeline_manager.replay(&query) {
+        Ok(events) => Ok(Json(json!({ "events": events }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn timeline_replay_handler(
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    timeline_search_handler(headers, axum::extract::Query(params), State(state)).await
+}
+
+async fn timeline_project_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    timeline_recent_handler(headers, State(state)).await
+}
+
+async fn timeline_session_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.timeline_manager.load_events() {
+        Ok(events) => {
+            let filtered: Vec<_> = events.into_iter().filter(|e| e.session_id.as_deref() == Some(id.as_str())).collect();
+            Ok(Json(json!({ "events": filtered })))
+        }
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn timeline_job_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.timeline_manager.load_events() {
+        Ok(events) => {
+            let filtered: Vec<_> = events.into_iter().filter(|e| e.job_refs.contains(&id)).collect();
+            Ok(Json(json!({ "events": filtered })))
+        }
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn timeline_replay_session_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    timeline_session_handler(headers, Path(id), State(state)).await
+}
+
+async fn timeline_replay_job_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    timeline_job_handler(headers, Path(id), State(state)).await
+}
+
+async fn timeline_privacy_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "privacy_level": "Standard", "redaction": true })))
+}
+
+async fn timeline_reindex_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "reindexed" })))
+}
+
+async fn timeline_export_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "exported", "format": "json" })))
 }

@@ -38,6 +38,13 @@ impl QuickAccessParser {
                 match cmd {
                     "recall" => format!("/recall {}", args),
                     "search" => format!("/brain search {}", args),
+                    "timeline" | "recent" | "today" | "yesterday" | "replay" | "history" | "what-did-we-do" => {
+                        if args.is_empty() {
+                            format!("/timeline {}", cmd)
+                        } else {
+                            format!("/timeline {} {}", cmd, args)
+                        }
+                    }
                     _ => format!("/recall {}", rest)
                 }
             }
@@ -69,6 +76,7 @@ impl QuickAccessParser {
                     "session" => format!("/session {}", args),
                     "context" => format!("/context {}", args),
                     "quota" => format!("/quota {}", args),
+                    "history" | "timeline" => format!("/timeline {}", args),
                     _ => format!("/session {}", rest)
                 }
             }

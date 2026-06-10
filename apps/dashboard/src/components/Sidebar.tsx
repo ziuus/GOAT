@@ -16,6 +16,7 @@ const navItems = [
   { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
   { name: 'Memory Galaxy', href: '/memory', icon: Sparkles },
   { name: 'Brain Search', href: '/brain', icon: BrainCircuit },
+  { name: 'Timeline', href: '/timeline', icon: Calendar },
   { name: 'Audit Log', href: '/audit', icon: FileText },
   { name: 'Jobs', href: '/jobs', icon: TerminalSquare },
   { name: 'Schedule', href: '/schedule', icon: Calendar },

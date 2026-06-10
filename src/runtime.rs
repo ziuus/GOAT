@@ -52,6 +52,8 @@ pub struct GoatRuntime {
     
     /// Skill Researcher for the session
     pub skill_researcher: crate::skill_researcher::SkillResearcher,
+    /// Timeline Manager for the session
+    pub timeline_manager: crate::timeline::TimelineManager,
     /// Whether this session was resumed from the brain (true) or is fresh (false).
     pub session_resumed: bool,
     /// Whether brain (SQLite) is disabled via `--no-brain`.
@@ -265,6 +267,7 @@ impl GoatRuntime {
             startup_warnings,
             session_id: session_id.clone(),
             skill_researcher: crate::skill_researcher::SkillResearcher::new(session_id.clone()),
+            timeline_manager: crate::timeline::TimelineManager::new(&paths.data_dir),
             session_resumed,
             brain_disabled: no_brain,
             brain,
