@@ -68,6 +68,8 @@ pub struct GoatRuntime {
     pub approval_gate: ApprovalGate,
     /// MCP server manager.
     pub mcp_manager: McpManager,
+    /// MCP runtime state manager (Phase 3.8).
+    pub mcp_runtime: crate::mcp_runtime::McpRuntimeManager,
 
     /// Conversation history (sent to LLM each turn).
     pub history: Vec<Message>,
@@ -247,7 +249,7 @@ impl GoatRuntime {
             subagent_manager: crate::subagents::SubagentManager::new(paths.clone()),
             external_agent_manager,
             paths,
-            config,
+            config: config.clone(),
             startup_warnings,
             session_id,
             session_resumed,
@@ -258,6 +260,11 @@ impl GoatRuntime {
             swarm_router: SwarmRouter::default(),
             approval_gate: ApprovalGate::new(),
             mcp_manager: McpManager::new(),
+            mcp_runtime: {
+                let mut mgr = crate::mcp_runtime::McpRuntimeManager::new();
+                mgr.init_from_config(&config);
+                mgr
+            },
             history,
             provider_label,
             active_profile,
@@ -271,6 +278,46 @@ impl GoatRuntime {
         (runtime, boot_log)
     }
 
+    pub fn sync_mcp_tools(&mut self) {
+        for (srv_name, server) in self.mcp_manager.running_servers_metadata() {
+            if let Some(mrs) = self.mcp_runtime.get_mut(&srv_name) {
+                mrs.state = crate::mcp_runtime::McpServerState::Running;
+                mrs.pid = server.client.pid();
+                if mrs.started_at.is_none() {
+                    mrs.started_at = Some(std::time::SystemTime::now());
+                }
+                mrs.discovered_tools = server.tools.clone();
+            }
+
+            for tool in &server.tools {
+                if let (Some(name), Some(desc)) = (tool.get("name").and_then(|v| v.as_str()), tool.get("description").and_then(|v| v.as_str())) {
+                    self.tool_registry.register(crate::tool_registry::ToolMetadata {
+                        name: format!("{}_{}", srv_name, name),
+                        description: format!("[MCP: {}] {}", srv_name, desc),
+                        category: crate::tool_registry::ToolCategory::Mcp,
+                        risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
+                        requires_approval: true,
+                        read_only: false,
+                        available_in_tui: true,
+                        available_in_headless: true,
+                        available_in_agent: true,
+                        permission_group: "mcp".to_string(),
+                    });
+                }
+            }
+        }
+
+        // Handle stopped servers
+        let running_names = self.mcp_manager.running_servers();
+        for mut mrs in self.mcp_runtime.list_all_mut() {
+            if !running_names.contains(&mrs.name) {
+                if mrs.state == crate::mcp_runtime::McpServerState::Running {
+                    mrs.state = crate::mcp_runtime::McpServerState::Stopped;
+                    mrs.pid = None;
+                }
+            }
+        }
+    }
     // ── Runtime mutations ─────────────────────────────────────────────────────
 
     /// Switch to a different profile at runtime.

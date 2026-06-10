@@ -161,6 +161,7 @@ pub struct App {
     pub checkpoint_manager: crate::checkpoint::CheckpointManager,
     /// Selected file context for AI prompting (Phase 3.6)
     pub selected_files: Vec<String>,
+    pub mcp_runtime: crate::mcp_runtime::McpRuntimeManager,
 }
 
 impl App {
@@ -224,6 +225,7 @@ impl App {
             brain: rt.brain,
             llm_router: rt.llm_router,
             mcp_manager: rt.mcp_manager,
+            mcp_runtime: rt.mcp_runtime,
             history: rt.history,
             config: rt.config,
             swarm_router: rt.swarm_router,
@@ -256,11 +258,31 @@ impl App {
         }
     }
 
-    /// Create a new `App` directly from config + paths.
     pub fn new(config: Config, paths: GoatPaths, startup_warnings: Vec<String>) -> Self {
         let (runtime, boot_log) =
             GoatRuntime::bootstrap(config, paths, startup_warnings, false, None);
         Self::from_runtime(runtime, boot_log)
+    }
+
+    pub fn sync_mcp_tools(&mut self) {
+        for (srv_name, server) in self.mcp_manager.running_servers_metadata() {
+            for tool in &server.tools {
+                if let (Some(name), Some(desc)) = (tool.get("name").and_then(|v| v.as_str()), tool.get("description").and_then(|v| v.as_str())) {
+                    self.tool_registry.register(crate::tool_registry::ToolMetadata {
+                        name: format!("{}_{}", srv_name, name),
+                        description: format!("[MCP: {}] {}", srv_name, desc),
+                        category: crate::tool_registry::ToolCategory::Mcp,
+                        risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
+                        requires_approval: true,
+                        read_only: false,
+                        available_in_tui: true,
+                        available_in_headless: true,
+                        available_in_agent: true,
+                        permission_group: "mcp".to_string(),
+                    });
+                }
+            }
+        }
     }
 
     pub fn quit(&mut self) {
@@ -491,8 +513,58 @@ impl App {
                         }
                     }
                 }
+                let tool_result = if deferred.name == "mcp_start" {
+                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    if let Some(config) = self.config.mcp_servers.get(srv_name).cloned() {
+                        let logs = self.mcp_manager.start_server(srv_name, &config).await;
+                        for log in &logs { self.push_log(log.clone()); }
+                        if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
+                            mrs.state = crate::mcp_runtime::McpServerState::Running;
+                        }
+                        self.sync_mcp_tools();
+                        format!("MCP Server '{}' started.", srv_name)
+                    } else {
+                        "Server not found.".to_string()
+                    }
+                } else if deferred.name == "mcp_restart" {
+                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    if let Some(config) = self.config.mcp_servers.get(srv_name).cloned() {
+                        let mut logs = Vec::new();
+                        if self.mcp_manager.running_servers().contains(&srv_name.to_string()) {
+                            logs.extend(self.mcp_manager.stop_server(srv_name).await);
+                        }
+                        logs.extend(self.mcp_manager.start_server(srv_name, &config).await);
+                        for log in &logs { self.push_log(log.clone()); }
+                        if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
+                            mrs.state = crate::mcp_runtime::McpServerState::Running;
+                        }
+                        self.sync_mcp_tools();
+                        format!("MCP Server '{}' restarted.", srv_name)
+                    } else {
+                        "Server not found.".to_string()
+                    }
+                } else if deferred.name == "mcp_stop" {
+                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let logs = self.mcp_manager.stop_server(srv_name).await;
+                    for log in &logs { self.push_log(log.clone()); }
+                    if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
+                        mrs.state = crate::mcp_runtime::McpServerState::Stopped;
+                    }
+                    format!("MCP Server '{}' stopped.", srv_name)
+                } else {
+                    if let Some(native_result) = crate::tools::NativeTools::execute(&deferred.name, deferred.args.clone()).await {
+                        match native_result {
+                            Ok(res) => res,
+                            Err(e) => format!("Tool error: {}", e),
+                        }
+                    } else {
+                        match self.mcp_manager.call_tool(&deferred.name, deferred.args.clone()).await {
+                            Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
+                            Err(e) => format!("MCP tool error: {}", e),
+                        }
+                    }
+                };
 
-                let tool_result = execute_native_tool(&deferred.name, deferred.args.clone()).await;
 
                 if let Some(id) = &deferred.patch_id {
                     if let Some(p) = self.workflow.get_patch_mut(id) {
@@ -504,6 +576,15 @@ impl App {
                 }
 
                 self.push_log(format!("[TOOL] {}", tool_result));
+
+                self.tool_registry.log_execution(
+                    &self.paths,
+                    &self.session_id,
+                    &deferred.name,
+                    &crate::tool_registry::ToolAction::Allow, // Approved
+                    true,
+                    &tool_result,
+                );
 
                 self.history.push(Message {
                     role: "tool".to_string(),
@@ -784,10 +865,12 @@ impl App {
                 let subcommand = parts.get(0).copied().unwrap_or("status");
                 match subcommand {
                     "status" | "" => {
-                        self.push_log("[MCP] Status (Phase 3.7 Foundation)".to_string());
+                        self.push_log("[MCP] Status".to_string());
                         let enabled_count = self.config.mcp_servers.values().filter(|s| s.enabled).count();
                         self.push_log(format!("[MCP] Configured servers: {}", self.config.mcp_servers.len()));
                         self.push_log(format!("[MCP] Enabled servers: {}", enabled_count));
+                        let running = self.mcp_manager.running_servers();
+                        self.push_log(format!("[MCP] Running servers: {}", running.len()));
                     }
                     "list" => {
                         if self.config.mcp_servers.is_empty() {
@@ -796,7 +879,12 @@ impl App {
                             self.push_log("[MCP] Configured MCP Servers:".to_string());
                             let srvs: Vec<_> = self.config.mcp_servers.iter().map(|(n, s)| (n.clone(), s.enabled, s.risk.clone())).collect();
                             for (name, enabled, risk) in srvs {
-                                self.push_log(format!("[MCP] - {} (Enabled: {}, Risk: {})", name, enabled, risk));
+                                let state = if let Some(mrs) = self.mcp_runtime.get(&name) {
+                                    mrs.state.to_string()
+                                } else {
+                                    "Unknown".to_string()
+                                };
+                                self.push_log(format!("[MCP] - {} (Enabled: {}, Risk: {}, State: {})", name, enabled, risk, state));
                             }
                         }
                     }
@@ -808,6 +896,18 @@ impl App {
                             self.push_log(format!("[MCP] Enabled: {}", srv.enabled));
                             self.push_log(format!("[MCP] Transport: {}", srv.transport));
                             self.push_log(format!("[MCP] Risk Policy: {}", srv.risk));
+                            if let Some(mrs) = self.mcp_runtime.get(name).cloned() {
+                                self.push_log(format!("[MCP] State: {}", mrs.state));
+                                if let Some(pid) = mrs.pid {
+                                    self.push_log(format!("[MCP] PID: {}", pid));
+                                }
+                                if let Some(start) = mrs.started_at {
+                                    self.push_log(format!("[MCP] Started At: {:?}", start));
+                                }
+                                if !mrs.discovered_tools.is_empty() {
+                                    self.push_log(format!("[MCP] Discovered Tools: {}", mrs.discovered_tools.len()));
+                                }
+                            }
                             self.push_log(format!("[MCP] Command: {} {:?}", srv.command, srv.args));
                         } else {
                             self.push_log(format!("[MCP] Server '{}' not found.", name));
@@ -816,8 +916,96 @@ impl App {
                     "doctor" => {
                         self.push_log(format!("[MCP] Doctor: {} configured servers.", self.config.mcp_servers.len()));
                     }
-                    "start" | "stop" | "restart" => {
-                        self.push_log(format!("[MCP] Lifecycle action '{}' is planned/partial for Phase 3.8.", subcommand));
+                    "start" => {
+                        let name = parts.get(1).copied().unwrap_or("");
+                        if let Some(srv_config) = self.config.mcp_servers.get(name).cloned() {
+                            if !srv_config.enabled {
+                                self.push_log(format!("[MCP] Server '{}' is disabled in config. Refusing to start.", name));
+                            } else {
+                                use crate::approval::{ApprovalRequest, RiskLevel};
+                                let req = ApprovalRequest {
+                                    tool_name: "mcp_start".to_string(),
+                                    action_summary: format!("Start MCP server '{}': {} {:?}", name, srv_config.command, srv_config.args),
+                                    risk_level: RiskLevel::High,
+                                    explanation: None,
+                                    working_directory: None,
+                                };
+                                self.pending_approval = Some(DeferredToolCall {
+                                    id: "manual".to_string(),
+                                    name: "mcp_start".to_string(),
+                                    args: serde_json::json!({"name": name}),
+                                    request: req,
+                                    patch_id: None,
+                                });
+                                self.push_log(format!("[MCP] Starting server '{}' requires approval.", name));
+                            }
+                        } else {
+                            self.push_log(format!("[MCP] Server '{}' not found in config.", name));
+                        }
+                    }
+                    "stop" => {
+                        let name = parts.get(1).copied().unwrap_or("");
+                        if self.mcp_manager.running_servers().contains(&name.to_string()) {
+                            self.push_log(format!("[MCP] Stopping server '{}'...", name));
+                            // In app.rs we need to await this.
+                            // However, handle_slash_command is async now! Let's verify... wait, handle_slash_command is async!
+                            // So we can await here!
+                            // wait, let me check if app.rs `handle_slash_command` is `pub async fn handle_slash_command`
+                            // Yes, in app.rs line 555 it is `pub async fn handle_slash_command(&mut self, cmd: &str) -> bool`
+                            // Oh, wait! The compiler might complain about `&mut self` if we call `self.mcp_manager.stop_server(name).await;`
+                            // We can just set up deferred action for stop too if we don't want to deal with mutable borrows.
+                            // Actually, I can just `stop_server` without approval.
+                            // Let's use `DeferredToolCall` anyway to ensure it runs correctly, or maybe we can't because there is no `mcp_stop` there.
+                            // Wait! Let me just add `mcp_stop` to the deferred action list.
+                            use crate::approval::{ApprovalRequest, RiskLevel};
+                            let req = ApprovalRequest {
+                                tool_name: "mcp_stop".to_string(),
+                                action_summary: format!("Stop MCP server '{}'", name),
+                                risk_level: RiskLevel::Low, // Stop is safe
+                                explanation: None,
+                                working_directory: None,
+                            };
+                            self.pending_approval = Some(DeferredToolCall {
+                                id: "manual".to_string(),
+                                name: "mcp_stop".to_string(),
+                                args: serde_json::json!({"name": name}),
+                                request: req,
+                                patch_id: None,
+                            });
+                            self.push_log(format!("[MCP] Stopping server '{}' requires confirmation.", name));
+                        } else {
+                            self.push_log(format!("[MCP] Server '{}' is not running.", name));
+                        }
+                    }
+                    "restart" => {
+                        let name = parts.get(1).copied().unwrap_or("");
+                        if let Some(srv_config) = self.config.mcp_servers.get(name).cloned() {
+                            use crate::approval::{ApprovalRequest, RiskLevel};
+                            let req = ApprovalRequest {
+                                tool_name: "mcp_restart".to_string(),
+                                action_summary: format!("Restart MCP server '{}'", name),
+                                risk_level: RiskLevel::High,
+                                explanation: None,
+                                working_directory: None,
+                            };
+                            self.pending_approval = Some(DeferredToolCall {
+                                id: "manual".to_string(),
+                                name: "mcp_restart".to_string(),
+                                args: serde_json::json!({"name": name}),
+                                request: req,
+                                patch_id: None,
+                            });
+                            self.push_log(format!("[MCP] Restarting server '{}' requires approval.", name));
+                        } else {
+                            self.push_log(format!("[MCP] Server '{}' not found in config.", name));
+                        }
+                    }
+                    "tools" => {
+                        let name = parts.get(1).copied().unwrap_or("");
+                        self.push_log(format!("[MCP] Server '{}' tools (placeholder).", name));
+                    }
+                    "call" => {
+                        self.push_log("[MCP] Tool call execution is partial; lifecycle and discovery are available.".to_string());
                     }
                     _ => self.push_log(
                         "[MCP] Unknown command. Use /mcp status, list, show, start, stop, restart, doctor.".to_string(),
@@ -3055,7 +3243,7 @@ impl App {
                                 }
 
                                 let approval_request =
-                                    build_approval_request(&tc.function.name, &args);
+                                    build_approval_request(&tc.function.name, &args, &tool_action);
 
                                 if let Some(req) = approval_request {
                                     match self.approval_gate.check_policy(&req) {
@@ -3206,8 +3394,8 @@ impl App {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalRequest> {
-    match tool_name {
+fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::tool_registry::ToolAction) -> Option<ApprovalRequest> {
+    let req = match tool_name {
         "bash" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
             Some(bash_approval_request(command))
@@ -3254,6 +3442,18 @@ fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalReque
             Some(call_subagent_approval_request(agent_cli, prompt))
         }
         _ => None,
+    };
+
+    if req.is_none() && matches!(tool_action, crate::tool_registry::ToolAction::Ask(_)) {
+        Some(ApprovalRequest {
+            tool_name: tool_name.to_string(),
+            action_summary: format!("Execute tool '{}'", tool_name),
+            risk_level: crate::approval::RiskLevel::High,
+            explanation: Some(format!("Arguments: {}", serde_json::to_string_pretty(args).unwrap_or_default())),
+            working_directory: None,
+        })
+    } else {
+        req
     }
 }
 

@@ -496,10 +496,12 @@ async fn handle_slash_command(
             let subcommand = parts.get(1).copied().unwrap_or("status");
             match subcommand {
                 "status" => {
-                    println!("[MCP] Status (Phase 3.7 Foundation)");
+                    println!("[MCP] Status");
                     let enabled_count = rt.config.mcp_servers.values().filter(|s| s.enabled).count();
                     println!("[MCP] Configured servers: {}", rt.config.mcp_servers.len());
                     println!("[MCP] Enabled servers: {}", enabled_count);
+                    let running = rt.mcp_manager.running_servers();
+                    println!("[MCP] Running servers: {}", running.len());
                 }
                 "list" => {
                     if rt.config.mcp_servers.is_empty() {
@@ -507,7 +509,12 @@ async fn handle_slash_command(
                     } else {
                         println!("[MCP] Configured MCP Servers:");
                         for (name, srv) in &rt.config.mcp_servers {
-                            println!("[MCP] - {} (Enabled: {}, Risk: {})", name, srv.enabled, srv.risk);
+                            let state = if let Some(mrs) = rt.mcp_runtime.get(name) {
+                                mrs.state.to_string()
+                            } else {
+                                "Unknown".to_string()
+                            };
+                            println!("[MCP] - {} (Enabled: {}, Risk: {}, State: {})", name, srv.enabled, srv.risk, state);
                         }
                     }
                 }
@@ -518,13 +525,136 @@ async fn handle_slash_command(
                         println!("[MCP] Enabled: {}", srv.enabled);
                         println!("[MCP] Transport: {}", srv.transport);
                         println!("[MCP] Risk Policy: {}", srv.risk);
+                        if let Some(mrs) = rt.mcp_runtime.get(name) {
+                            println!("[MCP] State: {}", mrs.state);
+                            if let Some(pid) = mrs.pid {
+                                println!("[MCP] PID: {}", pid);
+                            }
+                            if let Some(start) = mrs.started_at {
+                                println!("[MCP] Started At: {:?}", start);
+                            }
+                            if !mrs.discovered_tools.is_empty() {
+                                println!("[MCP] Discovered Tools: {}", mrs.discovered_tools.len());
+                            }
+                        }
                         println!("[MCP] Command: {} {:?}", srv.command, srv.args);
                     } else {
                         println!("[MCP] Server '{}' not found.", name);
                     }
                 }
-                "start" | "stop" | "restart" => {
-                    println!("[MCP] Lifecycle action '{}' is planned/partial for Phase 3.8.", subcommand);
+                "start" => {
+                    let name = parts.get(2).copied().unwrap_or("");
+                    if let Some(srv_config) = rt.config.mcp_servers.get(name).cloned() {
+                        if !srv_config.enabled {
+                            println!("[MCP] Server '{}' is disabled in config. Refusing to start.", name);
+                        } else {
+                            use crate::approval::{ApprovalRequest, RiskLevel};
+                            let req = ApprovalRequest {
+                                tool_name: "mcp_start".to_string(),
+                                action_summary: format!("Start MCP server '{}': {} {:?}", name, srv_config.command, srv_config.args),
+                                risk_level: RiskLevel::High,
+                                explanation: None,
+                                working_directory: None,
+                            };
+                            let decision = prompt_approval_stdin(&req, &mut rt.approval_gate);
+                            if let crate::approval::ApprovalDecision::Approved = decision {
+                                println!("[MCP] Starting server '{}'...", name);
+                                let logs = rt.mcp_manager.start_server(name, &srv_config).await;
+                                for log in &logs {
+                                    println!("{}", log);
+                                }
+                                if let Some(mrs) = rt.mcp_runtime.get_mut(name) {
+                                    mrs.state = crate::mcp_runtime::McpServerState::Running;
+                                }
+                                rt.sync_mcp_tools();
+                                rt.tool_registry.log_execution(
+                                    &rt.paths,
+                                    &rt.session_id,
+                                    "mcp_start",
+                                    &crate::tool_registry::ToolAction::Allow,
+                                    true,
+                                    &logs.join("\n"),
+                                );
+                            } else {
+                                println!("[MCP] Start request for '{}' denied.", name);
+                            }
+                        }
+                    } else {
+                        println!("[MCP] Server '{}' not found in config.", name);
+                    }
+                }
+                "stop" => {
+                    let name = parts.get(2).copied().unwrap_or("");
+                    if rt.mcp_manager.running_servers().contains(&name.to_string()) {
+                        println!("[MCP] Stopping server '{}'...", name);
+                        let logs = rt.mcp_manager.stop_server(name).await;
+                        for log in &logs {
+                            println!("{}", log);
+                        }
+                        if let Some(mrs) = rt.mcp_runtime.get_mut(name) {
+                            mrs.state = crate::mcp_runtime::McpServerState::Stopped;
+                        }
+                        rt.tool_registry.log_execution(
+                            &rt.paths,
+                            &rt.session_id,
+                            "mcp_stop",
+                            &crate::tool_registry::ToolAction::Allow,
+                            true,
+                            &logs.join("\n"),
+                        );
+                    } else {
+                        println!("[MCP] Server '{}' is not running.", name);
+                    }
+                }
+                "restart" => {
+                    let name = parts.get(2).copied().unwrap_or("");
+                    if let Some(srv_config) = rt.config.mcp_servers.get(name).cloned() {
+                        use crate::approval::{ApprovalRequest, RiskLevel};
+                        let req = ApprovalRequest {
+                            tool_name: "mcp_restart".to_string(),
+                            action_summary: format!("Restart MCP server '{}'", name),
+                            risk_level: RiskLevel::High,
+                            explanation: None,
+                            working_directory: None,
+                        };
+                        let decision = prompt_approval_stdin(&req, &mut rt.approval_gate);
+                        if let crate::approval::ApprovalDecision::Approved = decision {
+                            println!("[MCP] Restarting server '{}'...", name);
+                            let mut all_logs = Vec::new();
+                            if rt.mcp_manager.running_servers().contains(&name.to_string()) {
+                                let stop_logs = rt.mcp_manager.stop_server(name).await;
+                                for log in &stop_logs { println!("{}", log); }
+                                all_logs.extend(stop_logs);
+                            }
+                            let start_logs = rt.mcp_manager.start_server(name, &srv_config).await;
+                            for log in &start_logs { println!("{}", log); }
+                            all_logs.extend(start_logs);
+                            if let Some(mrs) = rt.mcp_runtime.get_mut(name) {
+                                mrs.state = crate::mcp_runtime::McpServerState::Running;
+                            }
+                            rt.sync_mcp_tools();
+                            rt.tool_registry.log_execution(
+                                &rt.paths,
+                                &rt.session_id,
+                                "mcp_restart",
+                                &crate::tool_registry::ToolAction::Allow,
+                                true,
+                                &all_logs.join("\n"),
+                            );
+                        } else {
+                            println!("[MCP] Restart request for '{}' denied.", name);
+                        }
+                    } else {
+                        println!("[MCP] Server '{}' not found in config.", name);
+                    }
+                }
+                "tools" => {
+                    let name = parts.get(2).copied().unwrap_or("");
+                    // TODO tool listing for server
+                    println!("[MCP] Server '{}' tools (placeholder).", name);
+                }
+                "call" => {
+                    println!("[MCP] Tool call execution is partial; lifecycle and discovery are available.");
                 }
                 "doctor" => {
                     println!("[MCP] Doctor: {} configured servers.", rt.config.mcp_servers.len());
@@ -1663,7 +1793,7 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                 continue;
                             }
 
-                            let approval_req = build_approval_request(&tc.function.name, &args);
+                            let approval_req = build_approval_request(&tc.function.name, &args, &tool_action);
 
                             if let Some(req) = approval_req {
                                 // Check session policy first.
@@ -1674,7 +1804,7 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             tc.function.name
                                         );
                                         let result =
-                                            execute_native_tool(&tc.function.name, args).await;
+                                            execute_tool(rt, &tc.function.name, args).await;
                                         if let Some(id) = &patch_id {
                                             if let Some(p) = rt.workflow.get_patch_mut(id) {
                                                 p.status = crate::task::PatchStatus::Applied;
@@ -1745,8 +1875,7 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                     tc.function.name
                                                 );
                                                 let result =
-                                                    execute_native_tool(&tc.function.name, args)
-                                                        .await;
+                                                    execute_tool(rt, &tc.function.name, args).await;
                                                 if let Some(id) = &patch_id {
                                                     if let Some(p) = rt.workflow.get_patch_mut(id) {
                                                         p.status =
@@ -1887,9 +2016,9 @@ fn prompt_approval_stdin(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalRequest> {
+fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::tool_registry::ToolAction) -> Option<ApprovalRequest> {
     use crate::approval::{ApprovalRequest, bash_approval_request, call_subagent_approval_request};
-    match tool_name {
+    let req = match tool_name {
         "bash" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
             Some(bash_approval_request(command))
@@ -1936,14 +2065,32 @@ fn build_approval_request(tool_name: &str, args: &Value) -> Option<ApprovalReque
             Some(call_subagent_approval_request(agent_cli, prompt))
         }
         _ => None,
+    };
+
+    if req.is_none() && matches!(tool_action, crate::tool_registry::ToolAction::Ask(_)) {
+        Some(ApprovalRequest {
+            tool_name: tool_name.to_string(),
+            action_summary: format!("Execute tool '{}'", tool_name),
+            risk_level: crate::approval::RiskLevel::High,
+            explanation: Some(format!("Arguments: {}", serde_json::to_string_pretty(args).unwrap_or_default())),
+            working_directory: None,
+        })
+    } else {
+        req
     }
 }
 
-async fn execute_native_tool(name: &str, args: Value) -> String {
-    match NativeTools::execute(name, args).await {
-        Some(Ok(result)) => result,
-        Some(Err(e)) => format!("Tool error: {}", e),
-        None => format!("Unknown tool: {}", name),
+async fn execute_tool(rt: &mut crate::runtime::GoatRuntime, name: &str, args: Value) -> String {
+    if let Some(native_result) = NativeTools::execute(name, args.clone()).await {
+        match native_result {
+            Ok(result) => result,
+            Err(e) => format!("Tool error: {}", e),
+        }
+    } else {
+        match rt.mcp_manager.call_tool(name, args).await {
+            Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
+            Err(e) => format!("MCP tool error: {}", e),
+        }
     }
 }
 

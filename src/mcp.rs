@@ -81,6 +81,10 @@ impl McpClient {
         matches!(self.child.try_wait(), Ok(None))
     }
 
+    pub fn pid(&self) -> Option<u32> {
+        self.child.id()
+    }
+
     pub async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.is_running() {
             self.child.kill().await?;
@@ -167,6 +171,76 @@ impl McpManager {
         Self::default()
     }
 
+    pub fn running_servers_metadata(&self) -> Vec<(String, &ManagedMcpServer)> {
+        self.servers.iter().map(|(k, v)| (k.clone(), v)).collect()
+    }
+
+    pub async fn start_server(&mut self, name: &str, config: &McpServerConfig) -> Vec<String> {
+        let mut logs = Vec::new();
+        if self.servers.contains_key(name) {
+            logs.push(format!("[MCP] Server '{name}' already running."));
+            return logs;
+        }
+
+        match McpClient::spawn_with_env(
+            &config.command,
+            &config.args.iter().map(String::as_str).collect::<Vec<_>>(),
+            &config.env,
+        )
+        .await
+        {
+            Ok(mut client) => match client.initialize().await {
+                Ok(_) => match client.list_tools().await {
+                    Ok(tool_payload) => {
+                        let tools = tool_payload
+                            .get("tools")
+                            .and_then(Value::as_array)
+                            .cloned()
+                            .unwrap_or_default();
+
+                        for tool in &tools {
+                            if let Some(tool_name) = tool.get("name").and_then(Value::as_str) {
+                                self.tool_index
+                                    .insert(tool_name.to_string(), name.to_string());
+                            }
+                        }
+
+                        self.servers
+                            .insert(name.to_string(), ManagedMcpServer { client, tools });
+                        logs.push(format!("[MCP] Server '{name}' started."));
+                    }
+                    Err(err) => logs.push(format!(
+                        "[MCP ERROR] Server '{name}' tool listing failed: {err}"
+                    )),
+                },
+                Err(err) => logs.push(format!(
+                    "[MCP ERROR] Server '{name}' initialize failed: {err}"
+                )),
+            },
+            Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' spawn failed: {err}")),
+        }
+        logs
+    }
+
+    pub async fn stop_server(&mut self, name: &str) -> Vec<String> {
+        let mut logs = Vec::new();
+        if let Some(mut server) = self.servers.remove(name) {
+            for tool in &server.tools {
+                if let Some(tool_name) = tool.get("name").and_then(Value::as_str) {
+                    self.tool_index.remove(tool_name);
+                }
+            }
+            match timeout(MCP_SHUTDOWN_TIMEOUT, server.client.shutdown()).await {
+                Ok(Ok(())) => logs.push(format!("[MCP] Server '{name}' stopped.")),
+                Ok(Err(err)) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+                Err(_) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown timed out.")),
+            }
+        } else {
+            logs.push(format!("[MCP] Server '{name}' is not running."));
+        }
+        logs
+    }
+
     pub async fn start_configured(
         &mut self,
         configs: &HashMap<String, McpServerConfig>,
@@ -174,48 +248,7 @@ impl McpManager {
         let mut logs = Vec::new();
 
         for (name, config) in configs {
-            if self.servers.contains_key(name) {
-                logs.push(format!("[MCP] Server '{name}' already running."));
-                continue;
-            }
-
-            match McpClient::spawn_with_env(
-                &config.command,
-                &config.args.iter().map(String::as_str).collect::<Vec<_>>(),
-                &config.env,
-            )
-            .await
-            {
-                Ok(mut client) => match client.initialize().await {
-                    Ok(_) => match client.list_tools().await {
-                        Ok(tool_payload) => {
-                            let tools = tool_payload
-                                .get("tools")
-                                .and_then(Value::as_array)
-                                .cloned()
-                                .unwrap_or_default();
-
-                            for tool in &tools {
-                                if let Some(tool_name) = tool.get("name").and_then(Value::as_str) {
-                                    self.tool_index
-                                        .insert(tool_name.to_string(), name.to_string());
-                                }
-                            }
-
-                            self.servers
-                                .insert(name.to_string(), ManagedMcpServer { client, tools });
-                            logs.push(format!("[MCP] Server '{name}' started."));
-                        }
-                        Err(err) => logs.push(format!(
-                            "[MCP ERROR] Server '{name}' tool listing failed: {err}"
-                        )),
-                    },
-                    Err(err) => logs.push(format!(
-                        "[MCP ERROR] Server '{name}' initialize failed: {err}"
-                    )),
-                },
-                Err(err) => logs.push(format!("[MCP ERROR] Server '{name}' spawn failed: {err}")),
-            }
+            logs.extend(self.start_server(name, config).await);
         }
 
         if configs.is_empty() {

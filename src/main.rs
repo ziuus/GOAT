@@ -10,6 +10,7 @@ pub mod external_agents;
 pub mod headless;
 pub mod llm;
 pub mod mcp;
+pub mod mcp_runtime;
 pub mod memory;
 pub mod models;
 pub mod paths;
