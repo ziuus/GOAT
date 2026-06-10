@@ -273,7 +273,9 @@ pub struct PendingApproval {
 }
 
 pub struct ApprovalQueue {
-    pending: std::sync::Arc<tokio::sync::Mutex<HashMap<String, (PendingApproval, tokio::sync::oneshot::Sender<char>)>>>,
+    pending: std::sync::Arc<
+        tokio::sync::Mutex<HashMap<String, (PendingApproval, tokio::sync::oneshot::Sender<char>)>>,
+    >,
 }
 
 impl Default for ApprovalQueue {
@@ -311,7 +313,12 @@ impl ApprovalQueue {
     }
 
     pub async fn list(&self) -> Vec<PendingApproval> {
-        self.pending.lock().await.values().map(|(p, _)| p.clone()).collect()
+        self.pending
+            .lock()
+            .await
+            .values()
+            .map(|(p, _)| p.clone())
+            .collect()
     }
 
     pub async fn get(&self, id: &str) -> Option<PendingApproval> {

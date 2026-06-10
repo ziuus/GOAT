@@ -8,8 +8,8 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tower_http::cors::{Any, CorsLayer};
 use tokio_stream::StreamExt;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::runtime::GoatRuntime;
 
@@ -241,7 +241,12 @@ async fn events_stream_handler(
     headers: HeaderMap,
     axum::extract::Query(query): axum::extract::Query<std::collections::HashMap<String, String>>,
     State(state): State<Arc<ApiState>>,
-) -> Result<axum::response::sse::Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<
+    axum::response::sse::Sse<
+        impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>,
+    >,
+    (StatusCode, Json<serde_json::Value>),
+> {
     if state.auth_required {
         let auth_valid = if let Some(auth_header) = headers.get("Authorization") {
             auth_header.to_str().unwrap_or("") == format!("Bearer {}", state.token)
@@ -252,10 +257,13 @@ async fn events_stream_handler(
         };
 
         if !auth_valid {
-            return Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))));
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "error": "Unauthorized" })),
+            ));
         }
     }
-    
+
     let rt = state.runtime.lock().await;
     let rx = rt.event_bus.subscribe();
     drop(rt);
@@ -269,8 +277,7 @@ async fn events_stream_handler(
                 .data(json))
         });
 
-    Ok(axum::response::sse::Sse::new(stream)
-        .keep_alive(axum::response::sse::KeepAlive::new()))
+    Ok(axum::response::sse::Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::new()))
 }
 
 async fn approvals_list_handler(

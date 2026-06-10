@@ -1426,12 +1426,21 @@ async fn handle_slash_command(
                 } else if arg == "doctor" {
                     println!("[DASHBOARD DOCTOR] Path: {}", dir.display());
                     let pkg_json = dir.join("package.json");
-                    println!("[DASHBOARD DOCTOR] package.json: {}", if pkg_json.exists() { "Found" } else { "Missing" });
+                    println!(
+                        "[DASHBOARD DOCTOR] package.json: {}",
+                        if pkg_json.exists() {
+                            "Found"
+                        } else {
+                            "Missing"
+                        }
+                    );
                 } else {
                     println!("[DASHBOARD] Unknown action '{}'. Use path, doctor.", arg);
                 }
             } else {
-                println!("[DASHBOARD] Not found. Run `goat dashboard dev` outside TUI to bootstrap or locate it.");
+                println!(
+                    "[DASHBOARD] Not found. Run `goat dashboard dev` outside TUI to bootstrap or locate it."
+                );
             }
             true
         }

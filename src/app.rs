@@ -1968,9 +1968,19 @@ impl App {
                     } else if arg == "doctor" {
                         self.push_log(format!("[DASHBOARD DOCTOR] Path: {}", dir.display()));
                         let pkg_json = dir.join("package.json");
-                        self.push_log(format!("[DASHBOARD DOCTOR] package.json: {}", if pkg_json.exists() { "Found" } else { "Missing" }));
+                        self.push_log(format!(
+                            "[DASHBOARD DOCTOR] package.json: {}",
+                            if pkg_json.exists() {
+                                "Found"
+                            } else {
+                                "Missing"
+                            }
+                        ));
                     } else {
-                        self.push_log(format!("[DASHBOARD] Unknown action '{}'. Use path, doctor.", arg));
+                        self.push_log(format!(
+                            "[DASHBOARD] Unknown action '{}'. Use path, doctor.",
+                            arg
+                        ));
                     }
                 } else {
                     self.push_log("[DASHBOARD] Not found. Run `goat dashboard dev` outside TUI to bootstrap or locate it.".to_string());

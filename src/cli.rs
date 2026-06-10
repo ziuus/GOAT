@@ -2039,8 +2039,17 @@ fn handle_dashboard_command(action: &str) {
             println!("[DASHBOARD DOCTOR]");
             println!("  Dashboard Path: {}", active_dir.display());
             let pkg_json = active_dir.join("package.json");
-            println!("  package.json: {}", if pkg_json.exists() { "Found" } else { "Missing" });
-            println!("  To run the dashboard, navigate to the path, run `npm install`, then `npm run dev`.");
+            println!(
+                "  package.json: {}",
+                if pkg_json.exists() {
+                    "Found"
+                } else {
+                    "Missing"
+                }
+            );
+            println!(
+                "  To run the dashboard, navigate to the path, run `npm install`, then `npm run dev`."
+            );
         }
         "dev" => {
             println!("[DASHBOARD] Dashboard code is at: {}", active_dir.display());
@@ -2050,7 +2059,10 @@ fn handle_dashboard_command(action: &str) {
             println!("    npm run dev");
         }
         _ => {
-            println!("[DASHBOARD] Unknown action '{}'. Use dev, path, or doctor.", action);
+            println!(
+                "[DASHBOARD] Unknown action '{}'. Use dev, path, or doctor.",
+                action
+            );
         }
     }
 }

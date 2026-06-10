@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +60,7 @@ impl EventBus {
     pub async fn push(&self, event: GoatEvent) {
         // Redact any potential secrets from the message
         let evt = event.clone();
-        
+
         let mut hist = self.history.lock().await;
         if hist.len() >= self.max_history {
             hist.remove(0);

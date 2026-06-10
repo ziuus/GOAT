@@ -51,12 +51,14 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
     }
 
     // Publish daemon started event
-    rt.event_bus.push(crate::events::GoatEvent::new(
-        "daemon_started",
-        crate::events::EventSeverity::Info,
-        &format!("Daemon started with PID {}", pid),
-        None,
-    )).await;
+    rt.event_bus
+        .push(crate::events::GoatEvent::new(
+            "daemon_started",
+            crate::events::EventSeverity::Info,
+            &format!("Daemon started with PID {}", pid),
+            None,
+        ))
+        .await;
 
     let shared_rt = Arc::new(Mutex::new(rt));
 
@@ -90,12 +92,14 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
                     approval_status: None,
                 });
 
-                rt.event_bus.push(crate::events::GoatEvent::new(
-                    "job_started",
-                    crate::events::EventSeverity::Info,
-                    &msg,
-                    Some(serde_json::json!({ "job_id": job.id })),
-                )).await;
+                rt.event_bus
+                    .push(crate::events::GoatEvent::new(
+                        "job_started",
+                        crate::events::EventSeverity::Info,
+                        &msg,
+                        Some(serde_json::json!({ "job_id": job.id })),
+                    ))
+                    .await;
 
                 rt.scheduler_manager.log_audit(&format!(
                     "Daemon Executed job {}: {}",
