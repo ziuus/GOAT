@@ -56,7 +56,14 @@ export default function JobsPage() {
               {jobs.map((job) => (
                 <tr key={job.id} className="hover:bg-muted/50 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs">{job.id}</td>
-                  <td className="px-6 py-4 font-medium">{job.type}</td>
+                  <td className="px-6 py-4 font-medium">
+                    {job.type}
+                    {job.source_recipe && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                        {job.source_recipe}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <StatusBadge status={job.status} />
                   </td>

@@ -44,7 +44,16 @@ export default function HooksPage() {
           {hooks.map((hook, i) => (
             <div key={i} className="border border-border bg-card p-6 rounded-lg">
               <div className="flex items-start justify-between mb-4">
-                <h3 className="font-semibold">{hook.name || 'Unnamed Hook'}</h3>
+                <div>
+                  <h3 className="font-semibold">{hook.name || 'Unnamed Hook'}</h3>
+                  {hook.source_recipe && (
+                    <div className="mt-1">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                        {hook.source_recipe}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 {hook.enabled !== false ? (
                   <span className="bg-emerald-500/10 text-emerald-500 text-xs px-2 py-1 rounded-full border border-emerald-500/20">Active</span>
                 ) : (

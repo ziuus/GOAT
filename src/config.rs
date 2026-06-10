@@ -98,6 +98,9 @@ pub struct Config {
     /// Skill marketplace config.
     #[serde(default)]
     pub skill_marketplace: SkillMarketplaceConfig,
+    /// Recipes execution config.
+    #[serde(default)]
+    pub recipes: RecipeConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -1040,4 +1043,42 @@ fn default_auth_mode() -> String {
 }
 fn default_cache_ttl_minutes() -> u64 {
     1440
+}
+
+// ── Recipes Config ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RecipeConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub allow_activation: bool,
+    #[serde(default = "default_true")]
+    pub require_approval_for_activation: bool,
+    #[serde(default = "default_recipe_max_steps")]
+    pub max_steps_per_run: u32,
+    #[serde(default = "default_recipe_min_interval")]
+    pub min_schedule_interval_minutes: u32,
+    #[serde(default = "default_true")]
+    pub dry_run_before_activation: bool,
+}
+
+impl Default for RecipeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            allow_activation: true,
+            require_approval_for_activation: true,
+            max_steps_per_run: 20,
+            min_schedule_interval_minutes: 15,
+            dry_run_before_activation: true,
+        }
+    }
+}
+
+fn default_recipe_max_steps() -> u32 {
+    20
+}
+fn default_recipe_min_interval() -> u32 {
+    15
 }

@@ -14,7 +14,9 @@ import {
   Power,
   Workflow,
   Sparkles,
-  UserCheck
+  UserCheck,
+  Zap,
+  Play
 } from "lucide-react";
 
 const tabs = [
@@ -28,9 +30,10 @@ const tabs = [
 ];
 
 const mockRecipes = [
-  { id: "builtin_1", name: "cargo-check-on-save", author: "goat-core", source: "builtin", risk: "low", enabled: false, description: "Runs cargo check whenever a Rust file is modified." },
-  { id: "builtin_2", name: "checkpoint-before-write", author: "goat-core", source: "builtin", risk: "low", enabled: false, description: "Automatically creates a git checkpoint before executing any risky write." },
-  { id: "rem_1", name: "aws-s3-sync", author: "devops-guru", source: "marketplace", risk: "high", enabled: false, description: "Syncs build artifacts to an AWS S3 bucket. Requires credentials." },
+  { id: "builtin_1", name: "cargo-check-on-save", author: "goat-core", source: "builtin", risk: "low", enabled: false, activated: false, description: "Runs cargo check whenever a Rust file is modified." },
+  { id: "builtin_2", name: "checkpoint-before-write", author: "goat-core", source: "builtin", risk: "low", enabled: false, activated: false, description: "Automatically creates a git checkpoint before executing any risky write." },
+  { id: "installed_1", name: "summarize-jobs-daily", author: "goat-core", source: "installed", risk: "low", enabled: true, activated: true, description: "Summarize recent jobs daily." },
+  { id: "rem_1", name: "aws-s3-sync", author: "devops-guru", source: "marketplace", risk: "high", enabled: false, activated: false, description: "Syncs build artifacts to an AWS S3 bucket. Requires credentials." },
 ];
 
 export default function RecipesPage() {
@@ -190,8 +193,67 @@ export default function RecipesPage() {
                  </>
               )}
 
+              {/* INSTALLED RECIPES */}
+              {activeTab === "installed" && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                      <Download className="text-violet-400" />
+                      Installed Recipes
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-4 mt-4">
+                    {mockRecipes.filter(r => r.source === "installed").map((recipe) => (
+                      <motion.div variants={itemVariants} key={recipe.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/[0.07] hover:border-white/20 transition-all flex flex-col gap-4 group">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                              {recipe.name}
+                              <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-500/20 text-green-400 border border-green-500/30">Installed</span>
+                              {recipe.enabled && (
+                                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Enabled</span>
+                              )}
+                              {recipe.activated && (
+                                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30">Activated</span>
+                              )}
+                            </h3>
+                            <div className="text-xs text-slate-400 mt-1">by {recipe.author}</div>
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!recipe.enabled && (
+                              <button className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 text-xs font-medium flex items-center gap-2">
+                                <Power className="w-3.5 h-3.5" /> Enable
+                              </button>
+                            )}
+                            {recipe.enabled && !recipe.activated && (
+                              <button className="px-3 py-1.5 rounded-lg bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 border border-violet-500/30 text-xs font-medium flex items-center gap-2">
+                                <Zap className="w-3.5 h-3.5" /> Activate
+                              </button>
+                            )}
+                            {recipe.enabled && recipe.activated && (
+                              <button className="px-3 py-1.5 rounded-lg bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 border border-slate-500/30 text-xs font-medium flex items-center gap-2">
+                                <Power className="w-3.5 h-3.5" /> Deactivate
+                              </button>
+                            )}
+                            {recipe.enabled && (
+                              <button className="px-3 py-1.5 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/30 text-xs font-medium flex items-center gap-2">
+                                <Play className="w-3.5 h-3.5" /> Run Now
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed">
+                          {recipe.description}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {/* OTHER TABS PLACEHOLDER */}
-              {activeTab !== "builtin" && activeTab !== "marketplace" && (
+              {activeTab !== "builtin" && activeTab !== "marketplace" && activeTab !== "installed" && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto">
                   <motion.div variants={itemVariants} className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl">
                     <Workflow className="w-10 h-10 text-violet-400 opacity-50" />

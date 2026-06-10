@@ -138,11 +138,33 @@ pub async fn start_server(
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
         .route("/v1/recipes/:name/enable", post(recipes_enable_handler))
         .route("/v1/recipes/:name/disable", post(recipes_disable_handler))
-        .route("/v1/recipes/:name/uninstall", post(recipes_uninstall_handler))
-        .route("/v1/recipes/:name/provenance", get(recipes_provenance_handler))
-        .route("/v1/recipes/from-memory/:candidate_id", post(recipes_from_memory_handler))
+        .route(
+            "/v1/recipes/:name/uninstall",
+            post(recipes_uninstall_handler),
+        )
+        .route(
+            "/v1/recipes/:name/provenance",
+            get(recipes_provenance_handler),
+        )
+        .route(
+            "/v1/recipes/from-memory/:candidate_id",
+            post(recipes_from_memory_handler),
+        )
+        .route("/v1/recipes/:name/activate", post(recipes_activate_handler))
+        .route(
+            "/v1/recipes/:name/deactivate",
+            post(recipes_deactivate_handler),
+        )
+        .route("/v1/recipes/:name/run", post(recipes_run_handler))
+        .route("/v1/recipes/:name/plan", get(recipes_plan_handler))
+        .route("/v1/recipes/runs", get(recipes_runs_list_handler))
+        .route("/v1/recipes/:name/runs", get(recipes_runs_handler))
+        .route("/v1/recipes/:name/status", get(recipes_status_handler))
         .route("/v1/agent-templates", get(agent_templates_list_handler))
-        .route("/v1/agent-templates/:id/draft", post(agent_templates_draft_handler))
+        .route(
+            "/v1/agent-templates/:id/draft",
+            post(agent_templates_draft_handler),
+        )
         .layer(cors)
         .with_state(state);
 
@@ -1410,7 +1432,9 @@ async fn recipes_audit_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } })))
+    Ok(Json(
+        json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } }),
+    ))
 }
 
 async fn recipes_install_handler(
@@ -1432,7 +1456,10 @@ async fn recipes_enable_handler(
     let paths = rt.paths.clone();
     let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
     if let Err(e) = sm.enable(&name) {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ));
     }
     Ok(Json(json!({ "name": name, "status": "enabled" })))
 }
@@ -1447,7 +1474,10 @@ async fn recipes_disable_handler(
     let paths = rt.paths.clone();
     let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
     if let Err(e) = sm.disable(&name) {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ));
     }
     Ok(Json(json!({ "name": name, "status": "disabled" })))
 }
@@ -1462,7 +1492,10 @@ async fn recipes_uninstall_handler(
     let paths = rt.paths.clone();
     let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
     if let Err(e) = sm.uninstall(&name) {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ));
     }
     Ok(Json(json!({ "name": name, "status": "uninstalled" })))
 }
@@ -1482,7 +1515,103 @@ async fn recipes_from_memory_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "candidate_id": candidate_id, "status": "draft_created" })))
+    Ok(Json(
+        json!({ "status": "draft_created", "candidate_id": candidate_id }),
+    ))
+}
+
+async fn recipes_activate_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(rt.paths.clone());
+    if let Err(e) = sm.activate(&name, "hook") {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ));
+    }
+    Ok(Json(json!({ "name": name, "status": "activated" })))
+}
+
+async fn recipes_deactivate_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(rt.paths.clone());
+    if let Err(e) = sm.deactivate(&name) {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ));
+    }
+    Ok(Json(json!({ "name": name, "status": "deactivated" })))
+}
+
+async fn recipes_plan_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(rt.paths.clone());
+    match sm.plan(&name) {
+        Ok(plan) => Ok(Json(json!({ "plan": plan }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn recipes_run_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(rt.paths.clone());
+    match sm.run(&name) {
+        Ok(record) => Ok(Json(json!({ "record": record }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn recipes_runs_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "runs": [] })))
+}
+
+async fn recipes_runs_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "runs": [] })))
+}
+
+async fn recipes_status_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "status": "unknown" })))
 }
 
 async fn agent_templates_list_handler(
