@@ -262,11 +262,14 @@ Status legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Web server | `planned` | Phase 8 |
-| Session viewer | `planned` | Phase 8 |
-| Memory viewer | `planned` | Phase 8 |
-| Settings manager | `planned` | Phase 8 |
-| Subagent run viewer | `planned` | Phase 8 |
+| Web server / Next.js app | `working` | Phase 4.1 |
+| Local API endpoints | `working` | Phase 4.0 |
+| Token Auth | `working` | Phase 4.1 |
+| Approvals & SSE Streaming | `working` | Phase 4.2 |
+| Chat & Command UI | `working` | Phase 4.3 |
+| Repo Explorer | `working` | Phase 4.3 |
+| Diff Viewer | `working` | Phase 4.3 |
+| Context Management API | `working` | Phase 4.3 |
 
 ---
 

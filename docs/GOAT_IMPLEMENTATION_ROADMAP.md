@@ -568,6 +568,31 @@
 
 ---
 
+## Phase 4.2: Dashboard Approval Queue + Events ✅ COMPLETE
+
+**Goal:** Securely handle dangerous commands via dashboard and stream events.
+
+### Completed:
+- [x] Server-Sent Events (SSE) Bus in Daemon
+- [x] `/v1/events/stream` for real-time daemon logs and actions
+- [x] `ApprovalQueue` integration (bridges HTTP UI with synchronous ApprovalGate)
+- [x] `/approvals` dashboard page
+
+---
+
+## Phase 4.3: Dashboard Chat + Repo Explorer + Diffs ✅ COMPLETE
+
+**Goal:** Provide chat context, repo preview, and workspace diff UI on the web dashboard.
+
+### Completed:
+- [x] `/chat` UI for queuing chat events
+- [x] `RepoMap` API exposed at `/v1/repo/tree` and `/v1/repo/file`
+- [x] Interactive Dashboard Repo Explorer with Secret Protection
+- [x] Context API endpoints exposed to UI
+- [x] Real-time Git diff viewer (`/diffs`) on Dashboard
+
+---
+
 ## Phase 5.0: Tauri Desktop App (Planned)
 
 **Goal:** Native desktop app wrapping GOAT core + web UI.

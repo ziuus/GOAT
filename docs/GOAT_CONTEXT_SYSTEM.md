@@ -22,3 +22,6 @@ GOAT automatically manages token budget limits and injects context into AI promp
 
 ## AI Commit Generation
 `/commit message ai` extracts `git diff` and `git status --short` and runs an LLM generation step to output a conventional commit message. The prompt enforces no markdown wrappers and zero fluff. This is fully integrated into both TUI and Headless environments.
+
+## Dashboard Integration
+Phase 4.3 exposes the `/v1/context` API endpoints (GET, POST `/add`, POST `/remove`, POST `/clear`) allowing users to interactively construct the context selection safely via the Dashboard's Repo Explorer.

@@ -36,6 +36,12 @@ The API is structured around local observability and non-destructive operations 
 - `GET /v1/logs/recent`: Fetch recent daemon logs (tokens automatically redacted).
 - `POST /v1/command`: Submit a slash command for execution. 
   - *Note: Only safe, read-only commands (e.g., `/status`, `/jobs`, `/hooks`, `/schedule`) are currently permitted. Risky or state-altering commands will return a `403 Forbidden` requesting manual TUI approval.*
+- `POST /v1/chat`: Send a chat message (currently asynchronous foundation).
+- `GET /v1/repo/tree`: Fetch `RepoMap` workspace tree structure.
+- `GET /v1/repo/file?path=...`: Safely read a file, automatically redacting secrets.
+- `GET /v1/diffs`: Read-only view of the current uncommitted Git diff.
+- `GET /v1/context`, `POST /v1/context/add`, `POST /v1/context/remove`, `POST /v1/context/clear`: Workspace context management.
+- `GET /v1/sessions`: Fetch session history and details.
 
 ## Interaction with TUI and Headless Mode
 

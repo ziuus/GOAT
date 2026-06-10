@@ -1047,3 +1047,11 @@ cargo run -- --db <PATH>      → custom database file
 - Secure Bearer token authentication from daemon.
 - `/dashboard` CLI and slash commands (doctor, path, dev).
 - CORS headers for local daemon connections.
+
+### Phase 4.3: Dashboard Chat + Repo Explorer + Diff Viewer
+- Added `/chat` foundation to Dashboard.
+- Added `/repo` page providing an interactive RepoMap tree with secret-redacted file previews.
+- Added Context API endpoints to add/remove files to GOAT's context safely.
+- Added `/diffs` page for displaying current workspace git diffs in real-time.
+- Updated Dashboard Sidebar.
+- Improved Daemon routes (`/v1/chat`, `/v1/sessions`, `/v1/repo/tree`, `/v1/repo/file`, `/v1/diffs`, `/v1/context`).

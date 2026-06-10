@@ -65,3 +65,10 @@ Inside the TUI or Headless mode, you can type `/dashboard` to see the dashboard 
 ## Next Phases
 
 Phase 4.3+ will introduce interactive chat panels, voice interfaces, and deeper workflow automation components.
+
+## Phase 4.3 Expansions
+The Dashboard was upgraded to function as a visual coding companion with:
+- **Chat**: Accessible at `/chat`, routes conversational messages to the local GOAT session.
+- **Repo Explorer**: Accessible at `/repo`, utilizes `RepoMap` to render the project structure and safe file content previews.
+- **Diffs**: Accessible at `/diffs`, provides real-time Git diff inspection of the workspace.
+- **Context Management**: Files can be added to the Agent's context directly from the UI.
