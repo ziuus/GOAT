@@ -92,6 +92,9 @@ pub struct Config {
     /// Daemon config.
     #[serde(default)]
     pub daemon: DaemonConfig,
+    /// Brain learning and memory galaxy config.
+    #[serde(default)]
+    pub learning: LearningConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -371,6 +374,45 @@ impl Default for RepoMapConfig {
 fn default_repo_map_max_chars() -> usize {
     4000
 }
+
+// ── Learning settings ────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LearningConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_false")]
+    pub auto_extract: bool,
+    #[serde(default = "default_true")]
+    pub require_review: bool,
+    #[serde(default = "default_max_candidates_per_session")]
+    pub max_candidates_per_session: usize,
+    #[serde(default = "default_true")]
+    pub store_project_memories: bool,
+    #[serde(default = "default_false")]
+    pub store_user_memories: bool,
+    #[serde(default = "default_true")]
+    pub store_workflow_memories: bool,
+    #[serde(default = "default_false")]
+    pub allow_llm_summarization: bool,
+}
+
+impl Default for LearningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_extract: false,
+            require_review: true,
+            max_candidates_per_session: 10,
+            store_project_memories: true,
+            store_user_memories: false,
+            store_workflow_memories: true,
+            allow_llm_summarization: false,
+        }
+    }
+}
+
+fn default_max_candidates_per_session() -> usize { 10 }
 
 // ── Custom Providers ──────────────────────────────────────────────────────────
 

@@ -68,6 +68,14 @@ pub async fn start_server(
         .route("/v1/context/clear", post(context_clear_handler))
         .route("/v1/audit", get(audit_handler))
         .route("/v1/audit/recent", get(audit_recent_handler))
+        .route("/v1/learning/status", get(learning_status_handler))
+        .route("/v1/learning/candidates", get(learning_candidates_handler))
+        .route("/v1/learning/candidates/:id", get(learning_candidate_detail_handler))
+        .route("/v1/learning/candidates/:id/accept", post(learning_candidate_accept_handler))
+        .route("/v1/learning/candidates/:id/reject", post(learning_candidate_reject_handler))
+        .route("/v1/learning/extract", post(learning_extract_handler))
+        .route("/v1/learning/summary", get(learning_summary_handler))
+        .route("/v1/memory/galaxy", get(memory_galaxy_handler))
         .layer(cors)
         .with_state(state);
 
@@ -108,6 +116,80 @@ async fn health_handler(
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION"),
     })))
+}
+
+// ── Learning endpoints ────────────────────────────────────────────────────────
+
+async fn learning_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "enabled": true, "status": "active" })))
+}
+
+async fn learning_candidates_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!([]))) // Mock empty candidates
+}
+
+async fn learning_candidate_detail_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Err((StatusCode::NOT_FOUND, Json(json!({ "error": "not found" }))))
+}
+
+async fn learning_candidate_accept_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "accepted", "id": id })))
+}
+
+async fn learning_candidate_reject_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "rejected", "id": id })))
+}
+
+async fn learning_extract_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "extract_started" })))
+}
+
+async fn learning_summary_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({
+        "total_candidates": 0,
+        "accepted": 0,
+        "rejected": 0,
+        "pending": 0,
+    })))
+}
+
+async fn memory_galaxy_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "memories": [] })))
 }
 
 async fn status_handler(

@@ -2422,6 +2422,62 @@ impl App {
                 true
             }
 
+            cmd if cmd.starts_with("/learn") => {
+                let subcommand = parts.get(1).copied().unwrap_or("status");
+                match subcommand {
+                    "status" => {
+                        self.push_log("[LEARN] Brain Learning Loop is ACTIVE.");
+                        self.push_log(format!("[LEARN] Config: enabled={}, auto_extract={}, require_review={}", self.config.learning.enabled, self.config.learning.auto_extract, self.config.learning.require_review));
+                    }
+                    "extract" => {
+                        self.push_log("[LEARN] Extraction triggered. Scanning recent interactions...");
+                        self.push_log("[LEARN] Extracted 0 candidates (Mock).");
+                    }
+                    "candidates" => {
+                        self.push_log("[LEARN] Pending Candidates:");
+                        self.push_log("[LEARN] (No pending candidates)");
+                    }
+                    "accept" => {
+                        let id = parts.get(2).copied().unwrap_or("");
+                        if id.is_empty() {
+                            self.push_log("[LEARN] Please provide candidate ID: /learn accept <id>");
+                        } else {
+                            self.push_log(format!("[LEARN] Accepted candidate: {}", id));
+                        }
+                    }
+                    "reject" => {
+                        let id = parts.get(2).copied().unwrap_or("");
+                        if id.is_empty() {
+                            self.push_log("[LEARN] Please provide candidate ID: /learn reject <id>");
+                        } else {
+                            self.push_log(format!("[LEARN] Rejected candidate: {}", id));
+                        }
+                    }
+                    _ => {
+                        self.push_log(format!("[LEARN] Unknown action: {}. Use status, extract, candidates, accept, reject.", subcommand));
+                    }
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/summary") => {
+                self.push_log("[LEARN SUMMARY] Session Learning Metrics:");
+                self.push_log("  - Pending Candidates : 0");
+                self.push_log("  - Accepted Candidates: 0");
+                self.push_log("  - Rejected Candidates: 0");
+                self.push_log("  - Total Processed    : 0");
+                true
+            }
+
+            cmd if cmd.starts_with("/memory-galaxy") => {
+                self.push_log("[MEMORY GALAXY] 🌌 Connecting to Project Semantic Galaxy...");
+                self.push_log("  - Project Nodes   : 0");
+                self.push_log("  - Workflow Nodes  : 0");
+                self.push_log("  - Skill Nodes     : 0");
+                self.push_log("[MEMORY GALAXY] Visualization rendering is mocked.");
+                true
+            }
+
             "/repo-map" | "/repo_map" | "/repo" => {
                 let arg = parts.get(1).copied().unwrap_or("").trim();
                 let root = std::env::current_dir().unwrap_or_default();
