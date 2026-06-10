@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { goatApi, getGoatConfig } from '@/lib/goat-api';
 import { Calendar, PlayCircle } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function SchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
@@ -33,11 +34,11 @@ export default function SchedulePage() {
       </div>
 
       {schedule.length === 0 ? (
-        <div className="p-12 border border-dashed border-border rounded-lg text-center text-muted-foreground">
-          <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No scheduled tasks configured.</p>
-          <p className="text-xs mt-2">Edit your ~/.config/goat/goat.toml to add tasks.</p>
-        </div>
+        <EmptyState 
+          icon={Calendar} 
+          title="No scheduled tasks configured" 
+          description="Edit your ~/.config/goat/goat.toml to add scheduled tasks."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {schedule.map((task, i) => (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { goatApi, getGoatConfig } from '@/lib/goat-api';
 import { TerminalSquare, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -35,10 +36,11 @@ export default function JobsPage() {
       </div>
 
       {jobs.length === 0 ? (
-        <div className="p-12 border border-dashed border-border rounded-lg text-center text-muted-foreground">
-          <TerminalSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No background jobs found.</p>
-        </div>
+        <EmptyState 
+          icon={TerminalSquare} 
+          title="No background jobs found" 
+          description="Scheduled tasks and background LLM generations will appear here."
+        />
       ) : (
         <div className="border border-border rounded-lg overflow-hidden bg-card">
           <table className="w-full text-sm text-left">

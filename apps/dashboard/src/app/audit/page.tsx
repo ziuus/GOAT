@@ -77,7 +77,10 @@ export default function AuditPage() {
               <Loader2 className="w-6 h-6 animate-spin" />
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="text-muted-foreground text-center mt-10">No logs found matching criteria.</div>
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+              <Shield className="w-8 h-8 opacity-50" />
+              <p>No audit events found matching criteria.</p>
+            </div>
           ) : (
             filteredLogs.map((log, i) => (
               <div key={i} className="py-1 px-2 hover:bg-[#161b22] rounded whitespace-pre-wrap break-all border-b border-[#21262d] pb-2 mb-2 last:border-0">

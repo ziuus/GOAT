@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { goatApi, getGoatConfig } from '@/lib/goat-api';
 import { Clock } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function HooksPage() {
   const [hooks, setHooks] = useState<any[]>([]);
@@ -33,10 +34,11 @@ export default function HooksPage() {
       </div>
 
       {hooks.length === 0 ? (
-        <div className="p-12 border border-dashed border-border rounded-lg text-center text-muted-foreground">
-          <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No hooks configured.</p>
-        </div>
+        <EmptyState 
+          icon={Clock} 
+          title="No hooks configured" 
+          description="Automated triggers will appear here once configured."
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {hooks.map((hook, i) => (
