@@ -3,10 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
 
 use crate::approval::RiskLevel;
-use crate::config::Config;
 use crate::paths::GoatPaths;
 
 /// Unique identifier for an internal subagent.

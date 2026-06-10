@@ -1029,7 +1029,15 @@ impl Default for SkillMarketplaceConfig {
     }
 }
 
-fn default_marketplace_provider() -> String { "skills.sh".to_string() }
-fn default_marketplace_base_url() -> String { "https://api.skills.sh".to_string() }
-fn default_auth_mode() -> String { "vercel_oidc".to_string() }
-fn default_cache_ttl_minutes() -> u64 { 1440 }
+fn default_marketplace_provider() -> String {
+    "skills.sh".to_string()
+}
+fn default_marketplace_base_url() -> String {
+    "https://api.skills.sh".to_string()
+}
+fn default_auth_mode() -> String {
+    "vercel_oidc".to_string()
+}
+fn default_cache_ttl_minutes() -> u64 {
+    1440
+}

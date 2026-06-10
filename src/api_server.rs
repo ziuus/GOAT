@@ -92,18 +92,42 @@ pub async fn start_server(
         .route("/v1/studio/profiles", get(studio_profiles_handler))
         .route("/v1/studio/compare", post(studio_compare_handler))
         .route("/v1/studio/skills/draft", post(studio_skills_draft_handler))
-        .route("/v1/studio/skills/create", post(studio_skills_create_handler))
+        .route(
+            "/v1/studio/skills/create",
+            post(studio_skills_create_handler),
+        )
         .route("/v1/studio/agents/draft", post(studio_agents_draft_handler))
-        .route("/v1/studio/agents/create", post(studio_agents_create_handler))
-        .route("/v1/studio/workflows/draft", post(studio_workflows_draft_handler))
-        .route("/v1/studio/workflows/create", post(studio_workflows_create_handler))
+        .route(
+            "/v1/studio/agents/create",
+            post(studio_agents_create_handler),
+        )
+        .route(
+            "/v1/studio/workflows/draft",
+            post(studio_workflows_draft_handler),
+        )
+        .route(
+            "/v1/studio/workflows/create",
+            post(studio_workflows_create_handler),
+        )
         .route("/v1/skills/sources", get(skills_sources_handler))
         .route("/v1/skills/installed", get(skills_installed_handler))
-        .route("/v1/skills/provenance/:name", get(skills_provenance_handler))
-        .route("/v1/skills/remote/search", get(skills_remote_search_handler))
+        .route(
+            "/v1/skills/provenance/:name",
+            get(skills_provenance_handler),
+        )
+        .route(
+            "/v1/skills/remote/search",
+            get(skills_remote_search_handler),
+        )
         .route("/v1/skills/remote/:id", get(skills_remote_detail_handler))
-        .route("/v1/skills/remote/:id/audit", post(skills_remote_audit_handler))
-        .route("/v1/skills/remote/:id/install", post(skills_remote_install_handler))
+        .route(
+            "/v1/skills/remote/:id/audit",
+            post(skills_remote_audit_handler),
+        )
+        .route(
+            "/v1/skills/remote/:id/install",
+            post(skills_remote_install_handler),
+        )
         .route("/v1/skills/:name/update", post(skills_update_handler))
         .route("/v1/skills/:name/uninstall", post(skills_uninstall_handler))
         .layer(cors)
@@ -1141,16 +1165,18 @@ async fn studio_prompt_handler(
     Json(req): Json<StudioPromptReq>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    
+
     // Add simple implementation wrapping around LLM
     let rt = state.runtime.lock().await;
     let _ = req.profile.clone();
     let _ = req.mode.clone();
     let _ = req.context_files.clone();
     let _ = req.save_as.clone();
-    
+
     // Mock implementation for Phase 5.3 as partial endpoint without full wiring
-    Ok(Json(json!({ "output": format!("Simulated response for: {}", req.prompt) })))
+    Ok(Json(
+        json!({ "output": format!("Simulated response for: {}", req.prompt) }),
+    ))
 }
 
 async fn studio_profiles_handler(
@@ -1168,7 +1194,9 @@ async fn studio_compare_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "status": "partial", "message": "Compare mock response" })))
+    Ok(Json(
+        json!({ "status": "partial", "message": "Compare mock response" }),
+    ))
 }
 
 async fn studio_skills_draft_handler(
@@ -1177,7 +1205,10 @@ async fn studio_skills_draft_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let sm = crate::studio::StudioManager::new();
-    let draft = sm.save_draft(crate::studio::DraftType::Skill, json!({"name": "Draft Skill"}));
+    let draft = sm.save_draft(
+        crate::studio::DraftType::Skill,
+        json!({"name": "Draft Skill"}),
+    );
     Ok(Json(json!({ "draft": draft })))
 }
 
@@ -1195,7 +1226,10 @@ async fn studio_agents_draft_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let sm = crate::studio::StudioManager::new();
-    let draft = sm.save_draft(crate::studio::DraftType::Agent, json!({"name": "Draft Agent"}));
+    let draft = sm.save_draft(
+        crate::studio::DraftType::Agent,
+        json!({"name": "Draft Agent"}),
+    );
     Ok(Json(json!({ "draft": draft })))
 }
 
@@ -1213,7 +1247,10 @@ async fn studio_workflows_draft_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let sm = crate::studio::StudioManager::new();
-    let draft = sm.save_draft(crate::studio::DraftType::Workflow, json!({"name": "Draft Workflow"}));
+    let draft = sm.save_draft(
+        crate::studio::DraftType::Workflow,
+        json!({"name": "Draft Workflow"}),
+    );
     Ok(Json(json!({ "draft": draft })))
 }
 
@@ -1232,7 +1269,9 @@ async fn skills_sources_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "sources": ["local", "learned", "studio_draft", "remote_marketplace"] })))
+    Ok(Json(
+        json!({ "sources": ["local", "learned", "studio_draft", "remote_marketplace"] }),
+    ))
 }
 
 async fn skills_installed_handler(
@@ -1275,7 +1314,9 @@ async fn skills_remote_audit_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } })))
+    Ok(Json(
+        json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } }),
+    ))
 }
 
 async fn skills_remote_install_handler(

@@ -1,9 +1,8 @@
 use crate::config::SkillMarketplaceConfig;
 use crate::paths::GoatPaths;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RemoteSkillSummary {
@@ -57,15 +56,17 @@ impl SkillMarketplaceManager {
         Self { paths, config }
     }
 
-    pub async fn search(&self, query: &str) -> Result<Vec<RemoteSkillSummary>> {
+    pub async fn search(&self, _query: &str) -> Result<Vec<RemoteSkillSummary>> {
         if !self.config.enabled {
-            return Err(anyhow::anyhow!("Skill marketplace is disabled. Check config or auth."));
+            return Err(anyhow::anyhow!(
+                "Skill marketplace is disabled. Check config or auth."
+            ));
         }
         // TODO: Implement actual HTTP client
         Ok(vec![])
     }
 
-    pub async fn get_details(&self, id: &str) -> Result<RemoteSkillDetails> {
+    pub async fn get_details(&self, _id: &str) -> Result<RemoteSkillDetails> {
         if !self.config.enabled {
             return Err(anyhow::anyhow!("Skill marketplace is disabled."));
         }
@@ -77,7 +78,7 @@ impl SkillMarketplaceManager {
         let mut warnings = Vec::new();
         let mut risk_level = "low".to_string();
         let lower = content.to_lowercase();
-        
+
         if lower.contains("rm -rf") || lower.contains("sudo") {
             risk_level = "critical".to_string();
             warnings.push("Contains destructive or privileged commands".to_string());
@@ -86,7 +87,7 @@ impl SkillMarketplaceManager {
             risk_level = "high".to_string();
             warnings.push("Contains arbitrary remote script execution".to_string());
         }
-        
+
         let action = if risk_level == "critical" || risk_level == "high" {
             "review_required".to_string()
         } else {
@@ -102,13 +103,16 @@ impl SkillMarketplaceManager {
 
     pub async fn install(&self, candidate: &SkillInstallCandidate) -> Result<()> {
         // Assume ApprovalGate has passed before calling this.
-        let safe_name = candidate.details.name.replace(|c: char| !c.is_alphanumeric(), "_");
+        let safe_name = candidate
+            .details
+            .name
+            .replace(|c: char| !c.is_alphanumeric(), "_");
         let skill_dir = self.paths.skills_dir.join(&safe_name);
         fs::create_dir_all(&skill_dir)?;
-        
+
         let md_path = skill_dir.join("SKILL.md");
         fs::write(&md_path, &candidate.details.content)?;
-        
+
         // Write metadata
         let meta_path = skill_dir.join("skill.meta.json");
         let meta = serde_json::json!({
@@ -119,7 +123,7 @@ impl SkillMarketplaceManager {
             "audit_result": candidate.audit,
         });
         fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)?;
-        
+
         Ok(())
     }
 }
