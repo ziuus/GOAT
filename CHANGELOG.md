@@ -1025,3 +1025,16 @@ cargo run -- --db <PATH>      → custom database file
 - Initial commit: Core MVP for GOAT (TUI, MCP, Memory, LLM Routing)
 
 > Note: `src/ui.rs` that was present in earlier commits was lost (likely accidentally deleted or not committed). The app ran successfully as evidenced by log entries from 07:37:30 and 13:30:23 on 2026-06-08.
+
+## [0.13.0] - 2026-06-10
+### Added
+- **Phase 4.0: GOAT Daemon + Local API Foundation**
+- Persistent `goat daemon` sub-command for running background jobs and providing an API.
+- Secure, token-based Axum API Server listening on 127.0.0.1.
+- Auto-generated Bearer tokens at `~/.local/share/goat/daemon.token` (chmod 600).
+- Endpoint `/v1/status` exposing daemon status, memory, history, and MCP runtime states.
+- Endpoint `/v1/jobs` for tracking background jobs.
+- Endpoint `/v1/hooks` for listing registered hooks.
+- Endpoint `/v1/schedule` for scheduled background tasks.
+- `/daemon` and `/api` slash commands for observing Daemon status inside TUI and Headless modes.
+- Warnings in TUI/Headless modes when overlapping schedulers are detected.

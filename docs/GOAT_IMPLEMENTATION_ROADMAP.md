@@ -539,17 +539,17 @@
 
 ---
 
-## Phase 4.0: Daemon + WebSocket API (Planned)
+## Phase 4.0: Daemon + Local API Foundation ✅ COMPLETE
 
-**Goal:** Local HTTP/WebSocket daemon for multi-frontend support.
+**Goal:** Local HTTP daemon for multi-frontend support and background jobs.
 
-### Planned:
-- [ ] axum-based daemon (goat serve)
-- [ ] WebSocket event stream (messages, tool calls, approvals)
-- [ ] Sessions REST API
-- [ ] Approval request/response API
-- [ ] Memory/skills read API
-- [ ] Local-only bind (no remote access without explicit config)
+### Completed in 0.13.0:
+- [x] axum-based daemon (`goat daemon`)
+- [x] Secure Bearer token auto-generation
+- [x] REST API endpoints (`/v1/status`, `/v1/jobs`, `/v1/hooks`, `/v1/schedule`)
+- [x] CLI commands: `goat daemon start/status/doctor`
+- [x] TUI/Headless awareness (overlapping scheduler warnings)
+- [x] Local-only bind (127.0.0.1)
 
 ---
 

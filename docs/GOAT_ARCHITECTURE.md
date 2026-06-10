@@ -82,6 +82,7 @@ GOAT/                              # Cargo workspace root
 │   ├── goat-voice/                # Library: STT voice prompting
 │   ├── goat-config/               # Library: config, secrets, profiles
 │   ├── goat-security/             # Library: permissions, approval, audit
+│   ├── goat-daemon/               # Binary: daemon service + local API
 │   ├── goat-dashboard/            # Binary: optional web dashboard
 │   ├── goat-indexer/              # Library: project/system scanner
 │   └── goat-integrations/         # Library: external agent adapters

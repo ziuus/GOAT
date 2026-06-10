@@ -200,11 +200,19 @@ pub enum Command {
     /// Manage background jobs
     #[command(name = "jobs")]
     Jobs {
-        /// Action to perform: list, show, cancel, logs
+        /// Action to perform: list, show, cancel
         #[arg(default_value = "list")]
         action: String,
         /// Job ID
         arg: Option<String>,
+    },
+
+    /// Manage GOAT Daemon
+    #[command(name = "daemon")]
+    Daemon {
+        /// Action to perform: start, status, stop, doctor
+        #[arg(default_value = "start")]
+        action: String,
     },
 
     /// Show project awareness status or scan the current directory.
@@ -437,6 +445,11 @@ pub async fn handle_subcommand(
 
         Command::Patch { action } => {
             handle_patch_command(action);
+            Ok(true)
+        }
+
+        Command::Daemon { action } => {
+            handle_daemon_command(paths, config, action).await?;
             Ok(true)
         }
 
@@ -1948,6 +1961,44 @@ fn handle_jobs_command(
         }
         _ => {
             println!("Unknown jobs action: {}", action);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_daemon_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+) -> anyhow::Result<()> {
+    match action {
+        "start" => {
+            // Setup runtime and start daemon
+            let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
+                config.clone(),
+                paths.clone(),
+                vec![],
+                false,
+                None,
+            );
+            crate::daemon::run(rt).await?;
+        }
+        "status" => {
+            crate::daemon::get_status(paths);
+        }
+        "doctor" => {
+            crate::daemon::print_doctor(paths, config);
+        }
+        "stop" => {
+            println!(
+                "[DAEMON] Stop command is partial. Use Ctrl+C on the start terminal or kill the PID directly for now."
+            );
+        }
+        _ => {
+            println!(
+                "[DAEMON] Unknown action '{}'. Use start, status, stop, or doctor.",
+                action
+            );
         }
     }
     Ok(())

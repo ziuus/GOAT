@@ -248,6 +248,21 @@ async fn handle_slash_command(
             println!("[STATUS] History  : {} messages", rt.history.len());
             println!("[STATUS] MCP      : {} server(s)", rt.mcp_server_count);
 
+            let pid_path = rt.paths.data_dir.join("daemon.pid");
+            if pid_path.exists() {
+                println!("[STATUS] Daemon   : RUNNING (Scheduler active in daemon)");
+                println!(
+                    "[STATUS] API      : http://{}:{}",
+                    rt.config.daemon.host, rt.config.daemon.port
+                );
+                println!(
+                    "[WARN] Running local scheduler inside Headless while Daemon is active may duplicate jobs!"
+                );
+            } else {
+                println!("[STATUS] Daemon   : STOPPED");
+                println!("[STATUS] Scheduler: IN-PROCESS (Headless)");
+            }
+
             // Project & Memory context
             let memory_manager =
                 crate::memory::MemoryManager::new(&rt.paths, rt.config.memory.clone());
@@ -1334,6 +1349,59 @@ async fn handle_slash_command(
                 }
             } else {
                 println!("[JOBS] Unknown action '{}'", arg);
+            }
+            true
+        }
+
+        "/daemon" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg == "status" || arg.is_empty() {
+                let pid_path = rt.paths.data_dir.join("daemon.pid");
+                if pid_path.exists() {
+                    println!(
+                        "[DAEMON] Running (PID: {})",
+                        std::fs::read_to_string(&pid_path)
+                            .unwrap_or_default()
+                            .trim()
+                    );
+                } else {
+                    println!("[DAEMON] Stopped");
+                }
+            } else if arg == "doctor" {
+                println!(
+                    "[DAEMON DOCTOR] Enabled in config: {}",
+                    rt.config.daemon.enabled
+                );
+                println!(
+                    "[DAEMON DOCTOR] Bind Address: {}:{}",
+                    rt.config.daemon.host, rt.config.daemon.port
+                );
+                println!(
+                    "[DAEMON DOCTOR] Auth Required: {}",
+                    rt.config.daemon.auth_required
+                );
+            } else {
+                println!("[DAEMON] Unknown action '{}'. Use status, doctor.", arg);
+            }
+            true
+        }
+
+        "/api" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg == "status" || arg.is_empty() {
+                println!(
+                    "[API] Configured at http://{}:{}",
+                    rt.config.daemon.host, rt.config.daemon.port
+                );
+                if rt.config.daemon.auth_required {
+                    println!(
+                        "[API] Auth Required: true (Use Bearer token from ~/.local/share/goat/daemon.token)"
+                    );
+                } else {
+                    println!("[API] Auth Required: false (WARNING: Unauthenticated)");
+                }
+            } else {
+                println!("[API] Unknown action '{}'. Use status.", arg);
             }
             true
         }

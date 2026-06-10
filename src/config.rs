@@ -89,6 +89,9 @@ pub struct Config {
     /// Scheduler config.
     #[serde(default)]
     pub scheduler: SchedulerConfig,
+    /// Daemon config.
+    #[serde(default)]
+    pub daemon: DaemonConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -904,4 +907,40 @@ impl Default for SchedulerConfig {
             require_approval_for_actions: true,
         }
     }
+}
+
+// ── Daemon Settings ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DaemonConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_daemon_host")]
+    pub host: String,
+    #[serde(default = "default_daemon_port")]
+    pub port: u16,
+    #[serde(default = "default_true")]
+    pub auth_required: bool,
+}
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            host: default_daemon_host(),
+            port: default_daemon_port(),
+            auth_required: true,
+        }
+    }
+}
+
+fn default_daemon_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_daemon_port() -> u16 {
+    47647
+}
+fn default_false() -> bool {
+    false
 }

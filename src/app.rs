@@ -897,6 +897,20 @@ impl App {
                         self.push_log(format!("[STATUS] Checkpt  : {} ({})", cp.id, cp.label));
                     }
                 }
+                let pid_path = self.paths.data_dir.join("daemon.pid");
+                if pid_path.exists() {
+                    self.push_log(format!(
+                        "[STATUS] Daemon   : RUNNING (Scheduler active in daemon)"
+                    ));
+                    self.push_log(format!(
+                        "[STATUS] API      : http://{}:{}",
+                        self.config.daemon.host, self.config.daemon.port
+                    ));
+                    self.push_log(format!("[WARN] Running local scheduler inside TUI while Daemon is active may duplicate jobs!"));
+                } else {
+                    self.push_log(format!("[STATUS] Daemon   : STOPPED"));
+                    self.push_log(format!("[STATUS] Scheduler: IN-PROCESS (TUI)"));
+                }
 
                 // Project & Memory context
                 let memory_manager =
@@ -1874,6 +1888,62 @@ impl App {
                     }
                 } else {
                     self.push_log(format!("[JOBS] Unknown action '{}'", arg));
+                }
+                true
+            }
+
+            "/daemon" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                if arg == "status" || arg.is_empty() {
+                    let pid_path = self.paths.data_dir.join("daemon.pid");
+                    if pid_path.exists() {
+                        self.push_log(format!(
+                            "[DAEMON] Running (PID: {})",
+                            std::fs::read_to_string(&pid_path)
+                                .unwrap_or_default()
+                                .trim()
+                        ));
+                    } else {
+                        self.push_log("[DAEMON] Stopped".to_string());
+                    }
+                } else if arg == "doctor" {
+                    self.push_log(format!(
+                        "[DAEMON DOCTOR] Enabled in config: {}",
+                        self.config.daemon.enabled
+                    ));
+                    self.push_log(format!(
+                        "[DAEMON DOCTOR] Bind Address: {}:{}",
+                        self.config.daemon.host, self.config.daemon.port
+                    ));
+                    self.push_log(format!(
+                        "[DAEMON DOCTOR] Auth Required: {}",
+                        self.config.daemon.auth_required
+                    ));
+                } else {
+                    self.push_log(format!(
+                        "[DAEMON] Unknown action '{}'. Use status, doctor.",
+                        arg
+                    ));
+                }
+                true
+            }
+
+            "/api" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                if arg == "status" || arg.is_empty() {
+                    self.push_log(format!(
+                        "[API] Configured at http://{}:{}",
+                        self.config.daemon.host, self.config.daemon.port
+                    ));
+                    if self.config.daemon.auth_required {
+                        self.push_log("[API] Auth Required: true (Use Bearer token from ~/.local/share/goat/daemon.token)".to_string());
+                    } else {
+                        self.push_log(
+                            "[API] Auth Required: false (WARNING: Unauthenticated)".to_string(),
+                        );
+                    }
+                } else {
+                    self.push_log(format!("[API] Unknown action '{}'. Use status.", arg));
                 }
                 true
             }

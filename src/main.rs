@@ -1,3 +1,4 @@
+pub mod api_server;
 mod app;
 mod approval;
 mod brain;
@@ -5,6 +6,7 @@ pub mod checkpoint;
 mod cli;
 pub mod command_registry;
 pub mod config;
+pub mod daemon;
 pub mod error;
 pub mod external_agents;
 pub mod headless;

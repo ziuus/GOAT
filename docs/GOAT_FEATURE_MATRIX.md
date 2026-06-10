@@ -25,6 +25,8 @@ Status legend:
 | XDG-compliant data path for brain DB | `partial` | DB currently in project root (wrong) |
 | Rolling daily log file | `working` | `logs/goat.log.YYYY-MM-DD` |
 | Structured tracing logs | `working` | tracing + tracing-appender |
+| Background Daemon | `working` | Phase 4.0 |
+| Local API Server (Axum) | `working` | Phase 4.0 |
 
 ---
 

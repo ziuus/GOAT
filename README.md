@@ -2,7 +2,7 @@
 
 **GOAT** (General Omniscient Agentic Tool) is a Rust-first, terminal-first AI agent platform that combines the best features from leading AI agent systems into a single, modular, secure CLI/TUI experience.
 
-**Version:** 0.7.0 — Phase 3.0 (Advanced TUI)  
+**Version:** 0.13.0 — Phase 4.0 (GOAT Daemon & Local API)
 **Status:** Pre-Alpha — compiles, runs, memory/skills/project context active, multi-pane TUI, headless mode, multi-frontend architecture planned  
 
 > Do not use in production. This is pre-alpha software. Features listed as `planned` (e.g. Voice Companion/Jarvis Mode, Web Dashboard) are NOT yet implemented and are slated for future development phases.
@@ -18,6 +18,7 @@
 - **Project awareness** — learns your tech stack, commands, and architecture
 - **Subagent orchestration** — internal specialized agents + external agent adapters (OpenCode, Claude Code, etc.)
 - **Skills / Plugins** — extensible via TOML skill manifests
+- **Daemon & Background Jobs** — persistent local service for background tasks, scheduling, and local API integrations
 - **Voice Companion/Jarvis Mode** — **PLANNED FOR LATER PHASE**. Fully optional, disableable, no microphone listening without permission.
 - **Security-first** — approval gates, audit log, secret redaction, sandboxing
 
@@ -44,6 +45,7 @@ See [`docs/GOAT_PRODUCT_SPEC.md`](docs/GOAT_PRODUCT_SPEC.md) for the full produc
 | Approval gates | ✅ Working |
 | Project indexer | ✅ Working |
 | Curated Memory System | ✅ Working (USER.md / MEMORY.md) |
+| Daemon & Local API | ✅ Working |
 | Voice/Jarvis Mode | ❌ Planned (Future Phase) |
 
 See [`docs/GOAT_FEATURE_MATRIX.md`](docs/GOAT_FEATURE_MATRIX.md) for the complete feature status table.

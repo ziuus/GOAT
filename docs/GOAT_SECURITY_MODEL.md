@@ -23,6 +23,7 @@ GOAT is a local AI agent that can execute shell commands, read/write files, spaw
 | Data exfiltration | Agent reads sensitive files and sends contents to LLM | MEDIUM |
 | Supply chain risk | Malicious MCP server gains system access | MEDIUM |
 | Denial of service | Runaway agent loop exhausts resources or API budget | LOW |
+| Daemon API abuse | External process sends malicious commands to local daemon API | HIGH |
 
 ---
 
@@ -164,6 +165,22 @@ Implementation options:
 - Linux: seccomp-bpf syscall filtering
 - Simpler: path allowlist enforcement in `goat-security` before any fs operation
 - MVP: path prefix validation (no write outside workspace directory)
+
+---
+
+## 5. Daemon and API Security (Phase 4.0)
+
+### 5.1 Local Binding
+The GOAT Daemon API strictly binds to `127.0.0.1` by default. It is not exposed to the local network or internet unless explicitly overridden by the user.
+
+### 5.2 Token Authentication
+The API enforces Bearer Token authentication via the `Authorization: Bearer <token>` header. 
+- A secure 64-character token is auto-generated upon the first launch of the daemon.
+- It is saved to `~/.local/share/goat/daemon.token` with strict UNIX permissions (`chmod 600`).
+- Auth can be disabled in `goat.toml` for local development, but GOAT emits startup warnings when running unauthenticated.
+
+### 5.3 Read-Only Focus
+The API currently focuses on status, metrics, jobs, and observability. State-altering endpoints or slash commands (like `/exec`) via the API will trigger the standard `ApprovalGate` pipeline, ensuring dangerous commands cannot be pushed silently into the background.
 
 ---
 
