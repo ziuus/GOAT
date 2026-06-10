@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 const tabs = [
+  { id: "researcher", label: "Researcher", icon: Search },
   { id: "marketplace", label: "Remote Marketplace", icon: Globe },
   { id: "installed", label: "Installed", icon: Download },
   { id: "local", label: "Local", icon: TerminalSquare },
@@ -116,6 +117,54 @@ export default function SkillsPage() {
               className="h-full flex flex-col gap-6 max-w-5xl mx-auto"
             >
               
+              {/* RESEARCHER */}
+              {activeTab === "researcher" && (
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                      <Search className="text-emerald-400" />
+                      Skill Researcher
+                    </h2>
+                    <div className="text-sm px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Session Mode: Active
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+                    <h3 className="text-sm font-medium text-slate-300 mb-4">Find skills for your current task</h3>
+                    <div className="flex gap-4">
+                      <input
+                        type="text"
+                        placeholder="Describe your task (e.g., 'React code review', 'AWS deployment')"
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
+                      />
+                      <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium hover:from-emerald-400 hover:to-teal-500">
+                        Suggest Skills
+                      </button>
+                    </div>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-white mb-4">Session Context</h3>
+                  <div className="grid gap-4">
+                    <div className="bg-white/5 border border-emerald-500/30 rounded-2xl p-5 flex items-center justify-between group">
+                      <div>
+                        <h4 className="font-bold text-emerald-400">Attached: React UI Reviewer</h4>
+                        <p className="text-xs text-slate-400 mt-1">Source: Remote Marketplace • Risk: Low</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-medium">
+                          Promote to Pack
+                        </button>
+                        <button className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-medium">
+                          Detach
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* REMOTE MARKETPLACE */}
               {activeTab === "marketplace" && (
                 <>

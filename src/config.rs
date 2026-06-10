@@ -107,6 +107,9 @@ pub struct Config {
     /// Recipe marketplace and automation config.
     #[serde(default)]
     pub recipe_marketplace: RecipeConfig,
+    /// Skill researcher mode config.
+    #[serde(default)]
+    pub skill_researcher: SkillResearcherConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -1208,4 +1211,49 @@ fn default_embedding_timeout() -> u64 {
 }
 fn default_batch_size() -> usize {
     16
+}
+
+// ── Skill Researcher ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SkillResearcherConfig {
+    pub enabled_by_default: bool,
+    pub session_scoped: bool,
+    pub auto_search_on_task_change: bool,
+    pub require_review: bool,
+    pub allow_remote_marketplace: bool,
+    pub allow_web_research: bool,
+    pub allow_skills_sh: bool,
+    pub allow_brain_search: bool,
+    pub allow_local_skills: bool,
+    pub allow_installed_skills: bool,
+    pub allow_learned_skills: bool,
+    pub allow_previous_session_packs: bool,
+    pub max_results: usize,
+    pub max_remote_requests_per_session: usize,
+    pub cache_ttl_minutes: u64,
+    pub attach_top_skill_automatically: bool,
+}
+
+impl Default for SkillResearcherConfig {
+    fn default() -> Self {
+        Self {
+            enabled_by_default: false,
+            session_scoped: true,
+            auto_search_on_task_change: false,
+            require_review: true,
+            allow_remote_marketplace: true,
+            allow_web_research: false,
+            allow_skills_sh: true,
+            allow_brain_search: true,
+            allow_local_skills: true,
+            allow_installed_skills: true,
+            allow_learned_skills: true,
+            allow_previous_session_packs: true,
+            max_results: 10,
+            max_remote_requests_per_session: 20,
+            cache_ttl_minutes: 1440,
+            attach_top_skill_automatically: false,
+        }
+    }
 }

@@ -71,10 +71,12 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
             }
         };
 
-        let input = line.trim().to_string();
+        let mut input = line.trim().to_string();
         if input.is_empty() {
             continue;
         }
+
+        input = crate::quick_access::QuickAccessParser::parse_and_rewrite(&input);
 
         // Handle built-in headless commands (subset of slash commands).
         if input.starts_with('/') {

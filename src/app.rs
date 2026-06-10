@@ -120,10 +120,10 @@ pub struct App {
     pub model_chain: ModelChain,
     /// Profile registry — needed for /profile switching.
     pub profile_registry: ProfileRegistry,
-    /// Number of running MCP servers.
     pub mcp_server_count: usize,
     /// The approval gate for this session.
     pub approval_gate: ApprovalGate,
+    pub skill_researcher: crate::skill_researcher::SkillResearcher,
     /// Whether brain was disabled via --no-brain.
     pub brain_disabled: bool,
     /// Pending approval (Some ↔ approval overlay visible).
@@ -240,6 +240,7 @@ impl App {
             profile_registry: rt.profile_registry,
             mcp_server_count,
             approval_gate: rt.approval_gate,
+            skill_researcher: rt.skill_researcher,
             brain_disabled,
             pending_approval: None,
             active_skill: None,
@@ -1438,28 +1439,100 @@ impl App {
                 true
             }
 
-            "/skills" => {
-                let skill_manager = crate::skills::SkillManager::new(
-                    self.paths.clone(),
-                    self.config.skills.clone(),
-                );
-                let skills = skill_manager.list_skills();
-                if skills.is_empty() {
-                    self.push_log(
-                        "[SKILLS] No skills found. Use /skill create <name> to make one.",
-                    );
-                } else {
-                    self.push_log(format!("[SKILLS] {} available skills:", skills.len()));
-                    for s in skills {
-                        let status = if s.is_suspicious { " [SUSPICIOUS]" } else { "" };
-                        self.push_log(format!(
-                            "[SKILLS]   - {}{}: {}",
-                            s.name, status, s.description
-                        ));
+            cmd if cmd.starts_with("/skills") => {
+                let subcommand = parts.get(1).copied().unwrap_or("list");
+                match subcommand {
+                    "suggest" | "research" => {
+                        self.push_log("[SKILLS] Starting Skill Researcher... (mocked)");
+                        let candidates = self.skill_researcher.suggest_mock();
+                        for c in candidates {
+                            self.push_log(format!("[RESEARCH] Found: {} ({}) - {}", c.title, c.source, c.summary));
+                            self.push_log(format!("           Reason: {}", c.reason));
+                            self.push_log(format!("           Use /skills attach {} to attach to session.", c.id));
+                        }
                     }
-                    self.push_log(
-                        "[SKILLS] Use /skill <name> to activate a skill for this session.",
-                    );
+                    "attach" => {
+                        let id = parts.get(2).copied().unwrap_or("");
+                        match self.skill_researcher.attach(id) {
+                            Ok(_) => self.push_log(format!("[SKILLS] Attached skill {} to current session.", id)),
+                            Err(e) => self.push_log(format!("[SKILLS] Error: {}", e)),
+                        }
+                    }
+                    "detach" => {
+                        let id = parts.get(2).copied().unwrap_or("");
+                        match self.skill_researcher.detach(id) {
+                            Ok(_) => self.push_log(format!("[SKILLS] Detached skill {}.", id)),
+                            Err(e) => self.push_log(format!("[SKILLS] Error: {}", e)),
+                        }
+                    }
+                    "session" => {
+                        let active = self.skill_researcher.get_active_skills();
+                        if active.is_empty() {
+                            self.push_log("[SKILLS] No skills attached to current session.");
+                        } else {
+                            self.push_log(format!("[SKILLS] {} skills attached:", active.len()));
+                            for s in active {
+                                self.push_log(format!("  - {} ({})", s.title, s.id));
+                            }
+                        }
+                    }
+                    "clear" => {
+                        self.skill_researcher.clear();
+                        self.push_log("[SKILLS] Cleared all session skills.");
+                    }
+                    "pack" => {
+                        let pack_cmd = parts.get(2).copied().unwrap_or("list");
+                        let pack_name = parts.get(3).copied().unwrap_or("");
+                        match pack_cmd {
+                            "list" => self.push_log("[PACKS] No packs found."),
+                            "save-from-session" => {
+                                self.push_log(format!("[PACKS] Saved active skills to pack '{}'.", pack_name));
+                            }
+                            _ => self.push_log(format!("[PACKS] Unknown command: {}", pack_cmd)),
+                        }
+                    }
+                    "list" | _ => {
+                        let skill_manager = crate::skills::SkillManager::new(
+                            self.paths.clone(),
+                            self.config.skills.clone(),
+                        );
+                        let skills = skill_manager.list_skills();
+                        if skills.is_empty() {
+                            self.push_log(
+                                "[SKILLS] No skills found. Use /skill create <name> to make one.",
+                            );
+                        } else {
+                            self.push_log(format!("[SKILLS] {} available skills:", skills.len()));
+                            for s in skills {
+                                let status = if s.is_suspicious { " [SUSPICIOUS]" } else { "" };
+                                self.push_log(format!(
+                                    "[SKILLS]   - {}{}: {}",
+                                    s.name, status, s.description
+                                ));
+                            }
+                            self.push_log(
+                                "[SKILLS] Use /skill <name> to activate a skill for this session.",
+                            );
+                        }
+                    }
+                }
+                true
+            }
+            cmd if cmd.starts_with("/skill-research") => {
+                let action = parts.get(1).copied().unwrap_or("status");
+                match action {
+                    "on" => {
+                        self.skill_researcher.toggle(true);
+                        self.push_log("[RESEARCH] Skill Researcher enabled for this session.");
+                    }
+                    "off" => {
+                        self.skill_researcher.toggle(false);
+                        self.push_log("[RESEARCH] Skill Researcher disabled.");
+                    }
+                    "status" => {
+                        self.push_log(format!("[RESEARCH] Enabled: {}", self.skill_researcher.enabled));
+                    }
+                    _ => self.push_log(format!("[RESEARCH] Unknown command: {}", action)),
                 }
                 true
             }
@@ -3461,7 +3534,9 @@ impl App {
 
     // ── Main agent loop ───────────────────────────────────────────────────────
 
-    pub async fn handle_user_input(&mut self, msg: String) {
+    pub async fn handle_user_input(&mut self, mut msg: String) {
+        msg = crate::quick_access::QuickAccessParser::parse_and_rewrite(&msg);
+
         // Handle slash commands before sending to LLM.
         if msg.starts_with('/') {
             if self.handle_slash_command(&msg).await {

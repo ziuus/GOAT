@@ -398,7 +398,8 @@ async fn command_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
 
-    let cmd = req.command.trim();
+    let cmd_str = crate::quick_access::QuickAccessParser::parse_and_rewrite(req.command.trim());
+    let cmd = cmd_str.as_str();
 
     // Safe read-only commands
     let safe_commands = [

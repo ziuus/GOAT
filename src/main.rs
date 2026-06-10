@@ -1,3 +1,5 @@
+pub mod skill_researcher;
+pub mod quick_access;
 pub mod api_server;
 mod app;
 mod approval;

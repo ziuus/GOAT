@@ -49,6 +49,9 @@ pub struct GoatRuntime {
     // ── Session ───────────────────────────────────────────────────────────────
     /// Active session identifier (UUID for new sessions, legacy ID for resumed).
     pub session_id: String,
+    
+    /// Skill Researcher for the session
+    pub skill_researcher: crate::skill_researcher::SkillResearcher,
     /// Whether this session was resumed from the brain (true) or is fresh (false).
     pub session_resumed: bool,
     /// Whether brain (SQLite) is disabled via `--no-brain`.
@@ -260,7 +263,8 @@ impl GoatRuntime {
             paths: paths.clone(),
             config: config.clone(),
             startup_warnings,
-            session_id,
+            session_id: session_id.clone(),
+            skill_researcher: crate::skill_researcher::SkillResearcher::new(session_id.clone()),
             session_resumed,
             brain_disabled: no_brain,
             brain,
