@@ -885,6 +885,124 @@ async fn handle_slash_command(
             true
         }
 
+        cmd if cmd.starts_with("/transports") || cmd.starts_with("/transport") => {
+            let action = parts.get(1).copied().unwrap_or("status");
+            match action {
+                "status" | "doctor" => {
+                    println!("[TRANSPORTS] Checking status...");
+                    let handle = tokio::runtime::Handle::current();
+                    if let Ok(res) = handle.block_on(rt.transport_manager.check_doctor()) {
+                        println!("{}", res);
+                    } else {
+                        println!("[TRANSPORTS] Error checking status");
+                    }
+                }
+                "sessions" => {
+                    let sessions = rt.transport_manager.list_sessions();
+                    println!("[TRANSPORTS] Active Sessions ({}):", sessions.len());
+                    for s in sessions {
+                        println!("  - {} [{:?}]", s.id, s.provider);
+                    }
+                }
+                "messages" => {
+                    let messages = rt.transport_manager.get_messages();
+                    println!("[TRANSPORTS] Messages ({}):", messages.len());
+                    for m in messages.iter().take(10) {
+                        println!("  [{:?}] {}: {}", m.direction, m.session_id, m.content);
+                    }
+                }
+                "send" => {
+                    if let (Some(sid), Some(msg)) = (parts.get(2), parts.get(3)) {
+                        println!("[TRANSPORTS] Sending to {}: {}", sid, msg);
+                        let handle = tokio::runtime::Handle::current();
+                        if let Err(e) =
+                            handle.block_on(rt.transport_manager.send_outbound(sid, msg))
+                        {
+                            println!("[TRANSPORTS] Failed: {}", e);
+                        }
+                    } else {
+                        println!("[TRANSPORTS] Usage: /transports send <session_id> <message>");
+                    }
+                }
+                _ => println!("[TRANSPORTS] Unknown action: {}", action),
+            }
+            true
+        }
+        cmd if cmd.starts_with("/telegram") => {
+            println!(
+                "[TELEGRAM] Telegram transport is partially implemented (planned for Phase 5.14)."
+            );
+            true
+        }
+        cmd if cmd.starts_with("/discord") => {
+            println!(
+                "[DISCORD] Discord transport is partially implemented (planned for Phase 5.14)."
+            );
+            true
+        }
+        cmd if cmd.starts_with("/voice")
+            || cmd.starts_with("/talk")
+            || cmd.starts_with("/speak") =>
+        {
+            let is_shortcut = cmd.starts_with("/talk") || cmd.starts_with("/speak");
+            let action = if is_shortcut {
+                "speak"
+            } else {
+                parts.get(1).copied().unwrap_or("status")
+            };
+            let rest_idx = if is_shortcut { 1 } else { 2 };
+            let handle = tokio::runtime::Handle::current();
+
+            match action {
+                "status" | "doctor" => {
+                    println!("[VOICE] Checking status...");
+                    if let Ok(res) = handle.block_on(rt.voice_manager.check_doctor()) {
+                        println!("{}", res);
+                    } else {
+                        println!("[VOICE] Error checking status");
+                    }
+                }
+                "providers" => {
+                    println!("[VOICE] Available Providers:");
+                    for p in rt.voice_manager.get_providers() {
+                        println!("  - {}", p);
+                    }
+                }
+                "transcript" => {
+                    let text = parts[rest_idx..].join(" ");
+                    println!("[VOICE] Simulating transcript: '{}'", text);
+                    let input = crate::voice::VoiceInput {
+                        audio_base64: None,
+                        text_override: Some(text),
+                    };
+                    if let Ok(res) = handle.block_on(rt.voice_manager.transcribe(&input)) {
+                        println!("[VOICE] Result: {} (conf: {})", res.text, res.confidence);
+                    } else {
+                        println!("[VOICE] Failed to transcribe");
+                    }
+                }
+                "speak" | "talk" => {
+                    let text = parts[rest_idx..].join(" ");
+                    println!("[VOICE] Generating speech for: '{}'", text);
+                    if let Ok(res) = handle.block_on(rt.voice_manager.speak(&text)) {
+                        println!("[VOICE] TTS Success: {}", res.text);
+                    } else {
+                        println!("[VOICE] Failed to generate TTS");
+                    }
+                }
+                "privacy" => {
+                    println!(
+                        "[VOICE] Privacy Policy: Voice recordings and transcripts remain entirely local by default."
+                    );
+                    println!(
+                        "[VOICE] Cloud STT/TTS requires explicit opt-in via config file. No wake word or background listening is active."
+                    );
+                }
+                _ => println!("[VOICE] Unknown action: {}", action),
+            }
+            true
+        }
+
         cmd if cmd.starts_with("/external-agents") => {
             let subcmd = parts.get(1).copied().unwrap_or("list");
             match subcmd {

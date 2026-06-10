@@ -116,6 +116,12 @@ pub struct Config {
     /// Skill researcher mode config.
     #[serde(default)]
     pub skill_researcher: SkillResearcherConfig,
+    /// Transports config.
+    #[serde(default)]
+    pub transports: TransportConfig,
+    /// Voice config.
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -1307,6 +1313,82 @@ impl Default for BrowserConfig {
             redact_page_text: true,
             blocked_domains: Vec::new(),
             allowed_domains: Vec::new(),
+        }
+    }
+}
+
+// ── Transport Config ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TransportConfig {
+    pub enabled: bool,
+    pub local_webhook_enabled: bool,
+    pub desktop_enabled: bool,
+    pub telegram_enabled: bool,
+    pub discord_enabled: bool,
+    pub voice_enabled: bool,
+    pub public_bind: bool,
+    pub bind_host: String,
+    pub bind_port: u16,
+    pub require_token: bool,
+    pub allow_remote_commands: bool,
+    pub allow_remote_approval: bool,
+    pub allow_remote_file_access: bool,
+    pub max_message_chars: usize,
+    pub redact_messages: bool,
+}
+
+impl Default for TransportConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            local_webhook_enabled: false,
+            desktop_enabled: true,
+            telegram_enabled: false,
+            discord_enabled: false,
+            voice_enabled: false,
+            public_bind: false,
+            bind_host: "127.0.0.1".to_string(),
+            bind_port: 47648,
+            require_token: true,
+            allow_remote_commands: false,
+            allow_remote_approval: false,
+            allow_remote_file_access: false,
+            max_message_chars: 8000,
+            redact_messages: true,
+        }
+    }
+}
+
+// ── Voice Config ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct VoiceConfig {
+    pub enabled: bool,
+    pub stt_provider: String,
+    pub tts_provider: String,
+    pub local_only: bool,
+    pub allow_cloud_stt: bool,
+    pub allow_cloud_tts: bool,
+    pub push_to_talk: bool,
+    pub wake_word: bool,
+    pub store_audio: bool,
+    pub max_audio_seconds: usize,
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            stt_provider: "none".to_string(),
+            tts_provider: "none".to_string(),
+            local_only: true,
+            allow_cloud_stt: false,
+            allow_cloud_tts: false,
+            push_to_talk: true,
+            wake_word: false,
+            store_audio: false,
+            max_audio_seconds: 120,
         }
     }
 }

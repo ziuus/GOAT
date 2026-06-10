@@ -200,6 +200,14 @@ pub async fn start_server(
         .route("/v1/browser/screenshot", post(browser_screenshot_handler))
         .route("/v1/browser/read", post(browser_read_handler))
         .route("/v1/browser/qa", post(browser_qa_handler))
+        .route("/v1/transports/status", get(transports_status_handler))
+        .route("/v1/transports/sessions", get(transports_sessions_handler))
+        .route("/v1/transports/messages", get(transports_messages_handler))
+        .route("/v1/transports/send", post(transports_send_handler))
+        .route("/v1/voice/status", get(voice_status_handler))
+        .route("/v1/voice/providers", get(voice_providers_handler))
+        .route("/v1/voice/transcribe", post(voice_transcribe_handler))
+        .route("/v1/voice/speak", post(voice_speak_handler))
         .route("/v1/recipes/:id", get(recipes_detail_handler))
         .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
@@ -2475,4 +2483,116 @@ async fn browser_qa_handler(
     let _ = rt.browser_manager.screenshot(&req.url).await;
     let _ = rt.browser_manager.read_text(&req.url).await;
     Ok(Json(serde_json::json!({ "status": "qa_completed" })))
+}
+
+// ── Transports ─────────────────────────────────────────────────────────────
+
+async fn transports_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.transport_manager.check_doctor().await {
+        Ok(res) => Ok(Json(serde_json::json!({ "status": res }))),
+        Err(e) => Ok(Json(serde_json::json!({ "error": e.to_string() }))),
+    }
+}
+
+async fn transports_sessions_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let sessions = rt.transport_manager.list_sessions();
+    Ok(Json(serde_json::json!({ "sessions": sessions })))
+}
+
+async fn transports_messages_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let messages = rt.transport_manager.get_messages();
+    Ok(Json(serde_json::json!({ "messages": messages })))
+}
+
+#[derive(serde::Deserialize)]
+struct TransportsSendReq {
+    session_id: String,
+    content: String,
+}
+
+async fn transports_send_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<TransportsSendReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    match rt
+        .transport_manager
+        .send_outbound(&req.session_id, &req.content)
+        .await
+    {
+        Ok(_) => Ok(Json(serde_json::json!({ "success": true }))),
+        Err(e) => Ok(Json(serde_json::json!({ "error": e.to_string() }))),
+    }
+}
+
+// ── Voice ──────────────────────────────────────────────────────────────────
+
+async fn voice_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.voice_manager.check_doctor().await {
+        Ok(res) => Ok(Json(serde_json::json!({ "status": res }))),
+        Err(e) => Ok(Json(serde_json::json!({ "error": e.to_string() }))),
+    }
+}
+
+async fn voice_providers_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let providers = rt.voice_manager.get_providers();
+    Ok(Json(serde_json::json!({ "providers": providers })))
+}
+
+async fn voice_transcribe_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<crate::voice::VoiceInput>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.voice_manager.transcribe(&req).await {
+        Ok(res) => Ok(Json(serde_json::json!({ "transcript": res }))),
+        Err(e) => Ok(Json(serde_json::json!({ "error": e.to_string() }))),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct VoiceSpeakReq {
+    text: String,
+}
+
+async fn voice_speak_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<VoiceSpeakReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    match rt.voice_manager.speak(&req.text).await {
+        Ok(res) => Ok(Json(serde_json::json!({ "output": res }))),
+        Err(e) => Ok(Json(serde_json::json!({ "error": e.to_string() }))),
+    }
 }

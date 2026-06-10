@@ -41,7 +41,9 @@ pub mod task;
 pub mod timeline;
 pub mod tool_registry;
 mod tools;
+pub mod transports;
 mod ui;
+pub mod voice;
 
 use anyhow::{Context, Result};
 use clap::Parser;

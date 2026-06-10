@@ -167,6 +167,8 @@ pub struct App {
     pub hooks_manager: crate::hooks::HooksManager,
     pub scheduler_manager: crate::scheduler::SchedulerManager,
     pub job_tracker: crate::jobs::JobTracker,
+    pub transport_manager: crate::transports::TransportManager,
+    pub voice_manager: crate::voice::VoiceManager,
 }
 
 impl App {
@@ -267,6 +269,8 @@ impl App {
             hooks_manager: rt.hooks_manager,
             scheduler_manager: rt.scheduler_manager,
             job_tracker: rt.job_tracker,
+            transport_manager: rt.transport_manager,
+            voice_manager: rt.voice_manager,
         }
     }
 
@@ -1715,9 +1719,8 @@ impl App {
                         }
                     }
                     "qa" => {
-                        let url = parts.get(2).copied().unwrap_or("http://127.0.0.1:3000");
-                        self.push_log(format!("[BROWSER] Starting QA for {}", url));
-                        self.push_log("[BROWSER] Opening URL...");
+                        let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
+                        self.push_log(format!("[BROWSER] Running QA on {}", url));
                         let _ = rt.block_on(self.browser_manager.open_url(url));
                         self.push_log("[BROWSER] Taking screenshot...");
                         let _ = rt.block_on(self.browser_manager.screenshot(url));
@@ -1726,6 +1729,130 @@ impl App {
                         self.push_log("[BROWSER] QA Completed. Check timeline/dashboard.");
                     }
                     _ => self.push_log(format!("[BROWSER] Unknown action: {}", action)),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/transports") || cmd.starts_with("/transport") => {
+                let rt = tokio::runtime::Handle::current();
+                let action = parts.get(1).copied().unwrap_or("status");
+                match action {
+                    "status" | "doctor" => {
+                        self.push_log(format!("[TRANSPORTS] Checking status..."));
+                        if let Ok(res) = rt.block_on(self.transport_manager.check_doctor()) {
+                            for line in res.lines() {
+                                self.push_log(format!("[TRANSPORTS] {}", line));
+                            }
+                        } else {
+                            self.push_log("[TRANSPORTS] Error checking status".to_string());
+                        }
+                    }
+                    "sessions" => {
+                        let sessions = self.transport_manager.list_sessions();
+                        self.push_log(format!(
+                            "[TRANSPORTS] Active Sessions ({}):",
+                            sessions.len()
+                        ));
+                        for s in sessions {
+                            self.push_log(format!("  - {} [{:?}]", s.id, s.provider));
+                        }
+                    }
+                    "messages" => {
+                        let messages = self.transport_manager.get_messages();
+                        self.push_log(format!("[TRANSPORTS] Messages ({}):", messages.len()));
+                        for m in messages.iter().take(10) {
+                            self.push_log(format!(
+                                "  [{:?}] {}: {}",
+                                m.direction, m.session_id, m.content
+                            ));
+                        }
+                    }
+                    "send" => {
+                        if let (Some(sid), Some(msg)) = (parts.get(2), parts.get(3)) {
+                            self.push_log(format!("[TRANSPORTS] Sending to {}: {}", sid, msg));
+                            if let Err(e) =
+                                rt.block_on(self.transport_manager.send_outbound(sid, msg))
+                            {
+                                self.push_log(format!("[TRANSPORTS] Failed: {}", e));
+                            }
+                        } else {
+                            self.push_log(
+                                "[TRANSPORTS] Usage: /transports send <session_id> <message>"
+                                    .to_string(),
+                            );
+                        }
+                    }
+                    _ => self.push_log(format!("[TRANSPORTS] Unknown action: {}", action)),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/telegram") => {
+                self.push_log("[TELEGRAM] Telegram transport is partially implemented (planned for Phase 5.14).".to_string());
+                true
+            }
+            cmd if cmd.starts_with("/discord") => {
+                self.push_log("[DISCORD] Discord transport is partially implemented (planned for Phase 5.14).".to_string());
+                true
+            }
+            cmd if cmd.starts_with("/voice")
+                || cmd.starts_with("/talk")
+                || cmd.starts_with("/speak") =>
+            {
+                let rt = tokio::runtime::Handle::current();
+                let is_shortcut = cmd.starts_with("/talk") || cmd.starts_with("/speak");
+                let action = if is_shortcut {
+                    "speak"
+                } else {
+                    parts.get(1).copied().unwrap_or("status")
+                };
+                let rest_idx = if is_shortcut { 1 } else { 2 };
+
+                match action {
+                    "status" | "doctor" => {
+                        self.push_log(format!("[VOICE] Checking status..."));
+                        if let Ok(res) = rt.block_on(self.voice_manager.check_doctor()) {
+                            for line in res.lines() {
+                                self.push_log(format!("[VOICE] {}", line));
+                            }
+                        } else {
+                            self.push_log("[VOICE] Error checking status".to_string());
+                        }
+                    }
+                    "providers" => {
+                        self.push_log("[VOICE] Available Providers:".to_string());
+                        for p in self.voice_manager.get_providers() {
+                            self.push_log(format!("  - {}", p));
+                        }
+                    }
+                    "transcript" => {
+                        let text = parts[rest_idx..].join(" ");
+                        self.push_log(format!("[VOICE] Simulating transcript: '{}'", text));
+                        let input = crate::voice::VoiceInput {
+                            audio_base64: None,
+                            text_override: Some(text),
+                        };
+                        if let Ok(res) = rt.block_on(self.voice_manager.transcribe(&input)) {
+                            self.push_log(format!(
+                                "[VOICE] Result: {} (conf: {})",
+                                res.text, res.confidence
+                            ));
+                        } else {
+                            self.push_log("[VOICE] Failed to transcribe".to_string());
+                        }
+                    }
+                    "speak" | "talk" => {
+                        let text = parts[rest_idx..].join(" ");
+                        self.push_log(format!("[VOICE] Generating speech for: '{}'", text));
+                        if let Ok(res) = rt.block_on(self.voice_manager.speak(&text)) {
+                            self.push_log(format!("[VOICE] TTS Success: {}", res.text));
+                        } else {
+                            self.push_log("[VOICE] Failed to generate TTS".to_string());
+                        }
+                    }
+                    "privacy" => {
+                        self.push_log("[VOICE] Privacy Policy: Voice recordings and transcripts remain entirely local by default.".to_string());
+                        self.push_log("[VOICE] Cloud STT/TTS requires explicit opt-in via config file. No wake word or background listening is active.".to_string());
+                    }
+                    _ => self.push_log(format!("[VOICE] Unknown action: {}", action)),
                 }
                 true
             }
