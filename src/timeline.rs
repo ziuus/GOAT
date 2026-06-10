@@ -146,12 +146,15 @@ impl TimelineManager {
         // Simple mock replay query handling for now
         let events = self.load_events()?;
         let query_lower = query.to_lowercase();
-        
+
         let filtered: Vec<TimelineEvent> = events
             .into_iter()
-            .filter(|e| e.summary.to_lowercase().contains(&query_lower) || e.title.to_lowercase().contains(&query_lower))
+            .filter(|e| {
+                e.summary.to_lowercase().contains(&query_lower)
+                    || e.title.to_lowercase().contains(&query_lower)
+            })
             .collect();
-            
+
         Ok(filtered)
     }
 }

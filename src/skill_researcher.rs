@@ -95,7 +95,8 @@ impl SkillResearcher {
             risk_level: RiskLevel::Low,
             state: SessionSkillState::Suggested,
         };
-        self.session_skills.insert(candidate.id.clone(), candidate.clone());
+        self.session_skills
+            .insert(candidate.id.clone(), candidate.clone());
         vec![candidate]
     }
 
@@ -163,7 +164,10 @@ impl SkillResearcher {
         };
 
         std::fs::write(pack_dir.join("PACK.md"), md_content)?;
-        std::fs::write(pack_dir.join("pack.meta.json"), serde_json::to_string_pretty(&manifest)?)?;
+        std::fs::write(
+            pack_dir.join("pack.meta.json"),
+            serde_json::to_string_pretty(&manifest)?,
+        )?;
 
         Ok(())
     }

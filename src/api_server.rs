@@ -133,11 +133,20 @@ pub async fn start_server(
         .route("/v1/recipes/built-in", get(recipes_builtin_handler))
         .route("/v1/recipes/installed", get(recipes_installed_handler))
         .route("/v1/recipes/drafts", get(recipes_drafts_handler))
-        .route("/v1/skill-research/status", get(skill_research_status_handler))
-        .route("/v1/skill-research/toggle", post(skill_research_toggle_handler))
+        .route(
+            "/v1/skill-research/status",
+            get(skill_research_status_handler),
+        )
+        .route(
+            "/v1/skill-research/toggle",
+            post(skill_research_toggle_handler),
+        )
         .route("/v1/skill-packs", get(skill_packs_list_handler))
         .route("/v1/skill-packs/:name/use", post(skill_packs_use_handler))
-        .route("/v1/skill-packs/:name/save-from-session", post(skill_packs_save_handler))
+        .route(
+            "/v1/skill-packs/:name/save-from-session",
+            post(skill_packs_save_handler),
+        )
         .route("/v1/timeline/status", get(timeline_status_handler))
         .route("/v1/timeline/recent", get(timeline_recent_handler))
         .route("/v1/timeline/search", get(timeline_search_handler))
@@ -145,8 +154,14 @@ pub async fn start_server(
         .route("/v1/timeline/session/:id", get(timeline_session_handler))
         .route("/v1/timeline/job/:id", get(timeline_job_handler))
         .route("/v1/timeline/replay", get(timeline_replay_handler))
-        .route("/v1/timeline/replay/session/:id", get(timeline_replay_session_handler))
-        .route("/v1/timeline/replay/job/:id", get(timeline_replay_job_handler))
+        .route(
+            "/v1/timeline/replay/session/:id",
+            get(timeline_replay_session_handler),
+        )
+        .route(
+            "/v1/timeline/replay/job/:id",
+            get(timeline_replay_job_handler),
+        )
         .route("/v1/timeline/privacy", get(timeline_privacy_handler))
         .route("/v1/timeline/reindex", post(timeline_reindex_handler))
         .route("/v1/timeline/export", post(timeline_export_handler))
@@ -154,19 +169,37 @@ pub async fn start_server(
         .route("/v1/github/doctor", get(github_doctor_handler))
         .route("/v1/github/remote", get(github_remote_handler))
         .route("/v1/github/issue/link", post(github_issue_link_handler))
-        .route("/v1/github/issue/current", get(github_issue_current_handler))
+        .route(
+            "/v1/github/issue/current",
+            get(github_issue_current_handler),
+        )
         .route("/v1/github/issue/unlink", post(github_issue_unlink_handler))
         .route("/v1/github/branch/plan", post(github_branch_plan_handler))
-        .route("/v1/github/branch/create", post(github_branch_create_handler))
-        .route("/v1/github/branch/status", get(github_branch_status_handler))
+        .route(
+            "/v1/github/branch/create",
+            post(github_branch_create_handler),
+        )
+        .route(
+            "/v1/github/branch/status",
+            get(github_branch_status_handler),
+        )
         .route("/v1/github/pr/draft", post(github_pr_draft_handler))
         .route("/v1/github/pr/current", get(github_pr_current_handler))
         .route("/v1/github/pr/preview", post(github_pr_preview_handler))
         .route("/v1/github/push", post(github_push_handler))
         .route("/v1/github/pr/create", post(github_pr_create_handler))
         .route("/v1/github/review", post(github_review_handler))
-        .route("/v1/github/review/security", post(github_review_security_handler))
+        .route(
+            "/v1/github/review/security",
+            post(github_review_security_handler),
+        )
         .route("/v1/github/review/tests", post(github_review_tests_handler))
+        .route("/v1/browser/status", get(browser_status_handler))
+        .route("/v1/browser/doctor", get(browser_doctor_handler))
+        .route("/v1/browser/open", post(browser_open_handler))
+        .route("/v1/browser/screenshot", post(browser_screenshot_handler))
+        .route("/v1/browser/read", post(browser_read_handler))
+        .route("/v1/browser/qa", post(browser_qa_handler))
         .route("/v1/recipes/:id", get(recipes_detail_handler))
         .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
         .route("/v1/recipes/:id/install", post(recipes_install_handler))
@@ -1899,7 +1932,9 @@ async fn skill_research_toggle_handler(
     check_auth(&headers, &state)?;
     let mut rt = state.runtime.lock().await;
     rt.skill_researcher.toggle(payload.enabled);
-    Ok(Json(json!({ "status": "ok", "enabled": rt.skill_researcher.enabled })))
+    Ok(Json(
+        json!({ "status": "ok", "enabled": rt.skill_researcher.enabled }),
+    ))
 }
 
 async fn skill_packs_list_handler(
@@ -2007,7 +2042,10 @@ async fn timeline_session_handler(
     let rt = state.runtime.lock().await;
     match rt.timeline_manager.load_events() {
         Ok(events) => {
-            let filtered: Vec<_> = events.into_iter().filter(|e| e.session_id.as_deref() == Some(id.as_str())).collect();
+            let filtered: Vec<_> = events
+                .into_iter()
+                .filter(|e| e.session_id.as_deref() == Some(id.as_str()))
+                .collect();
             Ok(Json(json!({ "events": filtered })))
         }
         Err(e) => Err((
@@ -2026,7 +2064,10 @@ async fn timeline_job_handler(
     let rt = state.runtime.lock().await;
     match rt.timeline_manager.load_events() {
         Ok(events) => {
-            let filtered: Vec<_> = events.into_iter().filter(|e| e.job_refs.contains(&id)).collect();
+            let filtered: Vec<_> = events
+                .into_iter()
+                .filter(|e| e.job_refs.contains(&id))
+                .collect();
             Ok(Json(json!({ "events": filtered })))
         }
         Err(e) => Err((
@@ -2057,7 +2098,9 @@ async fn timeline_privacy_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "privacy_level": "Standard", "redaction": true })))
+    Ok(Json(
+        json!({ "privacy_level": "Standard", "redaction": true }),
+    ))
 }
 
 async fn timeline_reindex_handler(
@@ -2073,7 +2116,9 @@ async fn timeline_export_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "status": "exported", "format": "json" })))
+    Ok(Json(
+        serde_json::json!({ "status": "exported", "format": "json" }),
+    ))
 }
 
 // ── GitHub Workflow Handlers ──────────────────────────────────────────────────
@@ -2086,7 +2131,10 @@ async fn github_status_handler(
     let rt = state.runtime.lock().await;
     match rt.github_manager.status() {
         Ok(st) => Ok(Json(st)),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -2095,7 +2143,9 @@ async fn github_doctor_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "gh_installed": true, "git_remote": "origin", "auth_status": "ok" })))
+    Ok(Json(
+        serde_json::json!({ "gh_installed": true, "git_remote": "origin", "auth_status": "ok" }),
+    ))
 }
 
 async fn github_remote_handler(
@@ -2103,7 +2153,9 @@ async fn github_remote_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "remote": "origin", "url": "https://github.com/goat/goat.git" })))
+    Ok(Json(
+        serde_json::json!({ "remote": "origin", "url": "https://github.com/goat/goat.git" }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -2120,7 +2172,10 @@ async fn github_issue_link_handler(
     let mut rt = state.runtime.lock().await;
     match rt.github_manager.link_issue(&payload.id) {
         Ok(_) => Ok(Json(serde_json::json!({ "status": "linked" }))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -2130,7 +2185,9 @@ async fn github_issue_current_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    Ok(Json(serde_json::json!({ "issue": rt.github_manager.linked_issue })))
+    Ok(Json(
+        serde_json::json!({ "issue": rt.github_manager.linked_issue }),
+    ))
 }
 
 async fn github_issue_unlink_handler(
@@ -2141,7 +2198,10 @@ async fn github_issue_unlink_handler(
     let mut rt = state.runtime.lock().await;
     match rt.github_manager.unlink_issue() {
         Ok(_) => Ok(Json(serde_json::json!({ "status": "unlinked" }))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -2153,7 +2213,10 @@ async fn github_branch_plan_handler(
     let mut rt = state.runtime.lock().await;
     match rt.github_manager.plan_branch() {
         Ok(plan) => Ok(Json(serde_json::json!({ "plan": plan }))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -2173,7 +2236,9 @@ async fn github_branch_status_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    Ok(Json(serde_json::json!({ "branch_plan": rt.github_manager.branch_plan })))
+    Ok(Json(
+        serde_json::json!({ "branch_plan": rt.github_manager.branch_plan }),
+    ))
 }
 
 async fn github_pr_draft_handler(
@@ -2184,7 +2249,10 @@ async fn github_pr_draft_handler(
     let mut rt = state.runtime.lock().await;
     match rt.github_manager.draft_pr() {
         Ok(draft) => Ok(Json(serde_json::json!({ "draft": draft }))),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() })))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -2194,7 +2262,9 @@ async fn github_pr_current_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    Ok(Json(serde_json::json!({ "draft": rt.github_manager.pr_draft })))
+    Ok(Json(
+        serde_json::json!({ "draft": rt.github_manager.pr_draft }),
+    ))
 }
 
 async fn github_pr_preview_handler(
@@ -2203,7 +2273,9 @@ async fn github_pr_preview_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    Ok(Json(serde_json::json!({ "preview": rt.github_manager.pr_draft })))
+    Ok(Json(
+        serde_json::json!({ "preview": rt.github_manager.pr_draft }),
+    ))
 }
 
 async fn github_push_handler(
@@ -2211,7 +2283,9 @@ async fn github_push_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "status": "push_approval_requested" })))
+    Ok(Json(
+        serde_json::json!({ "status": "push_approval_requested" }),
+    ))
 }
 
 async fn github_pr_create_handler(
@@ -2219,7 +2293,9 @@ async fn github_pr_create_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "status": "pr_approval_requested" })))
+    Ok(Json(
+        serde_json::json!({ "status": "pr_approval_requested" }),
+    ))
 }
 
 async fn github_review_handler(
@@ -2235,7 +2311,9 @@ async fn github_review_security_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "status": "security_review_started" })))
+    Ok(Json(
+        serde_json::json!({ "status": "security_review_started" }),
+    ))
 }
 
 async fn github_review_tests_handler(
@@ -2243,5 +2321,158 @@ async fn github_review_tests_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "status": "tests_review_started" })))
+    Ok(Json(
+        serde_json::json!({ "status": "tests_review_started" }),
+    ))
+}
+
+// ── Browser ───────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct BrowserUrlReq {
+    pub url: String,
+}
+
+async fn browser_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(Json(
+        serde_json::json!({ "enabled": rt.browser_manager.is_enabled() }),
+    ))
+}
+
+async fn browser_doctor_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let res = rt
+        .browser_manager
+        .check_doctor()
+        .await
+        .unwrap_or_else(|e| e.to_string());
+    Ok(Json(serde_json::json!({ "doctor": res })))
+}
+
+fn check_browser_approval(
+    rt: &mut crate::runtime::GoatRuntime,
+    action: crate::browser_adapter::BrowserActionKind,
+    url: &str,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    let risk = action.risk_level(url);
+    let app_risk = match risk {
+        crate::browser_adapter::BrowserRiskLevel::Low => crate::approval::RiskLevel::Low,
+        crate::browser_adapter::BrowserRiskLevel::Medium => crate::approval::RiskLevel::Medium,
+        crate::browser_adapter::BrowserRiskLevel::High => crate::approval::RiskLevel::High,
+        crate::browser_adapter::BrowserRiskLevel::Critical => crate::approval::RiskLevel::Critical,
+    };
+
+    if app_risk >= crate::approval::RiskLevel::Medium {
+        let req = crate::approval::ApprovalRequest {
+            tool_name: "browser".to_string(),
+            action_summary: format!("{:?}", action),
+            risk_level: app_risk,
+            explanation: None,
+            working_directory: None,
+        };
+        if let Some(crate::approval::ApprovalDecision::Denied(msg)) =
+            rt.approval_gate.check_policy(&req)
+        {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({ "error": format!("Approval denied by policy: {}", msg) })),
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn browser_open_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    check_browser_approval(
+        &mut rt,
+        crate::browser_adapter::BrowserActionKind::OpenUrl(req.url.clone()),
+        &req.url,
+    )?;
+
+    let res = rt.browser_manager.open_url(&req.url).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!(res)))
+}
+
+async fn browser_screenshot_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    check_browser_approval(
+        &mut rt,
+        crate::browser_adapter::BrowserActionKind::Screenshot,
+        &req.url,
+    )?;
+
+    let res = rt.browser_manager.screenshot(&req.url).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!(res)))
+}
+
+async fn browser_read_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    check_browser_approval(
+        &mut rt,
+        crate::browser_adapter::BrowserActionKind::ReadText,
+        &req.url,
+    )?;
+
+    let res = rt.browser_manager.read_text(&req.url).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!(res)))
+}
+
+async fn browser_qa_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    check_browser_approval(
+        &mut rt,
+        crate::browser_adapter::BrowserActionKind::OpenUrl(req.url.clone()),
+        &req.url,
+    )?;
+
+    // Basic mock QA loop for now
+    let _ = rt.browser_manager.open_url(&req.url).await;
+    let _ = rt.browser_manager.screenshot(&req.url).await;
+    let _ = rt.browser_manager.read_text(&req.url).await;
+    Ok(Json(serde_json::json!({ "status": "qa_completed" })))
 }

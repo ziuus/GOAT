@@ -159,8 +159,8 @@ pub struct App {
     pub sidebar_visible: bool,
     /// Whether the context panel is visible in dashboard mode (Ctrl+R toggle)
     pub context_visible: bool,
-    /// Checkpoint manager
     pub checkpoint_manager: crate::checkpoint::CheckpointManager,
+    pub browser_manager: crate::browser_adapter::BrowserAdapterManager,
     /// Selected file context for AI prompting (Phase 3.6)
     pub selected_files: Vec<String>,
     pub mcp_runtime: crate::mcp_runtime::McpRuntimeManager,
@@ -245,6 +245,7 @@ impl App {
             skill_researcher: rt.skill_researcher,
             timeline_manager: rt.timeline_manager,
             github_manager: rt.github_manager,
+            browser_manager: rt.browser_manager,
             brain_disabled,
             pending_approval: None,
             active_skill: None,
@@ -1450,15 +1451,24 @@ impl App {
                         self.push_log("[SKILLS] Starting Skill Researcher... (mocked)");
                         let candidates = self.skill_researcher.suggest_mock();
                         for c in candidates {
-                            self.push_log(format!("[RESEARCH] Found: {} ({}) - {}", c.title, c.source, c.summary));
+                            self.push_log(format!(
+                                "[RESEARCH] Found: {} ({}) - {}",
+                                c.title, c.source, c.summary
+                            ));
                             self.push_log(format!("           Reason: {}", c.reason));
-                            self.push_log(format!("           Use /skills attach {} to attach to session.", c.id));
+                            self.push_log(format!(
+                                "           Use /skills attach {} to attach to session.",
+                                c.id
+                            ));
                         }
                     }
                     "attach" => {
                         let id = parts.get(2).copied().unwrap_or("");
                         match self.skill_researcher.attach(id) {
-                            Ok(_) => self.push_log(format!("[SKILLS] Attached skill {} to current session.", id)),
+                            Ok(_) => self.push_log(format!(
+                                "[SKILLS] Attached skill {} to current session.",
+                                id
+                            )),
                             Err(e) => self.push_log(format!("[SKILLS] Error: {}", e)),
                         }
                     }
@@ -1490,7 +1500,10 @@ impl App {
                         match pack_cmd {
                             "list" => self.push_log("[PACKS] No packs found."),
                             "save-from-session" => {
-                                self.push_log(format!("[PACKS] Saved active skills to pack '{}'.", pack_name));
+                                self.push_log(format!(
+                                    "[PACKS] Saved active skills to pack '{}'.",
+                                    pack_name
+                                ));
                             }
                             _ => self.push_log(format!("[PACKS] Unknown command: {}", pack_cmd)),
                         }
@@ -1534,7 +1547,10 @@ impl App {
                         self.push_log("[RESEARCH] Skill Researcher disabled.");
                     }
                     "status" => {
-                        self.push_log(format!("[RESEARCH] Enabled: {}", self.skill_researcher.enabled));
+                        self.push_log(format!(
+                            "[RESEARCH] Enabled: {}",
+                            self.skill_researcher.enabled
+                        ));
                     }
                     _ => self.push_log(format!("[RESEARCH] Unknown command: {}", action)),
                 }
@@ -1593,34 +1609,53 @@ impl App {
                             let _ = self.github_manager.unlink_issue();
                             self.push_log("[GITHUB] Unlinked issue.");
                         } else {
-                            self.push_log(format!("[GITHUB] Issue status: {:?}", self.github_manager.linked_issue));
+                            self.push_log(format!(
+                                "[GITHUB] Issue status: {:?}",
+                                self.github_manager.linked_issue
+                            ));
                         }
                     }
                     "branch" => {
                         let sub = parts.get(2).copied().unwrap_or("status");
                         if sub == "plan" {
                             if let Ok(plan) = self.github_manager.plan_branch() {
-                                self.push_log(format!("[GITHUB] Branch Plan: {}", plan.suggested_name));
+                                self.push_log(format!(
+                                    "[GITHUB] Branch Plan: {}",
+                                    plan.suggested_name
+                                ));
                             }
                         } else if sub == "create" {
                             if let Some(ref plan) = self.github_manager.branch_plan {
-                                self.push_log(format!("[GITHUB] Created branch {}", plan.suggested_name));
-                                self.github_manager.state = crate::github_workflow::GitHubWorkflowState::BranchCreated;
+                                self.push_log(format!(
+                                    "[GITHUB] Created branch {}",
+                                    plan.suggested_name
+                                ));
+                                self.github_manager.state =
+                                    crate::github_workflow::GitHubWorkflowState::BranchCreated;
                             }
                         } else {
-                            self.push_log(format!("[GITHUB] Branch state: {:?}", self.github_manager.state));
+                            self.push_log(format!(
+                                "[GITHUB] Branch state: {:?}",
+                                self.github_manager.state
+                            ));
                         }
                     }
                     "pr" => {
                         let sub = parts.get(2).copied().unwrap_or("status");
                         if sub == "draft" || sub == "body" || sub == "title" || sub == "preview" {
                             if let Ok(draft) = self.github_manager.draft_pr() {
-                                self.push_log(format!("[GITHUB] PR Draft:\nTitle: {}\n\n{}", draft.title, draft.body));
+                                self.push_log(format!(
+                                    "[GITHUB] PR Draft:\nTitle: {}\n\n{}",
+                                    draft.title, draft.body
+                                ));
                             }
                         } else if sub == "create" || sub == "create-draft" {
                             self.push_log("[GITHUB] PR Creation requested. Awaiting ApprovalGate.");
                         } else {
-                            self.push_log(format!("[GITHUB] PR state: {:?}", self.github_manager.state));
+                            self.push_log(format!(
+                                "[GITHUB] PR state: {:?}",
+                                self.github_manager.state
+                            ));
                         }
                     }
                     "push" => {
@@ -1630,6 +1665,67 @@ impl App {
                         self.push_log("[GITHUB] Reviewing diff and planning...");
                     }
                     _ => self.push_log(format!("[GITHUB] Unknown action: {}", action)),
+                }
+                true
+            }
+            cmd if cmd.starts_with("/browser") => {
+                let rt = tokio::runtime::Handle::current();
+                let action = parts.get(1).copied().unwrap_or("status");
+                match action {
+                    "status" | "doctor" => {
+                        self.push_log(format!("[BROWSER] Checking status..."));
+                        if let Ok(res) = rt.block_on(self.browser_manager.check_doctor()) {
+                            self.push_log(format!("[BROWSER] {}", res));
+                        } else {
+                            self.push_log("[BROWSER] Error checking doctor status".to_string());
+                        }
+                    }
+                    "open" => {
+                        if let Some(url) = parts.get(2) {
+                            self.push_log(format!("[BROWSER] Opening {}", url));
+                            if let Ok(res) = rt.block_on(self.browser_manager.open_url(url)) {
+                                self.push_log(format!("[BROWSER] Success: {}", res.success));
+                            } else {
+                                self.push_log("[BROWSER] Failed to open URL".to_string());
+                            }
+                        } else {
+                            self.push_log("[BROWSER] Missing URL".to_string());
+                        }
+                    }
+                    "screenshot" | "shot" => {
+                        let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
+                        self.push_log(format!("[BROWSER] Capturing screenshot of {}", url));
+                        if let Ok(res) = rt.block_on(self.browser_manager.screenshot(url)) {
+                            self.push_log(format!("[BROWSER] Screenshot success: {}", res.success));
+                        } else {
+                            self.push_log("[BROWSER] Failed to take screenshot".to_string());
+                        }
+                    }
+                    "read" => {
+                        let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
+                        self.push_log(format!("[BROWSER] Reading text from {}", url));
+                        if let Ok(res) = rt.block_on(self.browser_manager.read_text(url)) {
+                            if let Some(obs) = res.observation {
+                                if let Some(txt) = obs.text_content {
+                                    self.push_log(format!("[BROWSER] Text:\n{}", txt));
+                                }
+                            }
+                        } else {
+                            self.push_log("[BROWSER] Failed to read text".to_string());
+                        }
+                    }
+                    "qa" => {
+                        let url = parts.get(2).copied().unwrap_or("http://127.0.0.1:3000");
+                        self.push_log(format!("[BROWSER] Starting QA for {}", url));
+                        self.push_log("[BROWSER] Opening URL...");
+                        let _ = rt.block_on(self.browser_manager.open_url(url));
+                        self.push_log("[BROWSER] Taking screenshot...");
+                        let _ = rt.block_on(self.browser_manager.screenshot(url));
+                        self.push_log("[BROWSER] Reading DOM...");
+                        let _ = rt.block_on(self.browser_manager.read_text(url));
+                        self.push_log("[BROWSER] QA Completed. Check timeline/dashboard.");
+                    }
+                    _ => self.push_log(format!("[BROWSER] Unknown action: {}", action)),
                 }
                 true
             }

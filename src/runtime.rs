@@ -49,13 +49,15 @@ pub struct GoatRuntime {
     // ── Session ───────────────────────────────────────────────────────────────
     /// Active session identifier (UUID for new sessions, legacy ID for resumed).
     pub session_id: String,
-    
+
     /// Skill Researcher for the session
     pub skill_researcher: crate::skill_researcher::SkillResearcher,
     /// Timeline Manager for the session
     pub timeline_manager: crate::timeline::TimelineManager,
     /// GitHub Workflow Manager for the session
     pub github_manager: crate::github_workflow::GitHubWorkflowManager,
+    /// Browser Adapter Manager for the session
+    pub browser_manager: crate::browser_adapter::BrowserAdapterManager,
     /// Whether this session was resumed from the brain (true) or is fresh (false).
     pub session_resumed: bool,
     /// Whether brain (SQLite) is disabled via `--no-brain`.
@@ -270,7 +272,12 @@ impl GoatRuntime {
             session_id: session_id.clone(),
             skill_researcher: crate::skill_researcher::SkillResearcher::new(session_id.clone()),
             timeline_manager: crate::timeline::TimelineManager::new(&paths.data_dir),
-            github_manager: crate::github_workflow::GitHubWorkflowManager::new(config.github.clone()),
+            github_manager: crate::github_workflow::GitHubWorkflowManager::new(
+                config.github.clone(),
+            ),
+            browser_manager: crate::browser_adapter::BrowserAdapterManager::new(
+                config.browser.clone(),
+            ),
             session_resumed,
             brain_disabled: no_brain,
             brain,

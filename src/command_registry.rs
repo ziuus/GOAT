@@ -40,6 +40,7 @@ pub enum CommandCategory {
     Hooks,
     Scheduler,
     Jobs,
+    Browser,
     /// Commands planned for future phases — not yet implemented.
     Future,
 }
@@ -66,6 +67,7 @@ impl CommandCategory {
             CommandCategory::Hooks => "Hooks",
             CommandCategory::Scheduler => "Scheduler",
             CommandCategory::Jobs => "Jobs",
+            CommandCategory::Browser => "Browser / QA",
             CommandCategory::Future => "Future (Planned)",
         }
     }
@@ -91,6 +93,7 @@ impl CommandCategory {
             CommandCategory::Hooks => "🪝",
             CommandCategory::Scheduler => "⏱",
             CommandCategory::Jobs => "🏗",
+            CommandCategory::Browser => "🌐",
             CommandCategory::Future => "🔮",
         }
     }
@@ -401,6 +404,28 @@ impl CommandRegistry {
 /// Every slash command handled in app.rs and headless.rs must be here.
 fn all_commands() -> Vec<CommandMetadata> {
     vec![
+        // ── Browser / QA ───────────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/browser",
+            aliases: &["\\browser", "\\browser doctor", "\\browser status"],
+            category: CommandCategory::Browser,
+            description: "Interact with the browser adapter layer",
+            usage: "/browser <action> [url]",
+            examples: &[
+                "/browser status",
+                "/browser doctor",
+                "/browser open http://localhost:3000",
+                "/browser screenshot",
+                "/browser read",
+                "/browser qa http://localhost:3000",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
         // ── General ────────────────────────────────────────────────────────────
         CommandMetadata {
             name: "/help",

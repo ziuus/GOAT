@@ -123,11 +123,16 @@ impl GitHubWorkflowManager {
 
     pub fn plan_branch(&mut self) -> Result<GitHubBranchPlan> {
         let name = if let Some(iss) = &self.linked_issue {
-            format!("{}{}-{}", self.config.branch_prefix, iss.number, iss.title.replace(" ", "-").to_lowercase())
+            format!(
+                "{}{}-{}",
+                self.config.branch_prefix,
+                iss.number,
+                iss.title.replace(" ", "-").to_lowercase()
+            )
         } else {
             format!("{}feature-branch", self.config.branch_prefix)
         };
-        
+
         let plan = GitHubBranchPlan {
             suggested_name: name,
             base_branch: self.config.default_base_branch.clone(),
@@ -159,7 +164,7 @@ mod tests {
     fn test_github_workflow_state_transitions() {
         let mut mgr = GitHubWorkflowManager::new(GitHubWorkflowConfig::default());
         assert_eq!(mgr.state, GitHubWorkflowState::Unlinked);
-        
+
         let status = mgr.status().unwrap();
         assert_eq!(status["state"], "Unlinked");
 

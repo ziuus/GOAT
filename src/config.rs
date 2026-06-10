@@ -110,6 +110,9 @@ pub struct Config {
     /// Recipe marketplace and automation config.
     #[serde(default)]
     pub recipe_marketplace: RecipeConfig,
+    /// Browser integration config.
+    #[serde(default)]
+    pub browser: BrowserConfig,
     /// Skill researcher mode config.
     #[serde(default)]
     pub skill_researcher: SkillResearcherConfig,
@@ -1257,6 +1260,53 @@ impl Default for SkillResearcherConfig {
             max_remote_requests_per_session: 20,
             cache_ttl_minutes: 1440,
             attach_top_skill_automatically: false,
+        }
+    }
+}
+
+// ── Browser Config ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct BrowserConfig {
+    pub enabled: bool,
+    pub provider: String,
+    pub require_approval_for_navigation: bool,
+    pub require_approval_for_clicks: bool,
+    pub require_approval_for_forms: bool,
+    pub require_approval_for_downloads: bool,
+    pub require_approval_for_external_urls: bool,
+    pub allow_localhost_without_approval: bool,
+    pub allow_screenshots: bool,
+    pub allow_dom_read: bool,
+    pub allow_file_uploads: bool,
+    pub store_screenshots: bool,
+    pub max_steps_per_task: usize,
+    pub max_session_minutes: usize,
+    pub redact_page_text: bool,
+    pub blocked_domains: Vec<String>,
+    pub allowed_domains: Vec<String>,
+}
+
+impl Default for BrowserConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: "manual_stub".to_string(),
+            require_approval_for_navigation: false,
+            require_approval_for_clicks: true,
+            require_approval_for_forms: true,
+            require_approval_for_downloads: true,
+            require_approval_for_external_urls: true,
+            allow_localhost_without_approval: true,
+            allow_screenshots: true,
+            allow_dom_read: true,
+            allow_file_uploads: false,
+            store_screenshots: true,
+            max_steps_per_task: 20,
+            max_session_minutes: 30,
+            redact_page_text: true,
+            blocked_domains: Vec::new(),
+            allowed_domains: Vec::new(),
         }
     }
 }

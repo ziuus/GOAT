@@ -22,6 +22,7 @@ const navItems = [
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Hooks', href: '/hooks', icon: Clock },
   { name: 'GitHub Workflow', href: '/github', icon: GitBranch },
+  { name: 'Browser QA', href: '/browser', icon: Activity },
   { name: 'MCP & Tools', href: '/mcp', icon: TerminalSquare },
   { name: 'Logs', href: '/logs', icon: ScrollText },
   { name: 'Settings', href: '/settings', icon: Settings },
