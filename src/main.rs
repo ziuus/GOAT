@@ -8,6 +8,7 @@ pub mod command_registry;
 pub mod config;
 pub mod daemon;
 pub mod error;
+pub mod events;
 pub mod external_agents;
 pub mod headless;
 pub mod hooks;

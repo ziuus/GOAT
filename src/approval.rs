@@ -53,7 +53,7 @@ impl std::fmt::Display for RiskLevel {
 // ── Approval request ─────────────────────────────────────────────────────────
 
 /// A request for the user to approve or deny a dangerous operation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ApprovalRequest {
     /// The name of the tool being invoked (e.g. `"bash"`, `"write_file"`).
     pub tool_name: String,
@@ -251,13 +251,78 @@ impl ApprovalGate {
                     tool = %request.tool_name,
                     action = %request.action_summary,
                     input = %other,
-                    "unrecognized approval input — defaulting to Denied"
+                    "invalid input — defaulting to deny"
                 );
                 ApprovalDecision::Denied(format!(
-                    "Approval input '{}' not recognized. Execution of '{}' denied by default.",
-                    other, request.tool_name
+                    "User provided invalid input '{}', defaulting to deny.",
+                    other
                 ))
             }
+        }
+    }
+}
+
+// ── Phase 4.2: Approval Queue ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PendingApproval {
+    pub id: String,
+    pub created_at: u64,
+    pub request: ApprovalRequest,
+    pub source: String,
+}
+
+pub struct ApprovalQueue {
+    pending: std::sync::Arc<tokio::sync::Mutex<HashMap<String, (PendingApproval, tokio::sync::oneshot::Sender<char>)>>>,
+}
+
+impl Default for ApprovalQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ApprovalQueue {
+    pub fn new() -> Self {
+        Self {
+            pending: std::sync::Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub async fn add(
+        &self,
+        request: ApprovalRequest,
+        source: &str,
+    ) -> (PendingApproval, tokio::sync::oneshot::Receiver<char>) {
+        let id = uuid::Uuid::new_v4().to_string();
+        let pending = PendingApproval {
+            id: id.clone(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            request,
+            source: source.to_string(),
+        };
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.pending.lock().await.insert(id, (pending.clone(), tx));
+        (pending, rx)
+    }
+
+    pub async fn list(&self) -> Vec<PendingApproval> {
+        self.pending.lock().await.values().map(|(p, _)| p.clone()).collect()
+    }
+
+    pub async fn get(&self, id: &str) -> Option<PendingApproval> {
+        self.pending.lock().await.get(id).map(|(p, _)| p.clone())
+    }
+
+    pub async fn resolve(&self, id: &str, decision: char) -> bool {
+        if let Some((_, tx)) = self.pending.lock().await.remove(id) {
+            tx.send(decision).is_ok()
+        } else {
+            false
         }
     }
 }

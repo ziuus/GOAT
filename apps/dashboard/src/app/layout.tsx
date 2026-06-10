@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: 'Control center for the General Omniscient Agentic Tool',
 };
 
+import EventStreamProvider from '@/components/EventStreamProvider';
+
 export default function RootLayout({
   children,
 }: {
@@ -18,8 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} flex h-screen overflow-hidden bg-background`}>
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        <EventStreamProvider>
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto p-8">{children}</main>
+        </EventStreamProvider>
       </body>
     </html>
   );

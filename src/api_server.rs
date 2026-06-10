@@ -9,6 +9,7 @@ use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
+use tokio_stream::StreamExt;
 
 use crate::runtime::GoatRuntime;
 
@@ -46,6 +47,11 @@ pub async fn start_server(
         .route("/v1/mcp/status", get(mcp_status_handler))
         .route("/v1/command", post(command_handler))
         .route("/v1/logs/recent", get(logs_handler))
+        .route("/v1/events/stream", get(events_stream_handler))
+        .route("/v1/approvals", get(approvals_list_handler))
+        .route("/v1/approvals/:id", get(approval_detail_handler))
+        .route("/v1/approvals/:id/approve", post(approval_approve_handler))
+        .route("/v1/approvals/:id/deny", post(approval_deny_handler))
         .layer(cors)
         .with_state(state);
 
@@ -229,4 +235,86 @@ async fn logs_handler(
     } else {
         Ok(Json(json!({ "logs": [] })))
     }
+}
+
+async fn events_stream_handler(
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<std::collections::HashMap<String, String>>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<axum::response::sse::Sse<impl tokio_stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<serde_json::Value>)> {
+    if state.auth_required {
+        let auth_valid = if let Some(auth_header) = headers.get("Authorization") {
+            auth_header.to_str().unwrap_or("") == format!("Bearer {}", state.token)
+        } else if let Some(token) = query.get("token") {
+            token == &state.token
+        } else {
+            false
+        };
+
+        if !auth_valid {
+            return Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))));
+        }
+    }
+    
+    let rt = state.runtime.lock().await;
+    let rx = rt.event_bus.subscribe();
+    drop(rt);
+
+    let stream = tokio_stream::wrappers::BroadcastStream::new(rx)
+        .filter_map(|res| res.ok())
+        .map(|evt| {
+            let json = serde_json::to_string(&evt).unwrap_or_default();
+            Ok(axum::response::sse::Event::default()
+                .event(evt.kind)
+                .data(json))
+        });
+
+    Ok(axum::response::sse::Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::new()))
+}
+
+async fn approvals_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let approvals = rt.approval_queue.list().await;
+    Ok(Json(json!({ "approvals": approvals })))
+}
+
+async fn approval_detail_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    if let Some(approval) = rt.approval_queue.get(&id).await {
+        Ok(Json(json!({ "approval": approval })))
+    } else {
+        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Not found" }))))
+    }
+}
+
+async fn approval_approve_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let ok = rt.approval_queue.resolve(&id, 'y').await;
+    Ok(Json(json!({ "success": ok })))
+}
+
+async fn approval_deny_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let ok = rt.approval_queue.resolve(&id, 'n').await;
+    Ok(Json(json!({ "success": ok })))
 }

@@ -1,17 +1,18 @@
 # GOAT Web Dashboard
 
-**Version:** 0.13.0 (Phase 4.1)
+**Version:** 0.13.0 (Phase 4.2)
 **Status:** Alpha
 
-The GOAT Web Dashboard is a local-first, read-only interface to monitor your GOAT Daemon. It connects to the `axum` API over HTTP.
+The GOAT Web Dashboard is a local-first interface to monitor and control your GOAT Daemon. It connects to the `axum` API over HTTP and uses Server-Sent Events (SSE) for real-time updates.
 
 ## Architecture
 
 * **Frontend**: Next.js 15, React 19, TypeScript, TailwindCSS
 * **Location**: `apps/dashboard/`
 * **Connection**: Communicates with the local GOAT daemon API (`127.0.0.1:47647`)
+* **Real-time**: Uses `EventSource` to receive live system events (e.g. `daemon_started`, `job_started`) via SSE at `/v1/events/stream`.
 * **Security**: Token-based authentication using `~/.local/share/goat/daemon.token`
-* **State**: Read-only observability for Phase 4.1. No remote telemetry or cloud sync.
+* **State**: Allows read-only observability and interactive approval for risky commands via the Approval Queue.
 
 ## Setup & Running
 
@@ -39,12 +40,13 @@ Visit `http://localhost:3000` in your browser. Upon first load, you will be prom
 ## Views
 
 1. **Overview**: Displays daemon health, GOAT version, active profile, and system specs.
-2. **Jobs**: Lists active and recent scheduled background tasks.
-3. **Schedule**: Shows configured background routines from `goat.toml`.
-4. **Hooks**: Displays configured lifecycle hooks.
-5. **MCP & Tools**: Lists active Model Context Protocol servers and their discovered tools.
-6. **Logs**: Real-time view of recent daemon logs.
-7. **Settings**: Token configuration and API endpoint configuration.
+2. **Approvals**: Real-time interactive queue to securely review, approve, or deny sensitive operations intercepted by the ApprovalGate.
+3. **Jobs**: Lists active and recent scheduled background tasks.
+4. **Schedule**: Shows configured background routines from `goat.toml`.
+5. **Hooks**: Displays configured lifecycle hooks.
+6. **MCP & Tools**: Lists active Model Context Protocol servers and their discovered tools.
+7. **Logs**: Real-time view of recent daemon logs.
+8. **Settings**: Token configuration and API endpoint configuration.
 
 ## Command Integrations
 
@@ -58,8 +60,8 @@ Inside the TUI or Headless mode, you can type `/dashboard` to see the dashboard 
 
 * **Local Only**: The daemon API and the dashboard are designed for local operation.
 * **Token Auth**: The daemon enforces Bearer token authentication. The token is stored in your browser's `localStorage` and never transmitted remotely.
-* **Approval Gates**: The dashboard does not bypass GOAT's ApprovalGate. Dangerous operations are not executed directly from the dashboard UI at this time.
+* **Approval Gates**: The dashboard does not bypass GOAT's ApprovalGate. Dangerous operations are intercepted and surfaced in the Approval Queue, maintaining a centralized point of user authorization.
 
 ## Next Phases
 
-Phase 4.2+ will introduce real-time WebSocket events, interactive chat panels, and secure approval queues for remote execution.
+Phase 4.3+ will introduce interactive chat panels, voice interfaces, and deeper workflow automation components.

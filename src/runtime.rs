@@ -99,6 +99,10 @@ pub struct GoatRuntime {
     pub hooks_manager: crate::hooks::HooksManager,
     pub scheduler_manager: crate::scheduler::SchedulerManager,
     pub job_tracker: crate::jobs::JobTracker,
+
+    // ── Phase 4.2 Event Bus ──────────────────────────────────────────────────
+    pub event_bus: std::sync::Arc<crate::events::EventBus>,
+    pub approval_queue: std::sync::Arc<crate::approval::ApprovalQueue>,
 }
 
 impl GoatRuntime {
@@ -284,6 +288,8 @@ impl GoatRuntime {
                 paths.clone(),
             ),
             job_tracker: crate::jobs::JobTracker::new(),
+            event_bus: std::sync::Arc::new(crate::events::EventBus::new(1000)),
+            approval_queue: std::sync::Arc::new(crate::approval::ApprovalQueue::new()),
         };
 
         (runtime, boot_log)

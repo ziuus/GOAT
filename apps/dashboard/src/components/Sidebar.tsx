@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings } from 'lucide-react';
+import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings, ShieldCheck } from 'lucide-react';
 
 const navItems = [
   { name: 'Overview', href: '/', icon: Activity },
+  { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
   { name: 'Jobs', href: '/jobs', icon: TerminalSquare },
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Hooks', href: '/hooks', icon: Clock },

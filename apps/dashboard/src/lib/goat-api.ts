@@ -49,4 +49,23 @@ export const goatApi = {
   getSchedule: () => fetchGoat<any>('/v1/schedule'),
   getMcpStatus: () => fetchGoat<any>('/v1/mcp/status').catch(() => ({ servers: [] })),
   getLogs: () => fetchGoat<any>('/v1/logs/recent').catch(() => ({ logs: [] })),
+  getApprovals: () => fetchGoat<any>('/v1/approvals').catch(() => ({ approvals: [] })),
+  approveRequest: async (id: string) => {
+    const config = getGoatConfig();
+    if (!config) throw new Error('Not configured');
+    const res = await fetch(`${config.baseUrl}/v1/approvals/${id}/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+    return res.json();
+  },
+  denyRequest: async (id: string) => {
+    const config = getGoatConfig();
+    if (!config) throw new Error('Not configured');
+    const res = await fetch(`${config.baseUrl}/v1/approvals/${id}/deny`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+    return res.json();
+  },
 };
