@@ -232,7 +232,9 @@ impl McpManager {
             }
             match timeout(MCP_SHUTDOWN_TIMEOUT, server.client.shutdown()).await {
                 Ok(Ok(())) => logs.push(format!("[MCP] Server '{name}' stopped.")),
-                Ok(Err(err)) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown failed: {err}")),
+                Ok(Err(err)) => logs.push(format!(
+                    "[MCP ERROR] Server '{name}' shutdown failed: {err}"
+                )),
                 Err(_) => logs.push(format!("[MCP ERROR] Server '{name}' shutdown timed out.")),
             }
         } else {

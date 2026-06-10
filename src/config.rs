@@ -483,8 +483,12 @@ pub struct McpServerConfig {
     pub risk: String,
 }
 
-fn default_transport() -> String { "stdio".to_string() }
-fn default_risk() -> String { "ask".to_string() }
+fn default_transport() -> String {
+    "stdio".to_string()
+}
+fn default_risk() -> String {
+    "ask".to_string()
+}
 
 // ── ConfigLoadResult ──────────────────────────────────────────────────────────
 
@@ -585,8 +589,12 @@ impl Config {
             if mcp_json.exists() {
                 if let Ok(content) = fs::read_to_string(&mcp_json) {
                     if let Ok(parsed) = serde_json::from_str::<McpFile>(&content) {
-                        for (k, v) in parsed.mcpServers { config.mcp_servers.insert(k, v); }
-                        for (k, v) in parsed.servers { config.mcp_servers.insert(k, v); }
+                        for (k, v) in parsed.mcpServers {
+                            config.mcp_servers.insert(k, v);
+                        }
+                        for (k, v) in parsed.servers {
+                            config.mcp_servers.insert(k, v);
+                        }
                     } else {
                         warnings.push(format!("[CONFIG] Failed to parse {}", mcp_json.display()));
                     }
@@ -594,8 +602,12 @@ impl Config {
             } else if mcp_toml.exists() {
                 if let Ok(content) = fs::read_to_string(&mcp_toml) {
                     if let Ok(parsed) = toml::from_str::<McpFile>(&content) {
-                        for (k, v) in parsed.mcpServers { config.mcp_servers.insert(k, v); }
-                        for (k, v) in parsed.servers { config.mcp_servers.insert(k, v); }
+                        for (k, v) in parsed.mcpServers {
+                            config.mcp_servers.insert(k, v);
+                        }
+                        for (k, v) in parsed.servers {
+                            config.mcp_servers.insert(k, v);
+                        }
                     } else {
                         warnings.push(format!("[CONFIG] Failed to parse {}", mcp_toml.display()));
                     }

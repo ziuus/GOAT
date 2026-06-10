@@ -826,7 +826,10 @@ fn handle_tools_command(
             if paths.tool_catalog_file.exists() {
                 println!("Catalog loaded from: {}", paths.tool_catalog_file.display());
             } else {
-                println!("Catalog not found at {}. Using default docs catalog.", paths.tool_catalog_file.display());
+                println!(
+                    "Catalog not found at {}. Using default docs catalog.",
+                    paths.tool_catalog_file.display()
+                );
             }
             if let Some(a) = arg {
                 let parts: Vec<&str> = a.splitn(2, ' ').collect();
@@ -846,7 +849,9 @@ fn handle_tools_command(
         }
         "install" | "enable" | "disable" | "remove" => {
             println!("Tool/MCP {} is planned for Phase 3.8.", action);
-            println!("No automatic installation yet. Future installs require approval and sandbox checks.");
+            println!(
+                "No automatic installation yet. Future installs require approval and sandbox checks."
+            );
             if let Some(a) = arg {
                 println!("Target: {}", a);
             }
@@ -874,10 +879,21 @@ fn handle_mcp_command(
         "status" => {
             println!("MCP Status (Phase 3.7 Foundation)");
             let mcp_conf_exists = paths.mcp_json_file.exists() || paths.mcp_toml_file.exists();
-            println!("MCP config paths: {} / {}", paths.mcp_json_file.display(), paths.mcp_toml_file.display());
-            println!("MCP config exists: {}", if mcp_conf_exists { "yes" } else { "no" });
+            println!(
+                "MCP config paths: {} / {}",
+                paths.mcp_json_file.display(),
+                paths.mcp_toml_file.display()
+            );
+            println!(
+                "MCP config exists: {}",
+                if mcp_conf_exists { "yes" } else { "no" }
+            );
             let enabled_count = config.mcp_servers.values().filter(|s| s.enabled).count();
-            let risky_count = config.mcp_servers.values().filter(|s| s.risk == "ask" || s.risk == "deny").count();
+            let risky_count = config
+                .mcp_servers
+                .values()
+                .filter(|s| s.risk == "ask" || s.risk == "deny")
+                .count();
             println!("Configured servers: {}", config.mcp_servers.len());
             println!("Enabled servers: {}", enabled_count);
             println!("Risky servers: {}", risky_count);
@@ -889,10 +905,16 @@ fn handle_mcp_command(
                 return Ok(());
             }
             println!("{:-<80}", "");
-            println!("{:<15} | {:<8} | {:<10} | {:<8} | {}", "Server Name", "Enabled", "Transport", "Risk", "Command");
+            println!(
+                "{:<15} | {:<8} | {:<10} | {:<8} | {}",
+                "Server Name", "Enabled", "Transport", "Risk", "Command"
+            );
             println!("{:-<80}", "");
             for (name, srv) in &config.mcp_servers {
-                println!("{:<15} | {:<8} | {:<10} | {:<8} | {}", name, srv.enabled, srv.transport, srv.risk, srv.command);
+                println!(
+                    "{:<15} | {:<8} | {:<10} | {:<8} | {}",
+                    name, srv.enabled, srv.transport, srv.risk, srv.command
+                );
             }
             println!("{:-<80}", "");
         }
@@ -908,7 +930,10 @@ fn handle_mcp_command(
                 println!("Risk Policy: {}", srv.risk);
                 println!("Command: {}", srv.command);
                 println!("Args: {:?}", srv.args);
-                println!("Env Vars Configured: {:?}", srv.env.keys().collect::<Vec<_>>());
+                println!(
+                    "Env Vars Configured: {:?}",
+                    srv.env.keys().collect::<Vec<_>>()
+                );
             } else {
                 println!("MCP server '{}' not found in config.", name);
             }
@@ -918,20 +943,45 @@ fn handle_mcp_command(
                 println!("Usage: goat mcp {} <name>", action);
                 return Ok(());
             };
-            println!("Lifecycle action '{}' for MCP server '{}' is planned/partial.", action, name);
-            println!("Currently waiting for full MCP client lifecycle + ApprovalGate integration in Phase 3.8.");
+            println!(
+                "Lifecycle action '{}' for MCP server '{}' is planned/partial.",
+                action, name
+            );
+            println!(
+                "Currently waiting for full MCP client lifecycle + ApprovalGate integration in Phase 3.8."
+            );
         }
         "doctor" => {
             println!("MCP Doctor (Phase 3.7)");
             let mcp_conf_exists = paths.mcp_json_file.exists() || paths.mcp_toml_file.exists();
-            println!("[*] Config paths checked: {} / {}", paths.mcp_json_file.display(), paths.mcp_toml_file.display());
-            println!("[*] Config exists: {}", if mcp_conf_exists { "yes" } else { "no" });
+            println!(
+                "[*] Config paths checked: {} / {}",
+                paths.mcp_json_file.display(),
+                paths.mcp_toml_file.display()
+            );
+            println!(
+                "[*] Config exists: {}",
+                if mcp_conf_exists { "yes" } else { "no" }
+            );
             println!("[*] Configured servers: {}", config.mcp_servers.len());
-            println!("[*] Tool catalog path: {}", paths.tool_catalog_file.display());
-            println!("[*] Tool catalog exists: {}", if paths.tool_catalog_file.exists() { "yes" } else { "no" });
+            println!(
+                "[*] Tool catalog path: {}",
+                paths.tool_catalog_file.display()
+            );
+            println!(
+                "[*] Tool catalog exists: {}",
+                if paths.tool_catalog_file.exists() {
+                    "yes"
+                } else {
+                    "no"
+                }
+            );
         }
         _ => {
-            println!("Unknown action '{}'. Expected: status, list, show, start, stop, restart, doctor.", action);
+            println!(
+                "Unknown action '{}'. Expected: status, list, show, start, stop, restart, doctor.",
+                action
+            );
         }
     }
 
@@ -1833,7 +1883,7 @@ fn handle_hooks_command(
 ) -> anyhow::Result<()> {
     // Basic wrapper to print output from hooks manager for CLI usage.
     let mut hm = crate::hooks::HooksManager::new(config.hooks.clone(), paths.clone());
-    
+
     match action {
         "list" => {
             let info = hm.list_hooks_info();
@@ -1863,13 +1913,16 @@ fn handle_schedule_command(
     args: &[String],
 ) -> anyhow::Result<()> {
     let mut sm = crate::scheduler::SchedulerManager::new(config.scheduler.clone(), paths.clone());
-    
+
     match action {
         "list" => {
             let jobs = sm.list_jobs();
             println!("[SCHEDULE] Scheduled Jobs:");
             for j in jobs {
-                println!("  - [{}] {} (enabled: {})", j.id, j.prompt_or_command, j.enabled);
+                println!(
+                    "  - [{}] {} (enabled: {})",
+                    j.id, j.prompt_or_command, j.enabled
+                );
             }
         }
         "add" => {

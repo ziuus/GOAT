@@ -449,15 +449,24 @@ async fn handle_slash_command(
                         println!("[TOOLS] Catalog action '{}' on '{}'", action, arg);
                     } else {
                         println!("[TOOLS] Available Planned Categories:");
-                        println!("[TOOLS] - filesystem MCP, git tools, browser automation, web search,");
+                        println!(
+                            "[TOOLS] - filesystem MCP, git tools, browser automation, web search,"
+                        );
                         println!("[TOOLS]   Playwright/browser-use, image generation, TTS/STT,");
-                        println!("[TOOLS]   database tools, GitHub tools, calendar/email tools, local shell");
+                        println!(
+                            "[TOOLS]   database tools, GitHub tools, calendar/email tools, local shell"
+                        );
                     }
                 }
-                cmd if cmd.starts_with("install") || cmd.starts_with("enable") || cmd.starts_with("disable") => {
+                cmd if cmd.starts_with("install")
+                    || cmd.starts_with("enable")
+                    || cmd.starts_with("disable") =>
+                {
                     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
                     println!("[TOOLS] Action '{}' is planned for Phase 3.8.", parts[0]);
-                    println!("[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks.");
+                    println!(
+                        "[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks."
+                    );
                 }
                 name => {
                     if let Some(tool) = rt.tool_registry.get(name) {
@@ -499,7 +508,8 @@ async fn handle_slash_command(
             match subcommand {
                 "status" => {
                     println!("[MCP] Status");
-                    let enabled_count = rt.config.mcp_servers.values().filter(|s| s.enabled).count();
+                    let enabled_count =
+                        rt.config.mcp_servers.values().filter(|s| s.enabled).count();
                     println!("[MCP] Configured servers: {}", rt.config.mcp_servers.len());
                     println!("[MCP] Enabled servers: {}", enabled_count);
                     let running = rt.mcp_manager.running_servers();
@@ -516,7 +526,10 @@ async fn handle_slash_command(
                             } else {
                                 "Unknown".to_string()
                             };
-                            println!("[MCP] - {} (Enabled: {}, Risk: {}, State: {})", name, srv.enabled, srv.risk, state);
+                            println!(
+                                "[MCP] - {} (Enabled: {}, Risk: {}, State: {})",
+                                name, srv.enabled, srv.risk, state
+                            );
                         }
                     }
                 }
@@ -548,12 +561,18 @@ async fn handle_slash_command(
                     let name = parts.get(2).copied().unwrap_or("");
                     if let Some(srv_config) = rt.config.mcp_servers.get(name).cloned() {
                         if !srv_config.enabled {
-                            println!("[MCP] Server '{}' is disabled in config. Refusing to start.", name);
+                            println!(
+                                "[MCP] Server '{}' is disabled in config. Refusing to start.",
+                                name
+                            );
                         } else {
                             use crate::approval::{ApprovalRequest, RiskLevel};
                             let req = ApprovalRequest {
                                 tool_name: "mcp_start".to_string(),
-                                action_summary: format!("Start MCP server '{}': {} {:?}", name, srv_config.command, srv_config.args),
+                                action_summary: format!(
+                                    "Start MCP server '{}': {} {:?}",
+                                    name, srv_config.command, srv_config.args
+                                ),
                                 risk_level: RiskLevel::High,
                                 explanation: None,
                                 working_directory: None,
@@ -625,11 +644,15 @@ async fn handle_slash_command(
                             let mut all_logs = Vec::new();
                             if rt.mcp_manager.running_servers().contains(&name.to_string()) {
                                 let stop_logs = rt.mcp_manager.stop_server(name).await;
-                                for log in &stop_logs { println!("{}", log); }
+                                for log in &stop_logs {
+                                    println!("{}", log);
+                                }
                                 all_logs.extend(stop_logs);
                             }
                             let start_logs = rt.mcp_manager.start_server(name, &srv_config).await;
-                            for log in &start_logs { println!("{}", log); }
+                            for log in &start_logs {
+                                println!("{}", log);
+                            }
                             all_logs.extend(start_logs);
                             if let Some(mrs) = rt.mcp_runtime.get_mut(name) {
                                 mrs.state = crate::mcp_runtime::McpServerState::Running;
@@ -656,12 +679,19 @@ async fn handle_slash_command(
                     println!("[MCP] Server '{}' tools (placeholder).", name);
                 }
                 "call" => {
-                    println!("[MCP] Tool call execution is partial; lifecycle and discovery are available.");
+                    println!(
+                        "[MCP] Tool call execution is partial; lifecycle and discovery are available."
+                    );
                 }
                 "doctor" => {
-                    println!("[MCP] Doctor: {} configured servers.", rt.config.mcp_servers.len());
+                    println!(
+                        "[MCP] Doctor: {} configured servers.",
+                        rt.config.mcp_servers.len()
+                    );
                 }
-                _ => println!("[MCP] Unknown command. Use /mcp status, list, show, start, stop, restart, doctor."),
+                _ => println!(
+                    "[MCP] Unknown command. Use /mcp status, list, show, start, stop, restart, doctor."
+                ),
             }
             true
         }
@@ -1277,10 +1307,15 @@ async fn handle_slash_command(
                 let jobs = rt.scheduler_manager.list_jobs();
                 println!("[SCHEDULE] {} Scheduled Jobs:", jobs.len());
                 for j in jobs {
-                    println!("[SCHEDULE]   [{}] {} (enabled: {})", j.id, j.prompt_or_command, j.enabled);
+                    println!(
+                        "[SCHEDULE]   [{}] {} (enabled: {})",
+                        j.id, j.prompt_or_command, j.enabled
+                    );
                 }
             } else {
-                println!("[SCHEDULE] Adding jobs via Headless is partial. Use manual config for now.");
+                println!(
+                    "[SCHEDULE] Adding jobs via Headless is partial. Use manual config for now."
+                );
             }
             true
         }
@@ -1399,7 +1434,9 @@ async fn handle_slash_command(
                     println!("  Total: {} chars", total_chars);
                 }
                 "suggest" => {
-                    println!("[CONTEXT] Suggestions based on recent edits / current task (planned).");
+                    println!(
+                        "[CONTEXT] Suggestions based on recent edits / current task (planned)."
+                    );
                 }
                 _ => println!("[CONTEXT] Usage: /context [add|remove|clear|show|budget|suggest]"),
             }
@@ -1661,8 +1698,14 @@ async fn handle_slash_command(
 async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Option<&str>) {
     println!("[YOU] {}", user_msg);
 
-    let hook_logs = rt.hooks_manager.run_hooks("on_submit", &mut rt.approval_gate).await.unwrap_or_default();
-    for log in hook_logs { println!("[HOOKS] {}", log); }
+    let hook_logs = rt
+        .hooks_manager
+        .run_hooks("on_submit", &mut rt.approval_gate)
+        .await
+        .unwrap_or_default();
+    for log in hook_logs {
+        println!("[HOOKS] {}", log);
+    }
 
     let is_first = rt.history.iter().all(|m| m.role != "user");
     if is_first {
@@ -1847,7 +1890,8 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                 continue;
                             }
 
-                            let approval_req = build_approval_request(&tc.function.name, &args, &tool_action);
+                            let approval_req =
+                                build_approval_request(&tc.function.name, &args, &tool_action);
 
                             if let Some(req) = approval_req {
                                 // Check session policy first.
@@ -1857,20 +1901,41 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             "[APPROVAL] Auto-approved (session policy): {}",
                                             tc.function.name
                                         );
-                                        let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                        for log in hook_logs { println!("[HOOKS] {}", log); }
+                                        let hook_logs = rt
+                                            .hooks_manager
+                                            .run_hooks("before_tool_call", &mut rt.approval_gate)
+                                            .await
+                                            .unwrap_or_default();
+                                        for log in hook_logs {
+                                            println!("[HOOKS] {}", log);
+                                        }
 
                                         let is_patch = patch_id.is_some();
                                         if is_patch {
-                                            let logs = rt.hooks_manager.run_hooks("before_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
-                                            for log in logs { println!("[HOOKS] {}", log); }
+                                            let logs = rt
+                                                .hooks_manager
+                                                .run_hooks(
+                                                    "before_patch_apply",
+                                                    &mut rt.approval_gate,
+                                                )
+                                                .await
+                                                .unwrap_or_default();
+                                            for log in logs {
+                                                println!("[HOOKS] {}", log);
+                                            }
                                         }
 
                                         let result =
                                             execute_tool(rt, &tc.function.name, args).await;
 
-                                        let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                        for log in hook_logs { println!("[HOOKS] {}", log); }
+                                        let hook_logs = rt
+                                            .hooks_manager
+                                            .run_hooks("after_tool_call", &mut rt.approval_gate)
+                                            .await
+                                            .unwrap_or_default();
+                                        for log in hook_logs {
+                                            println!("[HOOKS] {}", log);
+                                        }
 
                                         if let Some(id) = &patch_id {
                                             if let Some(p) = rt.workflow.get_patch_mut(id) {
@@ -1879,8 +1944,17 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             if let Some(task) = &mut rt.workflow.active_task {
                                                 task.status = crate::task::TaskStatus::PatchApplied;
                                             }
-                                            let logs = rt.hooks_manager.run_hooks("after_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
-                                            for log in logs { println!("[HOOKS] {}", log); }
+                                            let logs = rt
+                                                .hooks_manager
+                                                .run_hooks(
+                                                    "after_patch_apply",
+                                                    &mut rt.approval_gate,
+                                                )
+                                                .await
+                                                .unwrap_or_default();
+                                            for log in logs {
+                                                println!("[HOOKS] {}", log);
+                                            }
                                         }
                                         println!("[TOOL] {}", result);
 
@@ -1943,20 +2017,47 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                     "[APPROVAL] ✓ Approved: {}",
                                                     tc.function.name
                                                 );
-                                                let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                                for log in hook_logs { println!("[HOOKS] {}", log); }
+                                                let hook_logs = rt
+                                                    .hooks_manager
+                                                    .run_hooks(
+                                                        "before_tool_call",
+                                                        &mut rt.approval_gate,
+                                                    )
+                                                    .await
+                                                    .unwrap_or_default();
+                                                for log in hook_logs {
+                                                    println!("[HOOKS] {}", log);
+                                                }
 
                                                 let is_patch = patch_id.is_some();
                                                 if is_patch {
-                                                    let logs = rt.hooks_manager.run_hooks("before_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
-                                                    for log in logs { println!("[HOOKS] {}", log); }
+                                                    let logs = rt
+                                                        .hooks_manager
+                                                        .run_hooks(
+                                                            "before_patch_apply",
+                                                            &mut rt.approval_gate,
+                                                        )
+                                                        .await
+                                                        .unwrap_or_default();
+                                                    for log in logs {
+                                                        println!("[HOOKS] {}", log);
+                                                    }
                                                 }
 
                                                 let result =
                                                     execute_tool(rt, &tc.function.name, args).await;
 
-                                                let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                                for log in hook_logs { println!("[HOOKS] {}", log); }
+                                                let hook_logs = rt
+                                                    .hooks_manager
+                                                    .run_hooks(
+                                                        "after_tool_call",
+                                                        &mut rt.approval_gate,
+                                                    )
+                                                    .await
+                                                    .unwrap_or_default();
+                                                for log in hook_logs {
+                                                    println!("[HOOKS] {}", log);
+                                                }
 
                                                 if let Some(id) = &patch_id {
                                                     if let Some(p) = rt.workflow.get_patch_mut(id) {
@@ -1968,8 +2069,17 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                         task.status =
                                                             crate::task::TaskStatus::PatchApplied;
                                                     }
-                                                    let logs = rt.hooks_manager.run_hooks("after_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
-                                                    for log in logs { println!("[HOOKS] {}", log); }
+                                                    let logs = rt
+                                                        .hooks_manager
+                                                        .run_hooks(
+                                                            "after_patch_apply",
+                                                            &mut rt.approval_gate,
+                                                        )
+                                                        .await
+                                                        .unwrap_or_default();
+                                                    for log in logs {
+                                                        println!("[HOOKS] {}", log);
+                                                    }
                                                 }
                                                 println!("[TOOL] {}", result);
 
@@ -2018,8 +2128,14 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                 }
                             } else {
                                 // Safe tool — no approval needed.
-                                let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                for log in hook_logs { println!("[HOOKS] {}", log); }
+                                let hook_logs = rt
+                                    .hooks_manager
+                                    .run_hooks("before_tool_call", &mut rt.approval_gate)
+                                    .await
+                                    .unwrap_or_default();
+                                for log in hook_logs {
+                                    println!("[HOOKS] {}", log);
+                                }
 
                                 let tool_result = if let Some(native_result) =
                                     NativeTools::execute(&tc.function.name, args.clone()).await
@@ -2036,8 +2152,14 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                     }
                                 };
 
-                                let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
-                                for log in hook_logs { println!("[HOOKS] {}", log); }
+                                let hook_logs = rt
+                                    .hooks_manager
+                                    .run_hooks("after_tool_call", &mut rt.approval_gate)
+                                    .await
+                                    .unwrap_or_default();
+                                for log in hook_logs {
+                                    println!("[HOOKS] {}", log);
+                                }
 
                                 println!("[TOOL] {}", tool_result);
                                 rt.history.push(Message {
@@ -2106,7 +2228,11 @@ pub fn prompt_approval_stdin(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::tool_registry::ToolAction) -> Option<ApprovalRequest> {
+fn build_approval_request(
+    tool_name: &str,
+    args: &Value,
+    tool_action: &crate::tool_registry::ToolAction,
+) -> Option<ApprovalRequest> {
     use crate::approval::{ApprovalRequest, bash_approval_request, call_subagent_approval_request};
     let req = match tool_name {
         "bash" => {
@@ -2162,7 +2288,10 @@ fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::to
             tool_name: tool_name.to_string(),
             action_summary: format!("Execute tool '{}'", tool_name),
             risk_level: crate::approval::RiskLevel::High,
-            explanation: Some(format!("Arguments: {}", serde_json::to_string_pretty(args).unwrap_or_default())),
+            explanation: Some(format!(
+                "Arguments: {}",
+                serde_json::to_string_pretty(args).unwrap_or_default()
+            )),
             working_directory: None,
         })
     } else {
@@ -2194,7 +2323,10 @@ fn trim_history(history: &mut Vec<Message>) {
 async fn handle_scheduled_jobs(rt: &mut crate::runtime::GoatRuntime) {
     let jobs = rt.scheduler_manager.tick();
     for job in jobs {
-        println!("[SCHEDULE] Executing job {}: {}", job.id, job.prompt_or_command);
+        println!(
+            "[SCHEDULE] Executing job {}: {}",
+            job.id, job.prompt_or_command
+        );
         rt.job_tracker.add_job(crate::jobs::BackgroundJob {
             id: job.id.clone(),
             r#type: "scheduled".to_string(),
@@ -2205,6 +2337,9 @@ async fn handle_scheduled_jobs(rt: &mut crate::runtime::GoatRuntime) {
             error: None,
             approval_status: None,
         });
-        rt.scheduler_manager.log_audit(&format!("Executed job {}: {}", job.id, job.prompt_or_command));
+        rt.scheduler_manager.log_audit(&format!(
+            "Executed job {}: {}",
+            job.id, job.prompt_or_command
+        ));
     }
 }

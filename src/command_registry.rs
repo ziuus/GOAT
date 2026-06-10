@@ -969,11 +969,25 @@ fn all_commands() -> Vec<CommandMetadata> {
         // ── MCP ────────────────────────────────────────────────────────────────
         CommandMetadata {
             name: "/mcp",
-            aliases: &["/mcp status", "/mcp list", "/mcp show", "/mcp doctor", "/mcp start", "/mcp stop", "/mcp restart"],
+            aliases: &[
+                "/mcp status",
+                "/mcp list",
+                "/mcp show",
+                "/mcp doctor",
+                "/mcp start",
+                "/mcp stop",
+                "/mcp restart",
+            ],
             category: CommandCategory::Mcp,
             description: "Manage MCP servers (status, list, show, start, stop, restart)",
             usage: "/mcp [action] [arg]",
-            examples: &["/mcp status", "/mcp list", "/mcp doctor", "/mcp show <name>", "/mcp start <name>"],
+            examples: &[
+                "/mcp status",
+                "/mcp list",
+                "/mcp doctor",
+                "/mcp show <name>",
+                "/mcp start <name>",
+            ],
             shortcut: None,
             surface: CommandSurface::both(),
             requires_approval: false,

@@ -106,13 +106,15 @@ impl SchedulerManager {
         let now = chrono::Utc::now();
 
         for job in self.jobs.values_mut() {
-            if !job.enabled { continue; }
-            
+            if !job.enabled {
+                continue;
+            }
+
             if let Some(ref next) = job.next_run {
                 if let Ok(next_time) = chrono::DateTime::parse_from_rfc3339(next) {
                     if now >= next_time.with_timezone(&chrono::Utc) {
                         to_run.push(job.clone());
-                        
+
                         // Update next_run if interval
                         if let Some(interval) = job.interval_minutes {
                             job.last_run = Some(now.to_rfc3339());
@@ -126,11 +128,11 @@ impl SchedulerManager {
                 }
             }
         }
-        
+
         if !to_run.is_empty() {
             self.save_jobs();
         }
-        
+
         to_run
     }
 }

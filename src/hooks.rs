@@ -30,7 +30,10 @@ impl HooksManager {
             .collect();
 
         for hook in hooks {
-            logs.push(format!("[HOOK] Triggered '{}' (event: {})", hook.name, event));
+            logs.push(format!(
+                "[HOOK] Triggered '{}' (event: {})",
+                hook.name, event
+            ));
             let log_msg = match hook.r#type.as_str() {
                 "log_only" => format!("[HOOK] Log-only hook '{}' executed.", hook.name),
                 "command" => {
@@ -50,9 +53,7 @@ impl HooksManager {
                             };
                             if let Some(decision) = gate.check_policy(&req) {
                                 match decision {
-                                    ApprovalDecision::Approved => {
-                                        self.execute_command(cmd).await
-                                    }
+                                    ApprovalDecision::Approved => self.execute_command(cmd).await,
                                     ApprovalDecision::Denied(r) => {
                                         format!("[HOOK] Denied by policy: {}", r)
                                     }
@@ -65,9 +66,7 @@ impl HooksManager {
                                 // For interactive modes, we prompt via stdin.
                                 let decision = crate::headless::prompt_approval_stdin(&req, gate);
                                 match decision {
-                                    ApprovalDecision::Approved => {
-                                        self.execute_command(cmd).await
-                                    }
+                                    ApprovalDecision::Approved => self.execute_command(cmd).await,
                                     ApprovalDecision::Denied(r) => {
                                         format!("[HOOK] Denied: {}", r)
                                     }
@@ -77,11 +76,20 @@ impl HooksManager {
                             self.execute_command(cmd).await
                         }
                     } else {
-                        format!("[HOOK] Command hook '{}' has no command configured.", hook.name)
+                        format!(
+                            "[HOOK] Command hook '{}' has no command configured.",
+                            hook.name
+                        )
                     }
                 }
-                "internal_action" => format!("[HOOK] Internal action '{}' not fully implemented yet.", hook.name),
-                _ => format!("[HOOK] Unknown type '{}' for hook '{}'", hook.r#type, hook.name),
+                "internal_action" => format!(
+                    "[HOOK] Internal action '{}' not fully implemented yet.",
+                    hook.name
+                ),
+                _ => format!(
+                    "[HOOK] Unknown type '{}' for hook '{}'",
+                    hook.r#type, hook.name
+                ),
             };
             logs.push(log_msg.clone());
             self.log_audit(&hook.name, event, &log_msg);
@@ -106,7 +114,10 @@ impl HooksManager {
                 if stderr.is_empty() {
                     format!("[HOOK] Executed successfully. Output:\n{}", stdout)
                 } else {
-                    format!("[HOOK] Executed with stderr.\nSTDOUT:\n{}\nSTDERR:\n{}", stdout, stderr)
+                    format!(
+                        "[HOOK] Executed with stderr.\nSTDOUT:\n{}\nSTDERR:\n{}",
+                        stdout, stderr
+                    )
                 }
             }
             Err(e) => format!("[HOOK] Failed to execute command: {}", e),
@@ -121,15 +132,26 @@ impl HooksManager {
         {
             use std::io::Write;
             let now = chrono::Utc::now().to_rfc3339();
-            let _ = writeln!(file, "[{}] Hook: {} | Event: {} | {}", now, name, event, msg);
+            let _ = writeln!(
+                file,
+                "[{}] Hook: {} | Event: {} | {}",
+                now, name, event, msg
+            );
         }
     }
 }
 
 impl HooksManager {
     pub fn list_hooks_info(&self) -> Vec<String> {
-        self.config.rules.iter().map(|r| {
-            format!("{} (event: {}, type: {}, enabled: {})", r.name, r.event, r.r#type, r.enabled)
-        }).collect()
+        self.config
+            .rules
+            .iter()
+            .map(|r| {
+                format!(
+                    "{} (event: {}, type: {}, enabled: {})",
+                    r.name, r.event, r.r#type, r.enabled
+                )
+            })
+            .collect()
     }
 }

@@ -279,7 +279,10 @@ impl GoatRuntime {
             tool_registry: crate::tool_registry::ToolRegistry::new(),
             selected_files: Vec::new(),
             hooks_manager: crate::hooks::HooksManager::new(config.hooks.clone(), paths.clone()),
-            scheduler_manager: crate::scheduler::SchedulerManager::new(config.scheduler.clone(), paths.clone()),
+            scheduler_manager: crate::scheduler::SchedulerManager::new(
+                config.scheduler.clone(),
+                paths.clone(),
+            ),
             job_tracker: crate::jobs::JobTracker::new(),
         };
 
@@ -298,19 +301,23 @@ impl GoatRuntime {
             }
 
             for tool in &server.tools {
-                if let (Some(name), Some(desc)) = (tool.get("name").and_then(|v| v.as_str()), tool.get("description").and_then(|v| v.as_str())) {
-                    self.tool_registry.register(crate::tool_registry::ToolMetadata {
-                        name: format!("{}_{}", srv_name, name),
-                        description: format!("[MCP: {}] {}", srv_name, desc),
-                        category: crate::tool_registry::ToolCategory::Mcp,
-                        risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
-                        requires_approval: true,
-                        read_only: false,
-                        available_in_tui: true,
-                        available_in_headless: true,
-                        available_in_agent: true,
-                        permission_group: "mcp".to_string(),
-                    });
+                if let (Some(name), Some(desc)) = (
+                    tool.get("name").and_then(|v| v.as_str()),
+                    tool.get("description").and_then(|v| v.as_str()),
+                ) {
+                    self.tool_registry
+                        .register(crate::tool_registry::ToolMetadata {
+                            name: format!("{}_{}", srv_name, name),
+                            description: format!("[MCP: {}] {}", srv_name, desc),
+                            category: crate::tool_registry::ToolCategory::Mcp,
+                            risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
+                            requires_approval: true,
+                            read_only: false,
+                            available_in_tui: true,
+                            available_in_headless: true,
+                            available_in_agent: true,
+                            permission_group: "mcp".to_string(),
+                        });
                 }
             }
         }

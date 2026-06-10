@@ -273,19 +273,23 @@ impl App {
     pub fn sync_mcp_tools(&mut self) {
         for (srv_name, server) in self.mcp_manager.running_servers_metadata() {
             for tool in &server.tools {
-                if let (Some(name), Some(desc)) = (tool.get("name").and_then(|v| v.as_str()), tool.get("description").and_then(|v| v.as_str())) {
-                    self.tool_registry.register(crate::tool_registry::ToolMetadata {
-                        name: format!("{}_{}", srv_name, name),
-                        description: format!("[MCP: {}] {}", srv_name, desc),
-                        category: crate::tool_registry::ToolCategory::Mcp,
-                        risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
-                        requires_approval: true,
-                        read_only: false,
-                        available_in_tui: true,
-                        available_in_headless: true,
-                        available_in_agent: true,
-                        permission_group: "mcp".to_string(),
-                    });
+                if let (Some(name), Some(desc)) = (
+                    tool.get("name").and_then(|v| v.as_str()),
+                    tool.get("description").and_then(|v| v.as_str()),
+                ) {
+                    self.tool_registry
+                        .register(crate::tool_registry::ToolMetadata {
+                            name: format!("{}_{}", srv_name, name),
+                            description: format!("[MCP: {}] {}", srv_name, desc),
+                            category: crate::tool_registry::ToolCategory::Mcp,
+                            risk_level: crate::approval::RiskLevel::High, // MCP tools are untrusted by default
+                            requires_approval: true,
+                            read_only: false,
+                            available_in_tui: true,
+                            available_in_headless: true,
+                            available_in_agent: true,
+                            permission_group: "mcp".to_string(),
+                        });
                 }
             }
         }
@@ -519,20 +523,38 @@ impl App {
                         }
                     }
                 }
-                let hook_logs = self.hooks_manager.run_hooks("before_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                for log in hook_logs { self.push_log(log); }
+                let hook_logs = self
+                    .hooks_manager
+                    .run_hooks("before_tool_call", &mut self.approval_gate)
+                    .await
+                    .unwrap_or_default();
+                for log in hook_logs {
+                    self.push_log(log);
+                }
 
                 let is_patch = deferred.patch_id.is_some();
                 if is_patch {
-                    let logs = self.hooks_manager.run_hooks("before_patch_apply", &mut self.approval_gate).await.unwrap_or_default();
-                    for log in logs { self.push_log(log); }
+                    let logs = self
+                        .hooks_manager
+                        .run_hooks("before_patch_apply", &mut self.approval_gate)
+                        .await
+                        .unwrap_or_default();
+                    for log in logs {
+                        self.push_log(log);
+                    }
                 }
 
                 let tool_result = if deferred.name == "mcp_start" {
-                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let srv_name = deferred
+                        .args
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     if let Some(config) = self.config.mcp_servers.get(srv_name).cloned() {
                         let logs = self.mcp_manager.start_server(srv_name, &config).await;
-                        for log in &logs { self.push_log(log.clone()); }
+                        for log in &logs {
+                            self.push_log(log.clone());
+                        }
                         if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
                             mrs.state = crate::mcp_runtime::McpServerState::Running;
                         }
@@ -542,14 +564,24 @@ impl App {
                         "Server not found.".to_string()
                     }
                 } else if deferred.name == "mcp_restart" {
-                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let srv_name = deferred
+                        .args
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     if let Some(config) = self.config.mcp_servers.get(srv_name).cloned() {
                         let mut logs = Vec::new();
-                        if self.mcp_manager.running_servers().contains(&srv_name.to_string()) {
+                        if self
+                            .mcp_manager
+                            .running_servers()
+                            .contains(&srv_name.to_string())
+                        {
                             logs.extend(self.mcp_manager.stop_server(srv_name).await);
                         }
                         logs.extend(self.mcp_manager.start_server(srv_name, &config).await);
-                        for log in &logs { self.push_log(log.clone()); }
+                        for log in &logs {
+                            self.push_log(log.clone());
+                        }
                         if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
                             mrs.state = crate::mcp_runtime::McpServerState::Running;
                         }
@@ -559,29 +591,50 @@ impl App {
                         "Server not found.".to_string()
                     }
                 } else if deferred.name == "mcp_stop" {
-                    let srv_name = deferred.args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let srv_name = deferred
+                        .args
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     let logs = self.mcp_manager.stop_server(srv_name).await;
-                    for log in &logs { self.push_log(log.clone()); }
+                    for log in &logs {
+                        self.push_log(log.clone());
+                    }
                     if let Some(mrs) = self.mcp_runtime.get_mut(srv_name) {
                         mrs.state = crate::mcp_runtime::McpServerState::Stopped;
                     }
                     format!("MCP Server '{}' stopped.", srv_name)
                 } else {
-                    if let Some(native_result) = crate::tools::NativeTools::execute(&deferred.name, deferred.args.clone()).await {
+                    if let Some(native_result) =
+                        crate::tools::NativeTools::execute(&deferred.name, deferred.args.clone())
+                            .await
+                    {
                         match native_result {
                             Ok(res) => res,
                             Err(e) => format!("Tool error: {}", e),
                         }
                     } else {
-                        match self.mcp_manager.call_tool(&deferred.name, deferred.args.clone()).await {
-                            Ok(res) => serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string()),
+                        match self
+                            .mcp_manager
+                            .call_tool(&deferred.name, deferred.args.clone())
+                            .await
+                        {
+                            Ok(res) => {
+                                serde_json::to_string(&res).unwrap_or_else(|_| "[]".to_string())
+                            }
                             Err(e) => format!("MCP tool error: {}", e),
                         }
                     }
                 };
 
-                let hook_logs = self.hooks_manager.run_hooks("after_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                for log in hook_logs { self.push_log(log); }
+                let hook_logs = self
+                    .hooks_manager
+                    .run_hooks("after_tool_call", &mut self.approval_gate)
+                    .await
+                    .unwrap_or_default();
+                for log in hook_logs {
+                    self.push_log(log);
+                }
 
                 if let Some(id) = &deferred.patch_id {
                     if let Some(p) = self.workflow.get_patch_mut(id) {
@@ -590,8 +643,14 @@ impl App {
                     if let Some(task) = &mut self.workflow.active_task {
                         task.status = crate::task::TaskStatus::PatchApplied;
                     }
-                    let logs = self.hooks_manager.run_hooks("after_patch_apply", &mut self.approval_gate).await.unwrap_or_default();
-                    for log in logs { self.push_log(log); }
+                    let logs = self
+                        .hooks_manager
+                        .run_hooks("after_patch_apply", &mut self.approval_gate)
+                        .await
+                        .unwrap_or_default();
+                    for log in logs {
+                        self.push_log(log);
+                    }
                 }
 
                 self.push_log(format!("[TOOL] {}", tool_result));
@@ -1095,22 +1154,37 @@ impl App {
                     }
                     cmd if cmd.starts_with("catalog") => {
                         self.push_log("[TOOLS] Tool Catalog (Phase 3.7 Foundation)".to_string());
-                        self.push_log("[TOOLS] Status: Informational only. No automatic installation yet.".to_string());
+                        self.push_log(
+                            "[TOOLS] Status: Informational only. No automatic installation yet."
+                                .to_string(),
+                        );
                         let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
                         if parts.len() > 1 {
                             let action = parts[1];
                             let arg = parts.get(2).unwrap_or(&"");
-                            self.push_log(format!("[TOOLS] Catalog action '{}' on '{}'", action, arg));
+                            self.push_log(format!(
+                                "[TOOLS] Catalog action '{}' on '{}'",
+                                action, arg
+                            ));
                         } else {
                             self.push_log("[TOOLS] Available Planned Categories:".to_string());
                             self.push_log("[TOOLS] - filesystem MCP, git tools, browser automation, web search,".to_string());
-                            self.push_log("[TOOLS]   Playwright/browser-use, image generation, TTS/STT,".to_string());
+                            self.push_log(
+                                "[TOOLS]   Playwright/browser-use, image generation, TTS/STT,"
+                                    .to_string(),
+                            );
                             self.push_log("[TOOLS]   database tools, GitHub tools, calendar/email tools, local shell".to_string());
                         }
                     }
-                    cmd if cmd.starts_with("install") || cmd.starts_with("enable") || cmd.starts_with("disable") => {
+                    cmd if cmd.starts_with("install")
+                        || cmd.starts_with("enable")
+                        || cmd.starts_with("disable") =>
+                    {
                         let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-                        self.push_log(format!("[TOOLS] Action '{}' is planned for Phase 3.8.", parts[0]));
+                        self.push_log(format!(
+                            "[TOOLS] Action '{}' is planned for Phase 3.8.",
+                            parts[0]
+                        ));
                         self.push_log("[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks.".to_string());
                     }
                     name => {
@@ -1750,7 +1824,10 @@ impl App {
                         }
                     }
                 } else {
-                    self.push_log("[HOOKS] Advanced hooks management requires config edits for now.".to_string());
+                    self.push_log(
+                        "[HOOKS] Advanced hooks management requires config edits for now."
+                            .to_string(),
+                    );
                 }
                 true
             }
@@ -1762,11 +1839,19 @@ impl App {
                     let jobs = self.scheduler_manager.list_jobs();
                     logs.push(format!("[SCHEDULE] {} Scheduled Jobs:", jobs.len()));
                     for j in jobs {
-                        logs.push(format!("[SCHEDULE]   [{}] {} (enabled: {})", j.id, j.prompt_or_command, j.enabled));
+                        logs.push(format!(
+                            "[SCHEDULE]   [{}] {} (enabled: {})",
+                            j.id, j.prompt_or_command, j.enabled
+                        ));
                     }
-                    for log in logs { self.push_log(log); }
+                    for log in logs {
+                        self.push_log(log);
+                    }
                 } else {
-                    self.push_log("[SCHEDULE] Adding jobs via TUI is partial. Use manual config for now.".to_string());
+                    self.push_log(
+                        "[SCHEDULE] Adding jobs via TUI is partial. Use manual config for now."
+                            .to_string(),
+                    );
                 }
                 true
             }
@@ -1784,7 +1869,9 @@ impl App {
                             logs.push(format!("[JOBS]   [{}] {} - {:?}", s.id, s.r#type, s.status));
                         }
                     }
-                    for log in logs { self.push_log(log); }
+                    for log in logs {
+                        self.push_log(log);
+                    }
                 } else {
                     self.push_log(format!("[JOBS] Unknown action '{}'", arg));
                 }
@@ -2486,7 +2573,9 @@ impl App {
                             );
                         } else {
                             if is_ai {
-                                self.push_log("[COMMIT] Generating AI commit message...".to_string());
+                                self.push_log(
+                                    "[COMMIT] Generating AI commit message...".to_string(),
+                                );
                                 let prompt = format!(
                                     "Generate a conventional commit message based on the following git status and diff stat. Do NOT include any intro/outro text, just the commit message.\n\nStatus:\n{}\n\nDiff Stat:\n{}",
                                     status_out.trim(),
@@ -2498,9 +2587,15 @@ impl App {
                                     tool_calls: None,
                                     tool_call_id: None,
                                 }];
-                                match self.llm_router.completion_with_fallback(&self.model_chain, history, None).await {
+                                match self
+                                    .llm_router
+                                    .completion_with_fallback(&self.model_chain, history, None)
+                                    .await
+                                {
                                     Ok((response, _)) => {
-                                        self.push_log("[COMMIT] Proposed AI commit message:".to_string());
+                                        self.push_log(
+                                            "[COMMIT] Proposed AI commit message:".to_string(),
+                                        );
                                         self.push_log("".to_string());
                                         let text = response.content.clone().unwrap_or_default();
                                         for line in text.lines() {
@@ -2509,7 +2604,10 @@ impl App {
                                         self.push_log("".to_string());
                                     }
                                     Err(e) => {
-                                        self.push_log(format!("[COMMIT] AI generation failed: {}", e));
+                                        self.push_log(format!(
+                                            "[COMMIT] AI generation failed: {}",
+                                            e
+                                        ));
                                     }
                                 }
                             } else {
@@ -2746,13 +2844,19 @@ impl App {
                             let full_path = root.join(path);
                             if full_path.exists() && full_path.is_file() {
                                 if crate::repo_map::looks_like_secret_file(&full_path) {
-                                    self.push_log(format!("[CONTEXT] Rejected: {} looks like a secret file.", path));
+                                    self.push_log(format!(
+                                        "[CONTEXT] Rejected: {} looks like a secret file.",
+                                        path
+                                    ));
                                 } else {
                                     if !self.selected_files.contains(&path.to_string()) {
                                         self.selected_files.push(path.to_string());
                                         self.push_log(format!("[CONTEXT] Added {}", path));
                                     } else {
-                                        self.push_log(format!("[CONTEXT] {} is already in context.", path));
+                                        self.push_log(format!(
+                                            "[CONTEXT] {} is already in context.",
+                                            path
+                                        ));
                                     }
                                 }
                             } else {
@@ -2784,7 +2888,8 @@ impl App {
                         let root = std::env::current_dir().unwrap_or_default();
                         let files = self.selected_files.clone();
                         for file in files {
-                            let content = std::fs::read_to_string(root.join(&file)).unwrap_or_default();
+                            let content =
+                                std::fs::read_to_string(root.join(&file)).unwrap_or_default();
                             let chars = content.chars().count();
                             total_chars += chars;
                             self.push_log(format!("  • {} ({} chars)", file, chars));
@@ -2792,9 +2897,15 @@ impl App {
                         self.push_log(format!("  Total: {} chars", total_chars));
                     }
                     "suggest" => {
-                        self.push_log("[CONTEXT] Suggestions based on recent edits / current task (planned).".to_string());
+                        self.push_log(
+                            "[CONTEXT] Suggestions based on recent edits / current task (planned)."
+                                .to_string(),
+                        );
                     }
-                    _ => self.push_log("[CONTEXT] Usage: /context [add|remove|clear|show|budget|suggest]".to_string()),
+                    _ => self.push_log(
+                        "[CONTEXT] Usage: /context [add|remove|clear|show|budget|suggest]"
+                            .to_string(),
+                    ),
                 }
                 true
             }
@@ -2803,7 +2914,10 @@ impl App {
                 let args = cmd.trim().split_whitespace().collect::<Vec<_>>();
                 if args.get(1).copied() == Some("relevant") {
                     if let Some(query) = args.get(2) {
-                        self.push_log(format!("[FILES] Finding files relevant to '{}' (planned)...", query));
+                        self.push_log(format!(
+                            "[FILES] Finding files relevant to '{}' (planned)...",
+                            query
+                        ));
                     } else {
                         self.push_log("[FILES] Usage: /files relevant <query>".to_string());
                     }
@@ -3098,8 +3212,14 @@ impl App {
 
         self.push_log(format!("[YOU] {}", msg));
 
-        let hook_logs = self.hooks_manager.run_hooks("on_submit", &mut self.approval_gate).await.unwrap_or_default();
-        for log in hook_logs { self.push_log(log); }
+        let hook_logs = self
+            .hooks_manager
+            .run_hooks("on_submit", &mut self.approval_gate)
+            .await
+            .unwrap_or_default();
+        for log in hook_logs {
+            self.push_log(log);
+        }
 
         let is_first = self.history.iter().all(|m| m.role != "user");
         if is_first {
@@ -3204,7 +3324,9 @@ impl App {
             // Phase 3.6: Inject Selected Context Files
             if !self.selected_files.is_empty() {
                 sys_prompt.push_str("\n\n<selected_files>\n");
-                sys_prompt.push_str("The user has explicitly added the following files to your context budget:\n");
+                sys_prompt.push_str(
+                    "The user has explicitly added the following files to your context budget:\n",
+                );
                 let root = std::env::current_dir().unwrap_or_default();
                 let mut current_budget = 0;
                 let max_budget = 20000;
@@ -3328,17 +3450,39 @@ impl App {
                                                 "[APPROVAL] Auto-approved (session policy): {}",
                                                 tc.function.name
                                             ));
-                                            let hook_logs = self.hooks_manager.run_hooks("before_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                                            for log in hook_logs { self.push_log(log); }
+                                            let hook_logs = self
+                                                .hooks_manager
+                                                .run_hooks(
+                                                    "before_tool_call",
+                                                    &mut self.approval_gate,
+                                                )
+                                                .await
+                                                .unwrap_or_default();
+                                            for log in hook_logs {
+                                                self.push_log(log);
+                                            }
 
                                             let is_patch = patch_id.is_some();
                                             if is_patch {
-                                                let logs = self.hooks_manager.run_hooks("before_patch_apply", &mut self.approval_gate).await.unwrap_or_default();
-                                                for log in logs { self.push_log(log); }
+                                                let logs = self
+                                                    .hooks_manager
+                                                    .run_hooks(
+                                                        "before_patch_apply",
+                                                        &mut self.approval_gate,
+                                                    )
+                                                    .await
+                                                    .unwrap_or_default();
+                                                for log in logs {
+                                                    self.push_log(log);
+                                                }
                                             }
 
                                             let result = if let Some(native_result) =
-                                                NativeTools::execute(&tc.function.name, args.clone()).await
+                                                NativeTools::execute(
+                                                    &tc.function.name,
+                                                    args.clone(),
+                                                )
+                                                .await
                                             {
                                                 match native_result {
                                                     Ok(res) => res,
@@ -3356,8 +3500,17 @@ impl App {
                                                 }
                                             };
 
-                                            let hook_logs = self.hooks_manager.run_hooks("after_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                                            for log in hook_logs { self.push_log(log); }
+                                            let hook_logs = self
+                                                .hooks_manager
+                                                .run_hooks(
+                                                    "after_tool_call",
+                                                    &mut self.approval_gate,
+                                                )
+                                                .await
+                                                .unwrap_or_default();
+                                            for log in hook_logs {
+                                                self.push_log(log);
+                                            }
 
                                             if let Some(id) = &patch_id {
                                                 if let Some(p) = self.workflow.get_patch_mut(id) {
@@ -3367,8 +3520,17 @@ impl App {
                                                     task.status =
                                                         crate::task::TaskStatus::PatchApplied;
                                                 }
-                                                let logs = self.hooks_manager.run_hooks("after_patch_apply", &mut self.approval_gate).await.unwrap_or_default();
-                                                for log in logs { self.push_log(log); }
+                                                let logs = self
+                                                    .hooks_manager
+                                                    .run_hooks(
+                                                        "after_patch_apply",
+                                                        &mut self.approval_gate,
+                                                    )
+                                                    .await
+                                                    .unwrap_or_default();
+                                                for log in logs {
+                                                    self.push_log(log);
+                                                }
                                             }
                                             self.push_log(format!("[TOOL] {}", result));
 
@@ -3444,8 +3606,14 @@ impl App {
                                     }
                                 } else {
                                     // Safe tool — no approval needed.
-                                    let hook_logs = self.hooks_manager.run_hooks("before_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                                    for log in hook_logs { self.push_log(log); }
+                                    let hook_logs = self
+                                        .hooks_manager
+                                        .run_hooks("before_tool_call", &mut self.approval_gate)
+                                        .await
+                                        .unwrap_or_default();
+                                    for log in hook_logs {
+                                        self.push_log(log);
+                                    }
 
                                     let tool_result = if let Some(native_result) =
                                         NativeTools::execute(&tc.function.name, args.clone()).await
@@ -3466,8 +3634,14 @@ impl App {
                                         }
                                     };
 
-                                    let hook_logs = self.hooks_manager.run_hooks("after_tool_call", &mut self.approval_gate).await.unwrap_or_default();
-                                    for log in hook_logs { self.push_log(log); }
+                                    let hook_logs = self
+                                        .hooks_manager
+                                        .run_hooks("after_tool_call", &mut self.approval_gate)
+                                        .await
+                                        .unwrap_or_default();
+                                    for log in hook_logs {
+                                        self.push_log(log);
+                                    }
 
                                     self.push_log(format!("[TOOL] {}", tool_result));
 
@@ -3507,7 +3681,11 @@ impl App {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::tool_registry::ToolAction) -> Option<ApprovalRequest> {
+fn build_approval_request(
+    tool_name: &str,
+    args: &Value,
+    tool_action: &crate::tool_registry::ToolAction,
+) -> Option<ApprovalRequest> {
     let req = match tool_name {
         "bash" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
@@ -3562,7 +3740,10 @@ fn build_approval_request(tool_name: &str, args: &Value, tool_action: &crate::to
             tool_name: tool_name.to_string(),
             action_summary: format!("Execute tool '{}'", tool_name),
             risk_level: crate::approval::RiskLevel::High,
-            explanation: Some(format!("Arguments: {}", serde_json::to_string_pretty(args).unwrap_or_default())),
+            explanation: Some(format!(
+                "Arguments: {}",
+                serde_json::to_string_pretty(args).unwrap_or_default()
+            )),
             working_directory: None,
         })
     } else {
@@ -3609,12 +3790,14 @@ pub fn generate_session_title(msg: &str) -> String {
     title
 }
 
-
 impl App {
     pub async fn handle_scheduled_jobs(&mut self) {
         let jobs = self.scheduler_manager.tick();
         for job in jobs {
-            self.push_log(format!("[SCHEDULE] Executing job {}: {}", job.id, job.prompt_or_command));
+            self.push_log(format!(
+                "[SCHEDULE] Executing job {}: {}",
+                job.id, job.prompt_or_command
+            ));
             // Trigger background job or tool here.
             // For now, we simulate execution and track it
             self.job_tracker.add_job(crate::jobs::BackgroundJob {
@@ -3627,9 +3810,12 @@ impl App {
                 error: None,
                 approval_status: None,
             });
-            
+
             // Log audit
-            self.scheduler_manager.log_audit(&format!("Executed job {}: {}", job.id, job.prompt_or_command));
+            self.scheduler_manager.log_audit(&format!(
+                "Executed job {}: {}",
+                job.id, job.prompt_or_command
+            ));
         }
     }
 }
