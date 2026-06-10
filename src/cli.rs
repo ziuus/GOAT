@@ -215,6 +215,14 @@ pub enum Command {
         action: String,
     },
 
+    /// Manage GOAT Web Dashboard
+    #[command(name = "dashboard")]
+    Dashboard {
+        /// Action to perform: dev, path, doctor
+        #[arg(default_value = "dev")]
+        action: String,
+    },
+
     /// Show project awareness status or scan the current directory.
     #[command(name = "project")]
     Project {
@@ -450,6 +458,11 @@ pub async fn handle_subcommand(
 
         Command::Daemon { action } => {
             handle_daemon_command(paths, config, action).await?;
+            Ok(true)
+        }
+
+        Command::Dashboard { action } => {
+            handle_dashboard_command(action);
             Ok(true)
         }
 
@@ -2002,4 +2015,42 @@ async fn handle_daemon_command(
         }
     }
     Ok(())
+}
+
+fn handle_dashboard_command(action: &str) {
+    let root = std::env::current_dir().unwrap_or_default();
+    let dashboard_dir = root.join("apps").join("dashboard");
+    let fallback_dir = root.join("dashboard");
+
+    let active_dir = if dashboard_dir.exists() {
+        dashboard_dir
+    } else if fallback_dir.exists() {
+        fallback_dir
+    } else {
+        println!("[DASHBOARD] Cannot find dashboard/ or apps/dashboard/ directory.");
+        return;
+    };
+
+    match action {
+        "path" => {
+            println!("{}", active_dir.display());
+        }
+        "doctor" => {
+            println!("[DASHBOARD DOCTOR]");
+            println!("  Dashboard Path: {}", active_dir.display());
+            let pkg_json = active_dir.join("package.json");
+            println!("  package.json: {}", if pkg_json.exists() { "Found" } else { "Missing" });
+            println!("  To run the dashboard, navigate to the path, run `npm install`, then `npm run dev`.");
+        }
+        "dev" => {
+            println!("[DASHBOARD] Dashboard code is at: {}", active_dir.display());
+            println!("  Please run the following in a new terminal:");
+            println!("    cd {}", active_dir.display());
+            println!("    npm install");
+            println!("    npm run dev");
+        }
+        _ => {
+            println!("[DASHBOARD] Unknown action '{}'. Use dev, path, or doctor.", action);
+        }
+    }
 }

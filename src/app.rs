@@ -1948,6 +1948,36 @@ impl App {
                 true
             }
 
+            "/dashboard" => {
+                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+                let root = std::env::current_dir().unwrap_or_default();
+                let dashboard_dir = root.join("apps").join("dashboard");
+                let fallback_dir = root.join("dashboard");
+
+                let active_dir = if dashboard_dir.exists() {
+                    Some(dashboard_dir)
+                } else if fallback_dir.exists() {
+                    Some(fallback_dir)
+                } else {
+                    None
+                };
+
+                if let Some(dir) = active_dir {
+                    if arg == "path" || arg.is_empty() {
+                        self.push_log(format!("[DASHBOARD] Located at: {}", dir.display()));
+                    } else if arg == "doctor" {
+                        self.push_log(format!("[DASHBOARD DOCTOR] Path: {}", dir.display()));
+                        let pkg_json = dir.join("package.json");
+                        self.push_log(format!("[DASHBOARD DOCTOR] package.json: {}", if pkg_json.exists() { "Found" } else { "Missing" }));
+                    } else {
+                        self.push_log(format!("[DASHBOARD] Unknown action '{}'. Use path, doctor.", arg));
+                    }
+                } else {
+                    self.push_log("[DASHBOARD] Not found. Run `goat dashboard dev` outside TUI to bootstrap or locate it.".to_string());
+                }
+                true
+            }
+
             "/clear" => {
                 self.logs.clear();
                 self.log_scroll = 0;

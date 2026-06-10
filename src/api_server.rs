@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::runtime::GoatRuntime;
 
@@ -30,6 +31,11 @@ pub async fn start_server(
         auth_required,
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
@@ -40,6 +46,7 @@ pub async fn start_server(
         .route("/v1/mcp/status", get(mcp_status_handler))
         .route("/v1/command", post(command_handler))
         .route("/v1/logs/recent", get(logs_handler))
+        .layer(cors)
         .with_state(state);
 
     let addr = format!("{}:{}", host, port);

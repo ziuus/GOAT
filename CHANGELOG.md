@@ -1038,3 +1038,12 @@ cargo run -- --db <PATH>      → custom database file
 - Endpoint `/v1/schedule` for scheduled background tasks.
 - `/daemon` and `/api` slash commands for observing Daemon status inside TUI and Headless modes.
 - Warnings in TUI/Headless modes when overlapping schedulers are detected.
+
+## [0.13.0] - 2026-06-10 (Dashboard update)
+### Added
+- **Phase 4.1: Web Dashboard Foundation**
+- Next.js local dashboard in `apps/dashboard`.
+- Read-only observability for Jobs, Schedules, Hooks, MCP, and Logs.
+- Secure Bearer token authentication from daemon.
+- `/dashboard` CLI and slash commands (doctor, path, dev).
+- CORS headers for local daemon connections.

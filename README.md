@@ -156,6 +156,7 @@ Rolling daily log files are written to `./logs/goat.log.YYYY-MM-DD`.
 | [`docs/GOAT_IMPLEMENTATION_ROADMAP.md`](docs/GOAT_IMPLEMENTATION_ROADMAP.md) | Phased implementation plan |
 | [`docs/GOAT_SECURITY_MODEL.md`](docs/GOAT_SECURITY_MODEL.md) | Security model, threats, controls |
 | [`docs/GOAT_CODEBASE_AUDIT.md`](docs/GOAT_CODEBASE_AUDIT.md) | Full Phase 0 codebase audit |
+| [`docs/GOAT_WEB_DASHBOARD.md`](docs/GOAT_WEB_DASHBOARD.md) | Dashboard architecture and setup |
 | [`CHANGELOG.md`](CHANGELOG.md) | Version history |
 
 ---
