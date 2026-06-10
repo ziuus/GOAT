@@ -83,6 +83,12 @@ pub struct Config {
     /// Checkpoint system config.
     #[serde(default)]
     pub checkpoint: CheckpointConfig,
+    /// Hooks system config.
+    #[serde(default)]
+    pub hooks: HooksConfig,
+    /// Scheduler config.
+    #[serde(default)]
+    pub scheduler: SchedulerConfig,
 }
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
@@ -821,6 +827,69 @@ impl Default for CheckpointConfig {
             enabled: true,
             auto_before_patch: true,
             max_checkpoints: 20,
+        }
+    }
+}
+
+// ── Hooks settings ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HooksConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub require_approval: bool,
+    #[serde(default)]
+    pub rules: Vec<HookRuleConfig>,
+}
+
+impl Default for HooksConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            require_approval: true,
+            rules: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HookRuleConfig {
+    pub name: String,
+    pub event: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_hook_type")]
+    pub r#type: String,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default = "default_risk_ask")]
+    pub risk: String,
+}
+
+fn default_hook_type() -> String {
+    "command".to_string()
+}
+
+fn default_risk_ask() -> String {
+    "ask".to_string()
+}
+
+// ── Scheduler settings ────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SchedulerConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub require_approval_for_actions: bool,
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            require_approval_for_actions: true,
         }
     }
 }

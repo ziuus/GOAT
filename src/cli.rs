@@ -167,13 +167,43 @@ pub enum Command {
         task: String,
     },
 
-    /// MCP server integration management.
     #[command(name = "mcp")]
     Mcp {
         /// Action to perform: status, list, show, doctor, start, stop, restart.
         #[arg(default_value = "status")]
         action: String,
         /// Target server name for 'show', 'start', 'stop', 'restart'.
+        arg: Option<String>,
+    },
+
+    /// Manage hooks
+    #[command(name = "hooks")]
+    Hooks {
+        /// Action to perform: list, show, enable, disable, run
+        #[arg(default_value = "list")]
+        action: String,
+        /// Hook name
+        arg: Option<String>,
+    },
+
+    /// Manage scheduled tasks
+    #[command(name = "schedule")]
+    Schedule {
+        /// Action to perform: list, add, show, enable, disable, run, delete
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Manage background jobs
+    #[command(name = "jobs")]
+    Jobs {
+        /// Action to perform: list, show, cancel, logs
+        #[arg(default_value = "list")]
+        action: String,
+        /// Job ID
         arg: Option<String>,
     },
 
@@ -584,6 +614,18 @@ pub async fn handle_subcommand(
         }
         Command::Mcp { action, arg } => {
             handle_mcp_command(paths, config, action, arg)?;
+            Ok(true)
+        }
+        Command::Hooks { action, arg } => {
+            handle_hooks_command(paths, config, &action, arg.as_deref())?;
+            Ok(true)
+        }
+        Command::Schedule { action, args } => {
+            handle_schedule_command(paths, config, &action, &args)?;
+            Ok(true)
+        }
+        Command::Jobs { action, arg } => {
+            handle_jobs_command(paths, config, &action, arg.as_deref())?;
             Ok(true)
         }
     }
@@ -1781,4 +1823,79 @@ async fn handle_delegate_external_command(
         }
         Err(e) => println!("Error: {}", e),
     }
+}
+
+fn handle_hooks_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
+    // Basic wrapper to print output from hooks manager for CLI usage.
+    let mut hm = crate::hooks::HooksManager::new(config.hooks.clone(), paths.clone());
+    
+    match action {
+        "list" => {
+            let info = hm.list_hooks_info();
+            println!("[HOOKS] Registered Hooks:");
+            for i in info {
+                println!("  - {}", i);
+            }
+        }
+        "show" => {
+            if let Some(name) = arg {
+                println!("[HOOKS] Show hook not fully implemented in CLI.");
+            } else {
+                println!("Usage: goat hooks show <name>");
+            }
+        }
+        _ => {
+            println!("Unknown hooks action: {}", action);
+        }
+    }
+    Ok(())
+}
+
+fn handle_schedule_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    let mut sm = crate::scheduler::SchedulerManager::new(config.scheduler.clone(), paths.clone());
+    
+    match action {
+        "list" => {
+            let jobs = sm.list_jobs();
+            println!("[SCHEDULE] Scheduled Jobs:");
+            for j in jobs {
+                println!("  - [{}] {} (enabled: {})", j.id, j.prompt_or_command, j.enabled);
+            }
+        }
+        "add" => {
+            println!("[SCHEDULE] Adding jobs via CLI is not fully implemented yet.");
+        }
+        _ => {
+            println!("Unknown schedule action: {}", action);
+        }
+    }
+    Ok(())
+}
+
+fn handle_jobs_command(
+    _paths: &crate::paths::GoatPaths,
+    _config: &crate::config::Config,
+    action: &str,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
+    match action {
+        "list" => {
+            println!("[JOBS] Listing jobs via CLI requires an active runtime session.");
+            println!("Please use `goat` TUI or `/jobs` slash command.");
+        }
+        _ => {
+            println!("Unknown jobs action: {}", action);
+        }
+    }
+    Ok(())
 }

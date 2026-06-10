@@ -37,6 +37,9 @@ pub enum CommandCategory {
     Ui,
     Logs,
     System,
+    Hooks,
+    Scheduler,
+    Jobs,
     /// Commands planned for future phases — not yet implemented.
     Future,
 }
@@ -60,6 +63,9 @@ impl CommandCategory {
             CommandCategory::Ui => "UI / Views",
             CommandCategory::Logs => "Logs",
             CommandCategory::System => "System",
+            CommandCategory::Hooks => "Hooks",
+            CommandCategory::Scheduler => "Scheduler",
+            CommandCategory::Jobs => "Jobs",
             CommandCategory::Future => "Future (Planned)",
         }
     }
@@ -82,6 +88,9 @@ impl CommandCategory {
             CommandCategory::Ui => "🖥",
             CommandCategory::Logs => "📋",
             CommandCategory::System => "⚙",
+            CommandCategory::Hooks => "🪝",
+            CommandCategory::Scheduler => "⏱",
+            CommandCategory::Jobs => "🏗",
             CommandCategory::Future => "🔮",
         }
     }
@@ -1623,15 +1632,15 @@ fn all_commands() -> Vec<CommandMetadata> {
         CommandMetadata {
             name: "/hooks",
             aliases: &[],
-            category: CommandCategory::Future,
+            category: CommandCategory::Hooks,
             description: "Configure lifecycle hooks (on-submit, on-tool-call, etc.)",
-            usage: "/hooks [list|add|remove]",
-            examples: &["/hooks list"],
+            usage: "/hooks [list|show|enable|disable|run]",
+            examples: &["/hooks list", "/hooks run format-after-patch"],
             shortcut: None,
             surface: CommandSurface::both(),
-            requires_approval: true,
-            risk: CommandRisk::High,
-            status: CommandStatus::Planned,
+            requires_approval: false,
+            risk: CommandRisk::Medium,
+            status: CommandStatus::Partial,
             related: None,
         },
         CommandMetadata {

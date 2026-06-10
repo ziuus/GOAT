@@ -48,6 +48,8 @@ pub async fn run(mut rt: GoatRuntime) -> Result<()> {
     let mut active_skill: Option<String> = None;
 
     loop {
+        handle_scheduled_jobs(&mut rt).await;
+
         // Show the prompt.
         print!("> ");
         if let Some(ref skill) = active_skill {
@@ -1251,6 +1253,55 @@ async fn handle_slash_command(
             }
             true
         }
+        "/hooks" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg.is_empty() || arg == "list" {
+                let info = rt.hooks_manager.list_hooks_info();
+                println!("[HOOKS] Registered Hooks:");
+                if info.is_empty() {
+                    println!("[HOOKS] No hooks configured.");
+                } else {
+                    for i in info {
+                        println!("[HOOKS]   - {}", i);
+                    }
+                }
+            } else {
+                println!("[HOOKS] Advanced hooks management requires config edits for now.");
+            }
+            true
+        }
+
+        "/schedule" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg.is_empty() || arg == "list" {
+                let jobs = rt.scheduler_manager.list_jobs();
+                println!("[SCHEDULE] {} Scheduled Jobs:", jobs.len());
+                for j in jobs {
+                    println!("[SCHEDULE]   [{}] {} (enabled: {})", j.id, j.prompt_or_command, j.enabled);
+                }
+            } else {
+                println!("[SCHEDULE] Adding jobs via Headless is partial. Use manual config for now.");
+            }
+            true
+        }
+
+        "/jobs" => {
+            let arg = parts.get(1..).unwrap_or(&[]).join(" ");
+            if arg.is_empty() || arg == "list" {
+                let statuses = rt.job_tracker.list_jobs();
+                println!("[JOBS] {} Active/Recent Jobs:", statuses.len());
+                if statuses.is_empty() {
+                    println!("[JOBS] No background jobs tracked.");
+                } else {
+                    for s in statuses {
+                        println!("[JOBS]   [{}] {} - {:?}", s.id, s.r#type, s.status);
+                    }
+                }
+            } else {
+                println!("[JOBS] Unknown action '{}'", arg);
+            }
+            true
+        }
 
         "/recall" => {
             let query = parts.get(1..).map(|p| p.join(" ")).unwrap_or_default();
@@ -1610,6 +1661,9 @@ async fn handle_slash_command(
 async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Option<&str>) {
     println!("[YOU] {}", user_msg);
 
+    let hook_logs = rt.hooks_manager.run_hooks("on_submit", &mut rt.approval_gate).await.unwrap_or_default();
+    for log in hook_logs { println!("[HOOKS] {}", log); }
+
     let is_first = rt.history.iter().all(|m| m.role != "user");
     if is_first {
         if let Some(ref brain) = rt.brain {
@@ -1803,8 +1857,21 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             "[APPROVAL] Auto-approved (session policy): {}",
                                             tc.function.name
                                         );
+                                        let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                        for log in hook_logs { println!("[HOOKS] {}", log); }
+
+                                        let is_patch = patch_id.is_some();
+                                        if is_patch {
+                                            let logs = rt.hooks_manager.run_hooks("before_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
+                                            for log in logs { println!("[HOOKS] {}", log); }
+                                        }
+
                                         let result =
                                             execute_tool(rt, &tc.function.name, args).await;
+
+                                        let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                        for log in hook_logs { println!("[HOOKS] {}", log); }
+
                                         if let Some(id) = &patch_id {
                                             if let Some(p) = rt.workflow.get_patch_mut(id) {
                                                 p.status = crate::task::PatchStatus::Applied;
@@ -1812,6 +1879,8 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                             if let Some(task) = &mut rt.workflow.active_task {
                                                 task.status = crate::task::TaskStatus::PatchApplied;
                                             }
+                                            let logs = rt.hooks_manager.run_hooks("after_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
+                                            for log in logs { println!("[HOOKS] {}", log); }
                                         }
                                         println!("[TOOL] {}", result);
 
@@ -1874,8 +1943,21 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                     "[APPROVAL] ✓ Approved: {}",
                                                     tc.function.name
                                                 );
+                                                let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                                for log in hook_logs { println!("[HOOKS] {}", log); }
+
+                                                let is_patch = patch_id.is_some();
+                                                if is_patch {
+                                                    let logs = rt.hooks_manager.run_hooks("before_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
+                                                    for log in logs { println!("[HOOKS] {}", log); }
+                                                }
+
                                                 let result =
                                                     execute_tool(rt, &tc.function.name, args).await;
+
+                                                let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                                for log in hook_logs { println!("[HOOKS] {}", log); }
+
                                                 if let Some(id) = &patch_id {
                                                     if let Some(p) = rt.workflow.get_patch_mut(id) {
                                                         p.status =
@@ -1886,6 +1968,8 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                                         task.status =
                                                             crate::task::TaskStatus::PatchApplied;
                                                     }
+                                                    let logs = rt.hooks_manager.run_hooks("after_patch_apply", &mut rt.approval_gate).await.unwrap_or_default();
+                                                    for log in logs { println!("[HOOKS] {}", log); }
                                                 }
                                                 println!("[TOOL] {}", result);
 
@@ -1934,6 +2018,9 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                 }
                             } else {
                                 // Safe tool — no approval needed.
+                                let hook_logs = rt.hooks_manager.run_hooks("before_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                for log in hook_logs { println!("[HOOKS] {}", log); }
+
                                 let tool_result = if let Some(native_result) =
                                     NativeTools::execute(&tc.function.name, args.clone()).await
                                 {
@@ -1948,6 +2035,9 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
                                         Err(e) => format!("MCP tool error: {}", e),
                                     }
                                 };
+
+                                let hook_logs = rt.hooks_manager.run_hooks("after_tool_call", &mut rt.approval_gate).await.unwrap_or_default();
+                                for log in hook_logs { println!("[HOOKS] {}", log); }
 
                                 println!("[TOOL] {}", tool_result);
                                 rt.history.push(Message {
@@ -1977,7 +2067,7 @@ async fn run_agent_turn(rt: &mut GoatRuntime, user_msg: String, active_skill: Op
 /// Print approval prompt to stdout and read y/n/a/d from stdin (blocking).
 ///
 /// Re-prompts on invalid input. Defaults to Denied on EOF.
-fn prompt_approval_stdin(
+pub fn prompt_approval_stdin(
     req: &ApprovalRequest,
     gate: &mut crate::approval::ApprovalGate,
 ) -> ApprovalDecision {
@@ -2098,5 +2188,23 @@ fn trim_history(history: &mut Vec<Message>) {
     let extra = history.len().saturating_sub(MAX_HISTORY_MESSAGES);
     if extra > 0 {
         history.drain(0..extra);
+    }
+}
+
+async fn handle_scheduled_jobs(rt: &mut crate::runtime::GoatRuntime) {
+    let jobs = rt.scheduler_manager.tick();
+    for job in jobs {
+        println!("[SCHEDULE] Executing job {}: {}", job.id, job.prompt_or_command);
+        rt.job_tracker.add_job(crate::jobs::BackgroundJob {
+            id: job.id.clone(),
+            r#type: "scheduled".to_string(),
+            status: "running".to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            finished_at: None,
+            output_preview: None,
+            error: None,
+            approval_status: None,
+        });
+        rt.scheduler_manager.log_audit(&format!("Executed job {}: {}", job.id, job.prompt_or_command));
     }
 }

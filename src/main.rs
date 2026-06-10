@@ -8,6 +8,8 @@ pub mod config;
 pub mod error;
 pub mod external_agents;
 pub mod headless;
+pub mod hooks;
+pub mod jobs;
 pub mod llm;
 pub mod mcp;
 pub mod mcp_runtime;
@@ -18,6 +20,7 @@ pub mod project;
 pub mod provider;
 pub mod repo_map;
 pub mod runtime;
+pub mod scheduler;
 mod skills;
 pub mod subagents;
 pub mod swarm;
@@ -193,6 +196,8 @@ async fn run_app(
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui::render(f, app))?;
+
+        app.handle_scheduled_jobs().await;
 
         if crossterm::event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {

@@ -1,0 +1,7 @@
+We need to implement Phase 3.8 of GOAT.
+Please create `src/mcp_runtime.rs` that defines a safe MCP runtime manager.
+It should include:
+- `McpRuntimeManager` struct managing MCP server state safely.
+- Server state enum: Configured, Disabled, Starting, Running, Stopped, Failed, Unsupported.
+- Tracking server name, config, enabled/disabled, transport, process state, pid, started_at, last_error, health status, discovered tools, risk policy.
+Do not start disabled servers automatically.

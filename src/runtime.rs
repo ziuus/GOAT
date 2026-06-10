@@ -94,6 +94,11 @@ pub struct GoatRuntime {
     pub selected_files: Vec<String>,
     /// Phase 2.8 External Agent Manager.
     pub external_agent_manager: crate::external_agents::ExternalAgentManager,
+
+    // ── Phase 3.9 Managers ───────────────────────────────────────────────────
+    pub hooks_manager: crate::hooks::HooksManager,
+    pub scheduler_manager: crate::scheduler::SchedulerManager,
+    pub job_tracker: crate::jobs::JobTracker,
 }
 
 impl GoatRuntime {
@@ -248,7 +253,7 @@ impl GoatRuntime {
         let runtime = GoatRuntime {
             subagent_manager: crate::subagents::SubagentManager::new(paths.clone()),
             external_agent_manager,
-            paths,
+            paths: paths.clone(),
             config: config.clone(),
             startup_warnings,
             session_id,
@@ -273,6 +278,9 @@ impl GoatRuntime {
             workflow: WorkflowState::default(),
             tool_registry: crate::tool_registry::ToolRegistry::new(),
             selected_files: Vec::new(),
+            hooks_manager: crate::hooks::HooksManager::new(config.hooks.clone(), paths.clone()),
+            scheduler_manager: crate::scheduler::SchedulerManager::new(config.scheduler.clone(), paths.clone()),
+            job_tracker: crate::jobs::JobTracker::new(),
         };
 
         (runtime, boot_log)
