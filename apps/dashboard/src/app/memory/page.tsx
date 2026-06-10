@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Brain, Star, Sparkles, Check, X, Shield, Activity, Globe } from "lucide-react";
+import { Brain, Star, Sparkles, Check, X, Shield, Activity, Globe, Workflow, Library } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function MemoryGalaxyPage() {
@@ -135,9 +135,22 @@ export default function MemoryGalaxyPage() {
                 </div>
                 <p className="text-sm text-zinc-300">{m.summary}</p>
                 {m.type === "skill_candidate" && (
-                   <div className="mt-4 flex">
+                   <div className="mt-4 flex gap-2">
                      <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
                         <Globe className="w-3.5 h-3.5" /> Search Marketplace
+                     </button>
+                   </div>
+                )}
+                {m.type === "workflow_candidate" && (
+                   <div className="mt-4 flex flex-wrap gap-2">
+                     <button className="flex items-center gap-2 text-xs text-violet-300 hover:text-violet-200 transition-colors border border-violet-500/30 px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20">
+                        <Workflow className="w-3.5 h-3.5" /> Create Recipe Draft
+                     </button>
+                     <button className="flex items-center gap-2 text-xs text-indigo-300 hover:text-indigo-200 transition-colors border border-indigo-500/30 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20">
+                        <Globe className="w-3.5 h-3.5" /> Find Matching Recipe
+                     </button>
+                     <button className="flex items-center gap-2 text-xs text-fuchsia-300 hover:text-fuchsia-200 transition-colors border border-fuchsia-500/30 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20">
+                        <Library className="w-3.5 h-3.5" /> Install Built-In
                      </button>
                    </div>
                 )}

@@ -22,6 +22,7 @@ pub mod models;
 pub mod paths;
 pub mod project;
 pub mod provider;
+pub mod recipe_marketplace;
 pub mod repo_map;
 pub mod runtime;
 pub mod scheduler;

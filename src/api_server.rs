@@ -128,8 +128,21 @@ pub async fn start_server(
             "/v1/skills/remote/:id/install",
             post(skills_remote_install_handler),
         )
-        .route("/v1/skills/:name/update", post(skills_update_handler))
         .route("/v1/skills/:name/uninstall", post(skills_uninstall_handler))
+        .route("/v1/recipes", get(recipes_list_handler))
+        .route("/v1/recipes/built-in", get(recipes_builtin_handler))
+        .route("/v1/recipes/installed", get(recipes_installed_handler))
+        .route("/v1/recipes/drafts", get(recipes_drafts_handler))
+        .route("/v1/recipes/:id", get(recipes_detail_handler))
+        .route("/v1/recipes/:id/audit", post(recipes_audit_handler))
+        .route("/v1/recipes/:id/install", post(recipes_install_handler))
+        .route("/v1/recipes/:name/enable", post(recipes_enable_handler))
+        .route("/v1/recipes/:name/disable", post(recipes_disable_handler))
+        .route("/v1/recipes/:name/uninstall", post(recipes_uninstall_handler))
+        .route("/v1/recipes/:name/provenance", get(recipes_provenance_handler))
+        .route("/v1/recipes/from-memory/:candidate_id", post(recipes_from_memory_handler))
+        .route("/v1/agent-templates", get(agent_templates_list_handler))
+        .route("/v1/agent-templates/:id/draft", post(agent_templates_draft_handler))
         .layer(cors)
         .with_state(state);
 
@@ -1342,6 +1355,149 @@ async fn skills_uninstall_handler(
     Path(name): Path<String>,
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&headers, &state)?;
     Ok(Json(json!({ "name": name, "status": "uninstalled" })))
+}
+
+// ── Recipe Marketplace Handlers ──────────────────────────────────────────────
+
+async fn recipes_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "recipes": [] })))
+}
+
+async fn recipes_builtin_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let paths = rt.paths.clone();
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
+    Ok(Json(json!({ "built_in": sm.built_in_recipes() })))
+}
+
+async fn recipes_installed_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "installed": [] })))
+}
+
+async fn recipes_drafts_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "drafts": [] })))
+}
+
+async fn recipes_detail_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "name": "dummy_recipe" })))
+}
+
+async fn recipes_audit_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "audit": { "risk_level": "low", "warnings": [], "recommended_action": "safe_to_install" } })))
+}
+
+async fn recipes_install_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "status": "approval_required" })))
+}
+
+async fn recipes_enable_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let paths = rt.paths.clone();
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
+    if let Err(e) = sm.enable(&name) {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+    }
+    Ok(Json(json!({ "name": name, "status": "enabled" })))
+}
+
+async fn recipes_disable_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let paths = rt.paths.clone();
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
+    if let Err(e) = sm.disable(&name) {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+    }
+    Ok(Json(json!({ "name": name, "status": "disabled" })))
+}
+
+async fn recipes_uninstall_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let paths = rt.paths.clone();
+    let sm = crate::recipe_marketplace::RecipeMarketplaceManager::new(paths);
+    if let Err(e) = sm.uninstall(&name) {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))));
+    }
+    Ok(Json(json!({ "name": name, "status": "uninstalled" })))
+}
+
+async fn recipes_provenance_handler(
+    headers: HeaderMap,
+    Path(name): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "name": name, "provenance": "local" })))
+}
+
+async fn recipes_from_memory_handler(
+    headers: HeaderMap,
+    Path(candidate_id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "candidate_id": candidate_id, "status": "draft_created" })))
+}
+
+async fn agent_templates_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "templates": [] })))
+}
+
+async fn agent_templates_draft_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": id, "status": "draft_created" })))
 }
