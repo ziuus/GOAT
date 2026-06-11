@@ -5,15 +5,15 @@ This directory contains screenshots of the GOAT UI/UX for use in documentation, 
 ## Required Screenshots Checklist
 Before the first public alpha release, ensure the following screenshots are captured and placed in this directory:
 
-- [ ] `01-home-dashboard.png`
-- [ ] `02-agent-command-center.png`
-- [ ] `03-learner-os.png`
-- [ ] `04-cofounder.png`
-- [ ] `05-promptforge.png`
-- [ ] `06-reports.png`
-- [ ] `07-timeline.png`
-- [ ] `08-brain-search.png`
-- [ ] `09-sidebar-safety.png`
+- [x] `01-home-dashboard.png`
+- [x] `02-agent-command-center.png`
+- [x] `03-learner-os.png`
+- [x] `04-cofounder.png`
+- [x] `05-promptforge.png`
+- [x] `06-reports.png`
+- [x] `07-timeline.png`
+- [x] `08-brain-search.png`
+- [x] `09-sidebar-safety.png`
 
 ## Capture Instructions (Manual)
 1. Start the Daemon (`cargo run --release -- daemon start`).

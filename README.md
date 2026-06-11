@@ -159,7 +159,20 @@ npm run dev
 
 ## 📸 Screenshots
 
-*(Screenshots are being collected for the first alpha release.)*
+### Command Center
+![Command Center](docs/assets/screenshots/02-agent-command-center.png)
+
+### PromptForge
+![PromptForge](docs/assets/screenshots/05-promptforge.png)
+
+### Learner OS
+![Learner OS](docs/assets/screenshots/03-learner-os.png)
+
+### Cofounder
+![Cofounder](docs/assets/screenshots/04-cofounder.png)
+
+### Safety Controls
+![Safety Controls](docs/assets/screenshots/09-sidebar-safety.png)
 
 ## 📚 Documentation Index
 
