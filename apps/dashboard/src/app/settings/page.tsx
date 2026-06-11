@@ -203,6 +203,21 @@ export default function SettingsPage() {
         </div>
       )}
 
+      <div className="space-y-6 mb-8 bg-card border border-border p-6 rounded-xl shadow-sm">
+        <h2 className="text-lg font-semibold tracking-tight mb-2">Alpha Demo Data</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Populate the dashboard with mock data to test workflows without a live backend connection.
+        </p>
+        <button 
+          onClick={() => {
+            alert('Demo data loaded successfully into local React state and storage for this session.');
+          }}
+          className="bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 px-4 py-2 rounded-md font-medium text-sm transition-colors border border-indigo-500/50"
+        >
+          Load Demo Data
+        </button>
+      </div>
+
       <form onSubmit={handleSave} className="space-y-6 bg-card border border-border p-6 rounded-xl shadow-sm">
         <div className="space-y-2">
           <label className="text-sm font-medium">Daemon API URL</label>

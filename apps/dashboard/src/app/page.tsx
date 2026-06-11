@@ -1,13 +1,58 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/ui/PageShell';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FeatureCard } from '@/components/ui/FeatureCard';
 import { SafetyNotice } from '@/components/ui/Status';
-import { Sparkles, Users, Search, TerminalSquare, BookOpen, Layers, Activity, Calendar, GitBranch } from 'lucide-react';
+import { ErrorState } from '@/components/ui/States';
+import { Sparkles, Search, TerminalSquare, BookOpen, Layers, Activity, GitBranch, PlayCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { goatApi } from '@/lib/goat-api';
 
 export default function Home() {
+  const [daemonStatus, setDaemonStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [mcpStatus, setMcpStatus] = useState<'idle' | 'connected'>('idle');
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        await goatApi.getHealth();
+        setDaemonStatus('online');
+        const mcp = await goatApi.getMcpStatus();
+        if (mcp && mcp.servers && mcp.servers.length > 0) {
+          setMcpStatus('connected');
+        }
+      } catch (e) {
+        setDaemonStatus('offline');
+      }
+    };
+    checkHealth();
+  }, []);
+
+  if (daemonStatus === 'offline') {
+    return (
+      <PageShell>
+        <PageHeader 
+          title="GOAT OS Offline" 
+          subtitle="The local daemon is not running."
+        />
+        <ErrorState 
+          title="Daemon Disconnected"
+          description="GOAT requires its local Rust daemon to execute agents, access memory, and manage workflows securely."
+          action={
+            <button 
+              onClick={() => alert("Run: cargo run --release -- daemon start")}
+              className="px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium rounded-lg text-sm border border-red-500/30"
+            >
+              How to start the daemon
+            </button>
+          }
+        />
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
       <PageHeader 
@@ -20,6 +65,24 @@ export default function Home() {
           <SafetyNotice />
 
           <section>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-1">Start Here</h2>
+            <div className="bg-gradient-to-r from-indigo-500/10 to-emerald-500/10 border border-white/10 rounded-xl p-6 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <PlayCircle className="w-5 h-5 text-indigo-400" /> Let's get started
+                </h3>
+                <p className="text-sm text-slate-400 mt-1">Configure your environment or dive straight into your first workflow.</p>
+              </div>
+              <div className="flex gap-3">
+                <Link href="/onboarding" className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors">
+                  Setup & Doctor
+                </Link>
+                <Link href="/cofounder" className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors">
+                  Try Cofounder
+                </Link>
+              </div>
+            </div>
+
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-1">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link href="/cofounder">
@@ -56,7 +119,9 @@ export default function Home() {
                   <Activity className="w-5 h-5 text-emerald-500" />
                   <span className="text-sm font-medium text-white">Daemon</span>
                 </div>
-                <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-semibold">Online</span>
+                <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-semibold">
+                  {daemonStatus === 'online' ? 'Online' : 'Checking'}
+                </span>
               </div>
               <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -67,10 +132,12 @@ export default function Home() {
               </div>
               <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <GitBranch className="w-5 h-5 text-slate-500" />
+                  <GitBranch className={`w-5 h-5 ${mcpStatus === 'connected' ? 'text-emerald-500' : 'text-slate-500'}`} />
                   <span className="text-sm font-medium text-white">GitHub MCP</span>
                 </div>
-                <span className="text-xs bg-slate-500/10 text-slate-400 px-2 py-0.5 rounded uppercase tracking-wider font-semibold">Idle</span>
+                <span className={`text-xs px-2 py-0.5 rounded uppercase tracking-wider font-semibold ${mcpStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                  {mcpStatus === 'connected' ? 'Connected' : 'Idle'}
+                </span>
               </div>
             </div>
           </section>

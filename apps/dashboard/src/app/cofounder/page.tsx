@@ -110,8 +110,8 @@ export default function CofounderPage() {
               title={activeIdea.title}
               subtitle={activeIdea.description}
               actions={
-                <button className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg text-sm font-medium hover:bg-indigo-500/30 border border-indigo-500/50 transition-colors">
-                  <Activity className="w-4 h-4" /> Run Validation
+                <button disabled title="Validation API coming soon" className="flex items-center gap-2 px-4 py-2 bg-slate-500/10 text-slate-500 rounded-lg text-sm font-medium border border-slate-500/20 cursor-not-allowed">
+                  <Activity className="w-4 h-4" /> Run Validation (Soon)
                 </button>
               }
             />
@@ -138,7 +138,7 @@ export default function CofounderPage() {
                 <p className="text-sm text-slate-300 leading-relaxed mt-2">
                   {activeIdea.mvpScope || 'No MVP scope generated yet.'}
                 </p>
-                <button className="mt-4 text-xs text-indigo-400 flex items-center gap-1 hover:underline">
+                <button disabled title="Generation coming soon" className="mt-4 text-xs text-slate-500 flex items-center gap-1 cursor-not-allowed">
                   Generate Scope <ChevronRight className="w-3 h-3" />
                 </button>
               </FeatureCard>

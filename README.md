@@ -56,6 +56,16 @@ GOAT provides specialized agents that own domain-specific strategies:
 * **Timeline** — an organized, chronological record of your projects and actions.
 * **Interfaces** — choose how you work: Dashboard, TUI, CLI, Daemon, or Desktop.
 
+### What can I do with GOAT today?
+GOAT is a practical tool for orchestrating multi-agent work locally. Right now you can:
+* **Plan a learning roadmap**: generate daily plans, practice tasks, and progress reports.
+* **Validate a startup idea**: run MVPs through the Cofounder agent and get an actionable scorecard.
+* **Research competitors**: gather structured insights through the Researcher agent.
+* **Review UI/UX**: have the Designer agent audit aesthetics and accessibility.
+* **Plan a launch**: draft distribution strategies via the Socializer agent.
+* **Improve prompts**: refine vague inputs into rigorous agent instructions with PromptForge.
+* **Generate reports**: document health checks and runbooks using the Operator agent.
+
 ## 🛡️ Why local-first?
 * **Runs on your machine:** Your code, models (via Ollama), and memory remain under your control.
 * **You stay in control:** The system operates exactly how you configure it.

@@ -85,22 +85,20 @@ Status legend:
 |---------|--------|-------|
 | TUI (Terminal UI) | 🟢 Works | Main navigation, chat, modal systems robust. |
 | Daemon / API | 🟢 Works | Headless mode fully implemented. |
-| Web Dashboard | 🟢 Works | Overhauled in Phase 5.26 with unified Design System, grouped sidebar, and command center. Next.js 15 app. |
-| Tauri Desktop App | 🟡 Partial | Native window spawns dashboard webview. Menu bar missing. |
-| Agent Collaboration | 🟢 Works | Implemented via `AgentCollaborationManager` (sessions, handoffs, workflows). |
-| ReAct loop (plan → act → observe) | `working` | Up to 10 iterations |
-| Configurable max iterations | `planned` | Currently hardcoded to 10 |
-| Tool calling dispatch | `working` | Native + MCP tools |
-| Session persistence | `working` | SQLite via brain.rs |
-| Session resume on startup | `working` | Loads latest session from DB |
-| Multi-session support | `partial` | DB supports it; UI does not |
-| Task cancellation | `planned` | Phase 2 |
-| Context compaction | `planned` | Phase 4 |
-| History bounding (80 messages) | `working` | app.rs trim_history() |
-| Checkpointing | `planned` | Phase 4 |
-| Error recovery / retry | `planned` | Phase 3 |
-| Human approval gates | `planned` | Phase 1 priority |
-| Dry-run mode | `planned` | Phase 2 |
+| Web Dashboard | 🟢 Works | Overhauled Next.js 15 app. |
+| Tauri Desktop App | 🟡 Partial | Native window spawns dashboard webview. |
+| Agent Collaboration | 🧪 Experimental | Built in backend, not fully exposed in Dashboard UI. |
+| Cofounder UI | 🟢 Works | UI built, state managed, API validation planned. |
+| Learner UI | 🟢 Works | Complete local state roadmap experience. |
+| PromptForge UI | 🟢 Works | Connected to local API. |
+| Socializer, Designer, Operator | 🧪 Experimental | UI shells created for Alpha. |
+| ReAct loop (plan → act → observe) | 🟢 Works | Up to 10 iterations |
+| Configurable max iterations | 🟡 Partial | Currently hardcoded to 10 |
+| Tool calling dispatch | 🟢 Works | Native + MCP tools |
+| Session persistence | 🟢 Works | SQLite via brain.rs |
+| Session resume on startup | 🟢 Works | Loads latest session from DB |
+| Multi-session support | 🟡 Partial | DB supports it; UI does not |
+| Human approval gates | 🟡 Partial | Phase 1 priority (ApprovalGate logic built) |
 
 ---
 
