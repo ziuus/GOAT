@@ -4053,6 +4053,101 @@ impl App {
                 true
             }
 
+            "/researcher" | "@researcher" | "@research" | "@sources" | "@competitors" | "@compare" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = if cmd.starts_with("@") {
+                    cmd.trim_start_matches('@')
+                } else {
+                    parts.get(0).copied().unwrap_or("list")
+                };
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let agent = match crate::agents::researcher::ResearcherAgent::new() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        self.push_log(format!("[RESEARCHER] Init error: {}", e));
+                        return true;
+                    }
+                };
+
+                match subcmd {
+                    "list" | "researcher" => {
+                        if let Ok(topics) = agent.list_topics() {
+                            self.push_log(format!("[RESEARCHER] {} topics found.", topics.len()));
+                            for t in topics {
+                                self.push_log(format!("  [{}] {} (State: {:?})", t.id, t.title, t.status));
+                            }
+                        }
+                    }
+                    "new-topic" => {
+                        match agent.create_topic(if target.is_empty() { "Untitled" } else { target }, "Main Question", "General") {
+                            Ok(t) => self.push_log(format!("[RESEARCHER] Topic created: {}", t.id)),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "plan" | "research" => {
+                        // Check if we need to create a topic first if it's an alias
+                        let topic_id = if subcmd == "research" && !target.is_empty() {
+                            if let Ok(t) = agent.create_topic(target, target, "General") {
+                                self.push_log(format!("[RESEARCHER] Created topic for research: {}", t.id));
+                                t.id
+                            } else {
+                                target.to_string()
+                            }
+                        } else {
+                            target.to_string()
+                        };
+                        match agent.create_plan(&topic_id) {
+                            Ok(_) => self.push_log(format!("[RESEARCHER] Plan created for {}", topic_id)),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "sources" => {
+                        match agent.list_sources(target) {
+                            Ok(s) => self.push_log(format!("[RESEARCHER] Found {} sources.", s.len())),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "notes" => {
+                        match agent.list_notes(target) {
+                            Ok(n) => self.push_log(format!("[RESEARCHER] Found {} notes.", n.len())),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "competitors" => {
+                        match agent.generate_competitors(target) {
+                            Ok(c) => self.push_log(format!("[RESEARCHER] Generated {} competitor scans.", c.len())),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "compare" => {
+                        match agent.generate_compare(target) {
+                            Ok(c) => self.push_log(format!("[RESEARCHER] Generated comparison for {}", c.options.join(" vs "))),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "market" => {
+                        match agent.generate_market(target) {
+                            Ok(_) => self.push_log(format!("[RESEARCHER] Generated market brief.")),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "brief" => {
+                        match agent.generate_brief(target) {
+                            Ok(_) => self.push_log(format!("[RESEARCHER] Brief generated.")),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    "report" => {
+                        match agent.generate_report(target) {
+                            Ok(r) => self.push_log(format!("[RESEARCHER] Report generated: {}", r.id)),
+                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                        }
+                    }
+                    _ => self.push_log(format!("[RESEARCHER] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");

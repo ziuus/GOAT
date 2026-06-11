@@ -47,6 +47,17 @@ pub async fn start_server(
         .route("/v1/designer/reviews/:id/plan", post(designer_plan_handler))
         .route("/v1/designer/reviews/:id/handoff", post(designer_handoff_handler))
         .route("/v1/designer/reviews/:id/report", post(designer_report_handler))
+        .route("/v1/researcher/status", get(researcher_status_handler))
+        .route("/v1/researcher/topics", get(researcher_list_topics_handler).post(researcher_create_topic_handler))
+        .route("/v1/researcher/topics/:id", get(researcher_get_topic_handler))
+        .route("/v1/researcher/topics/:id/plan", post(researcher_plan_handler))
+        .route("/v1/researcher/topics/:id/sources", get(researcher_list_sources_handler).post(researcher_add_source_handler))
+        .route("/v1/researcher/topics/:id/notes", get(researcher_list_notes_handler).post(researcher_add_note_handler))
+        .route("/v1/researcher/topics/:id/competitors", post(researcher_competitors_handler))
+        .route("/v1/researcher/topics/:id/compare", post(researcher_compare_handler))
+        .route("/v1/researcher/topics/:id/market", post(researcher_market_handler))
+        .route("/v1/researcher/topics/:id/brief", post(researcher_brief_handler))
+        .route("/v1/researcher/topics/:id/report", post(researcher_report_handler))
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -3361,5 +3372,142 @@ async fn designer_report_handler(
     let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let report_id = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report_id": report_id })))
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Researcher Endpoints
+// -----------------------------------------------------------------------------
+
+async fn researcher_status_handler() -> impl axum::response::IntoResponse {
+    let mut status = serde_json::Map::new();
+    status.insert("enabled".to_string(), serde_json::Value::Bool(true));
+    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    axum::Json(status)
+}
+
+async fn researcher_list_topics_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let topics = agent.list_topics().unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "topics": topics })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateResearchTopicReq {
+    title: String,
+    research_question: String,
+    domain: String,
+}
+
+async fn researcher_create_topic_handler(
+    axum::Json(req): axum::Json<CreateResearchTopicReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let topic = agent.create_topic(&req.title, &req.research_question, &req.domain).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "topic": topic })))
+}
+
+async fn researcher_get_topic_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Ok(Some(r)) = agent.get_topic(&id) {
+        Ok(axum::Json(serde_json::json!({ "topic": r })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn researcher_plan_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let plan = agent.create_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "plan": plan })))
+}
+
+async fn researcher_list_sources_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sources = agent.list_sources(&id).unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "sources": sources })))
+}
+
+#[derive(serde::Deserialize)]
+struct AddResearchSourceReq {
+    title: String,
+}
+
+async fn researcher_add_source_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+    axum::Json(req): axum::Json<AddResearchSourceReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let source = agent.add_source(&id, &req.title).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "source": source })))
+}
+
+async fn researcher_list_notes_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let notes = agent.list_notes(&id).unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "notes": notes })))
+}
+
+#[derive(serde::Deserialize)]
+struct AddResearchNoteReq {
+    claim: String,
+}
+
+async fn researcher_add_note_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+    axum::Json(req): axum::Json<AddResearchNoteReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let note = agent.add_note(&id, &req.claim).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "note": note })))
+}
+
+async fn researcher_competitors_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let scans = agent.generate_competitors(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "scans": scans })))
+}
+
+async fn researcher_compare_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let comp = agent.generate_compare(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "comparison": comp })))
+}
+
+async fn researcher_market_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let m = agent.generate_market(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "market_brief": m })))
+}
+
+async fn researcher_brief_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let b = agent.generate_brief(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "brief": b })))
+}
+
+async fn researcher_report_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "report": r })))
 }
 

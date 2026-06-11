@@ -54,6 +54,15 @@ const MOCK_AGENTS = [
     description: "Evaluates ideas, generates MVP specs, and creates validation plans.",
     domainResponsibilities: ["Ideation", "Validation", "Market Research"],
     parentPrime: null
+  },
+  {
+    id: "agent-6",
+    name: "Researcher Prime",
+    tier: "Prime",
+    status: "active",
+    description: "Deep source-grounded research, technology comparisons, and competitor analysis.",
+    domainResponsibilities: ["Research", "Comparisons", "Brief Generation"],
+    parentPrime: null
   }
 ];
 

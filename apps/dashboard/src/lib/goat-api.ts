@@ -222,3 +222,20 @@ export const designerApi = {
   createHandoff: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/handoff`, { method: 'POST' }).then(r => r.json()),
   generateReport: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/report`, { method: 'POST' }).then(r => r.json()),
 };
+
+export const researcherApi = {
+  getStatus: () => daemonFetch("/v1/researcher/status").then(r => r.json()),
+  listTopics: () => daemonFetch("/v1/researcher/topics").then(r => r.json()),
+  createTopic: (data: any) => daemonFetch("/v1/researcher/topics", { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  getTopic: (id: string) => daemonFetch(`/v1/researcher/topics/${id}`).then(r => r.json()),
+  createPlan: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/plan`, { method: "POST" }).then(r => r.json()),
+  listSources: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/sources`).then(r => r.json()),
+  addSource: (id: string, data: any) => daemonFetch(`/v1/researcher/topics/${id}/sources`, { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  listNotes: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/notes`).then(r => r.json()),
+  addNote: (id: string, data: any) => daemonFetch(`/v1/researcher/topics/${id}/notes`, { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  generateCompetitors: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/competitors`, { method: "POST" }).then(r => r.json()),
+  generateCompare: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/compare`, { method: "POST" }).then(r => r.json()),
+  generateMarket: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/market`, { method: "POST" }).then(r => r.json()),
+  generateBrief: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/brief`, { method: "POST" }).then(r => r.json()),
+  generateReport: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/report`, { method: "POST" }).then(r => r.json()),
+};
