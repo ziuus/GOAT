@@ -962,6 +962,19 @@ impl App {
                 true
             }
 
+            "/version" | "/about" => {
+                let ver = env!("CARGO_PKG_VERSION");
+                self.push_log(format!("[ABOUT] GOAT v{}", ver));
+                self.push_log(
+                    "[ABOUT] The Deep Research AI with TUI, Daemon, and React Dashboard."
+                        .to_string(),
+                );
+                self.push_log(
+                    "[ABOUT] Check https://github.com/hummcode/goat for updates.".to_string(),
+                );
+                true
+            }
+
             "/mcp" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcommand = parts.get(0).copied().unwrap_or("status");

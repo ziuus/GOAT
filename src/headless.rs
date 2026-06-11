@@ -227,6 +227,14 @@ async fn handle_slash_command(
             true
         }
 
+        "/version" | "/about" => {
+            let ver = env!("CARGO_PKG_VERSION");
+            println!("[ABOUT] GOAT v{}", ver);
+            println!("[ABOUT] The Deep Research AI with TUI, Daemon, and React Dashboard.");
+            println!("[ABOUT] Check https://github.com/hummcode/goat for updates.");
+            true
+        }
+
         "/status" => {
             println!("[STATUS] Provider : {}", rt.provider_label);
             println!("[STATUS] Profile  : {}", rt.active_profile);

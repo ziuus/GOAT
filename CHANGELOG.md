@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.1.0-alpha.1] — Phase 5.15: Public Repo Polish & Release Packaging (2026-06-11)
+
+### Added
+- **Public Documentation**: Added `INSTALL.md`, `BUILD_FROM_SOURCE.md`, `DEVELOPMENT.md`, `RELEASE_PROCESS.md`, `PACKAGING.md`, and `docs/README.md` index.
+- **Community Templates**: Added Issue templates, PR template, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, and `SUPPORT.md`.
+- **Repo Setup**: Created `GITHUB_REPO_SETUP.md` with recommended settings.
+- **Assets Folder**: Setup `docs/assets/` structure for screenshots, gifs, and logos.
+- **Clean Repo**: Purged accidental generated files and artifacts.
+
+## [Unreleased] — Phase 5.14: Agent Modes, Project Profiles & Onboarding Wizard (2026-06-10)
+
+### Added
+- **Agent Modes**: Introduced diverse profiles (e.g., Coding Assistant, Bug Hunter, UI Designer) with custom tooling, limits, and LLM overrides.
+- **Project Profiles**: Added workspace detectors for rust/node/nextjs to automatically set build commands and test commands.
+- **Onboarding Setup Wizard**: Interactive React-based dashboard flow for initial workspace tuning and mode selection.
+- **CLI Commands**: Added `/mode`, `/project`, and `/onboard` to headless/TUI interfaces.
+
+---
+
 ## [0.18.0] — Phase 5.8: True Semantic Search + Deep Brain Ingestion (2026-06-10)
 
 ### Added

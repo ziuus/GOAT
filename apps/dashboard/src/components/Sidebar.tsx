@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings, ShieldCheck, MessageSquare, FolderTree, GitBranch, Command, FileText, Sparkles, Wand2, Library, Workflow, BrainCircuit, Radio } from 'lucide-react';
 
+import pkg from '../../package.json';
+
 const navItems = [
   { name: 'Overview', href: '/', icon: Activity },
   { name: 'Commands', href: '/commands', icon: Command },
@@ -37,7 +39,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 border-r border-border bg-card flex flex-col">
       <div className="p-6 border-b border-border">
-        <h1 className="text-lg font-bold tracking-tight">GOAT Dashboard</h1>
+        <h1 className="text-lg font-bold tracking-tight">GOAT Dashboard <span className="text-xs font-normal text-muted-foreground ml-1">v{pkg.version}</span></h1>
         <p className="text-xs text-muted-foreground mt-1">General Omniscient Agentic Tool</p>
       </div>
       <nav className="flex-1 p-4 space-y-1">

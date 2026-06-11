@@ -611,6 +611,55 @@ pub fn run_doctor(
         },
     });
 
+    // ── Onboarding & Profiles ──────────────────────────────────────────────────
+    if config.onboarding.completed {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Onboarding".to_string(),
+            detail: "Completed".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Warn,
+            label: "Onboarding".to_string(),
+            detail: "Incomplete. Run `goat setup` or visit Dashboard /onboarding".to_string(),
+        });
+    }
+
+    if config.profiles.project_profile_enabled {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Project Profile".to_string(),
+            detail: "Enabled".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Project Profile".to_string(),
+            detail: "Disabled. Run `goat project detect` to set up.".to_string(),
+        });
+    }
+
+    // ── Dashboard Build ────────────────────────────────────────────────────────
+    let dashboard_path = std::env::current_dir()
+        .unwrap_or_default()
+        .join("apps")
+        .join("dashboard");
+    let next_path = dashboard_path.join(".next");
+    if next_path.exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Dashboard Build".to_string(),
+            detail: "Compiled and ready".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Warn,
+            label: "Dashboard Build".to_string(),
+            detail: "Missing. Run `cd apps/dashboard && npm install && npm run build`".to_string(),
+        });
+    }
+
     // ── Memory ────────────────────────────────────────────────────────────────
     let memory_manager = crate::memory::MemoryManager::new(paths, config.memory.clone());
     let (u_count, u_max, u_warn) = memory_manager.user_budget_status();
