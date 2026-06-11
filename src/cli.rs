@@ -31,9 +31,8 @@ use std::path::PathBuf;
 #[command(
     name = "goat",
     version = env!("CARGO_PKG_VERSION"),
-    about = "GOAT — Universal AI CLI/TUI agent platform",
-    long_about = "GOAT (General Omniscient Agentic Tool) is a Rust-first, terminal-native \
-                  AI agent platform.\n\n\
+    about = "GOAT — Local-first Agent OS",
+    long_about = "GOAT is a Rust-first, terminal-native AI agent platform.\n\n\
                   Modes:\n  \
                     goat              Start interactive TUI\n  \
                     goat --headless   Start headless stdin/stdout mode\n  \

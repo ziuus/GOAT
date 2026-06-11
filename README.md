@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="./namelogo.png" alt="GOAT logo" width="420" />
   <h1>GOAT</h1>
   <p><strong>The local-first AI Agent OS for building, learning, research, automation, and safe multi-agent workflows.</strong></p>
 

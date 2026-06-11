@@ -70,11 +70,11 @@ export default function Sidebar() {
   return (
     <aside className="w-64 border-r border-white/5 bg-[#050505] flex flex-col text-slate-300">
       <div className="p-6 border-b border-white/5 shrink-0">
-        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-          <Layers className="w-5 h-5 text-indigo-500" />
-          GOAT <span className="text-[10px] uppercase font-semibold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded ml-1">OS Alpha</span>
-        </h1>
-        <p className="text-xs text-slate-500 mt-2">Local-first AI Agent System</p>
+        <div className="flex items-center justify-between mb-2">
+          <img src="/namelogo.png" alt="GOAT Logo" className="h-6 object-contain" />
+          <span className="text-[10px] uppercase font-semibold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">OS Alpha</span>
+        </div>
+        <p className="text-xs text-slate-500">Local-first AI Agent System</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-none">

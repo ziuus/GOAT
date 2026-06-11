@@ -173,13 +173,23 @@ async fn main() -> Result<()> {
     // ── 7. Bootstrap shared runtime ───────────────────────────────────────────
     // Shared between TUI and headless: brain, LLM, session, approval gate,
     // model profiles, fallback chain, retry/timeout config.
-    let (runtime, boot_log) = runtime::GoatRuntime::bootstrap(
+    let (runtime, mut boot_log) = runtime::GoatRuntime::bootstrap(
         goat_config,
         goat_paths,
         config_warnings,
         cli.no_brain,
         cli.profile.clone(),
     );
+
+    let logo = vec![
+        r#"  ____  ___    _  _____"#.to_string(),
+        r#" / ___|/ _ \  / \|_   _|"#.to_string(),
+        r#"| |  _| | | |/ _ \ | |  "#.to_string(),
+        r#"| |_| | |_| / ___ \| |  "#.to_string(),
+        r#" \____|\___/_/   \_\_|  Local-first Agent OS"#.to_string(),
+        r#""#.to_string(),
+    ];
+    boot_log.splice(0..0, logo);
 
     // ── 8. Route to TUI or headless ───────────────────────────────────────────
     if cli.headless {

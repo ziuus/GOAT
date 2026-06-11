@@ -56,7 +56,11 @@ export default function Home() {
   return (
     <PageShell>
       <PageHeader 
-        title="Welcome to GOAT OS" 
+        title={
+          <div className="flex items-center gap-3">
+            <img src="/namelogo.png" alt="GOAT OS Logo" className="h-8 object-contain" />
+          </div>
+        }
         subtitle="Your local-first AI Agent Operating System for building, learning, research, and workflows."
       />
 

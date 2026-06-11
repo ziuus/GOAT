@@ -1575,7 +1575,7 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            format!("v{}", GOAT_VERSION),
+            format!("v{} │ Local-first Agent OS", GOAT_VERSION),
             Style::default()
                 .fg(Color::Rgb(80, 95, 140))
                 .bg(COLOR_HEADER_BG),

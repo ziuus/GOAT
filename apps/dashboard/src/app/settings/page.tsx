@@ -282,6 +282,14 @@ export default function SettingsPage() {
           </div>
         )}
       </form>
+
+      <div className="mt-12 flex flex-col items-center justify-center text-center space-y-4 pb-8">
+        <img src="/namelogo.png" alt="GOAT OS Logo" className="h-8 object-contain opacity-50 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300" />
+        <p className="text-xs text-muted-foreground">
+          GOAT OS Alpha &copy; 2026<br/>
+          Local-first AI Agent System
+        </p>
+      </div>
     </div>
   );
 }
