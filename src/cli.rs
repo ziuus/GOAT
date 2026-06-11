@@ -152,6 +152,17 @@ pub enum Command {
         args: Vec<String>,
     },
 
+    /// Manage Safe Extensions and Plugin Marketplace (Phase 6.8)
+    #[command(name = "extensions")]
+    Extensions {
+        /// Action to perform: list, discover, audit, install, enable, disable, remove
+        #[arg(default_value = "list")]
+        action: String,
+        /// ID or Path to extension depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Manage tools, permissions, and tool registry.
     #[command(name = "tools")]
     Tools {
@@ -684,6 +695,10 @@ pub async fn handle_subcommand(
             }
             Ok(true)
         }
+        Command::Extensions { action, args } => {
+            handle_extensions_command(paths, config, &action, &args)?;
+            Ok(true)
+        }
 
         Command::Tools { action, arg } => {
             handle_tools_command(paths, config, &action, arg.as_deref())?;
@@ -908,6 +923,122 @@ fn handle_new_session_command(paths: &crate::paths::GoatPaths) -> anyhow::Result
 }
 
 // ── tools command ─────────────────────────────────────────────────────────────
+
+fn handle_extensions_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    use crate::extensions::ExtensionRegistry;
+    let mut registry = ExtensionRegistry::new(paths.config_file.parent().unwrap_or(std::path::Path::new("/")), &paths.data_dir)?;
+    registry.load_state()?;
+
+    match action {
+        "list" => {
+            println!("Extension Registry (Phase 6.8)");
+            println!("{:-<80}", "");
+            println!("{:<30} | {:<15} | {:<15} | {:<10}", "ID", "Kind", "Status", "Trust");
+            println!("{:-<80}", "");
+            
+            let mut records = registry.list_extensions();
+            records.sort_by_key(|r| r.manifest.id.clone());
+            
+            for r in records {
+                println!(
+                    "{:<30} | {:<15?} | {:<15?} | {:<10?}",
+                    r.manifest.id, r.manifest.kind, r.status, r.trust_level
+                );
+            }
+        }
+        "discover" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions discover <path>");
+                return Ok(());
+            }
+            let path = std::path::Path::new(&args[0]);
+            match registry.discover_local(path) {
+                Ok(id) => println!("Discovered extension: {}", id),
+                Err(e) => println!("Error discovering extension: {}", e),
+            }
+        }
+        "audit" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions audit <id>");
+                return Ok(());
+            }
+            match registry.audit_extension(&args[0]) {
+                Ok(result) => {
+                    println!("Audit Results for {}: ", result.extension_id);
+                    println!("Passed: {}", result.passed);
+                    if result.findings.is_empty() {
+                        println!("No findings.");
+                    } else {
+                        for finding in result.findings {
+                            println!("- [{:?}] {}", finding.severity, finding.message);
+                        }
+                    }
+                }
+                Err(e) => println!("Error: {}", e),
+            }
+        }
+        "install" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions install <id>");
+                return Ok(());
+            }
+            let id = &args[0];
+            
+            // For CLI we assume user interaction is outside or explicitly trusted
+            if let Some(record) = registry.get_extension(id) {
+                if record.trust_level != crate::extensions::ExtensionTrustLevel::LocalBuiltin {
+                    println!("Warning: Installing untrusted extension.");
+                }
+            }
+            
+            match registry.install_extension(id) {
+                Ok(_) => println!("Successfully installed {}. It is currently DISABLED.", id),
+                Err(e) => println!("Error installing: {}", e),
+            }
+        }
+        "enable" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions enable <id>");
+                return Ok(());
+            }
+            match registry.enable_extension(&args[0]) {
+                Ok(_) => println!("Successfully enabled {}.", args[0]),
+                Err(e) => println!("Error enabling: {}", e),
+            }
+        }
+        "disable" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions disable <id>");
+                return Ok(());
+            }
+            match registry.disable_extension(&args[0]) {
+                Ok(_) => println!("Successfully disabled {}.", args[0]),
+                Err(e) => println!("Error disabling: {}", e),
+            }
+        }
+        "remove" => {
+            if args.is_empty() {
+                println!("Usage: goat extensions remove <id>");
+                return Ok(());
+            }
+            match registry.remove_extension(&args[0]) {
+                Ok(_) => println!("Successfully removed {}.", args[0]),
+                Err(e) => println!("Error removing: {}", e),
+            }
+        }
+        _ => {
+            println!("Unknown action: {}", action);
+            println!("Supported actions: list, discover, audit, install, enable, disable, remove");
+        }
+    }
+
+    Ok(())
+}
 
 fn handle_tools_command(
     paths: &crate::paths::GoatPaths,

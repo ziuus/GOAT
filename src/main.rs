@@ -19,6 +19,7 @@ pub mod daemon;
 pub mod embeddings;
 pub mod error;
 pub mod events;
+pub mod extensions;
 pub mod external_agents;
 pub mod github_workflow;
 pub mod headless;

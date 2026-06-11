@@ -598,6 +598,12 @@ pub async fn start_server(
         .route("/v1/providers", get(providers_list_handler))
         .route("/v1/providers/doctor", get(providers_doctor_handler))
         .route("/v1/models/route", post(models_route_handler))
+        .route("/v1/extensions", get(extensions_list_handler))
+        .route("/v1/extensions/:id", get(extensions_get_handler))
+        .route("/v1/extensions/:id/audit", get(extensions_audit_handler))
+        .route("/v1/extensions/:id/install", post(extensions_install_handler))
+        .route("/v1/extensions/:id/enable", post(extensions_enable_handler))
+        .route("/v1/extensions/:id/disable", post(extensions_disable_handler))
         .layer(cors)
         .with_state(state);
 
@@ -4778,7 +4784,7 @@ struct RouteRequest {
 async fn models_route_handler(
     State(state): State<Arc<ApiState>>,
     axum::extract::Json(req): axum::extract::Json<RouteRequest>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+) -> axum::Json<serde_json::Value> {
     use crate::providers::{ModelProviderRegistry, ModelRouteRequest};
     let rt = state.runtime.lock().await;
     let mut registry = ModelProviderRegistry::new(rt.config.model_routing.clone());
@@ -4801,7 +4807,77 @@ async fn models_route_handler(
     };
     
     let decision = registry.route(&route_req);
-    Ok(axum::Json(serde_json::json!({
-        "decision": decision
-    })))
+    axum::Json(serde_json::json!({ "routed_to": decision }))
+}
+
+// ── Extensions ─────────────────────────────────────────────────────────────
+
+async fn extensions_list_handler(
+    State(state): State<Arc<ApiState>>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    let records = rt.extension_registry.list_extensions();
+    axum::Json(serde_json::json!({ "extensions": records }))
+}
+
+async fn extensions_get_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    if let Some(record) = rt.extension_registry.get_extension(&id) {
+        axum::Json(serde_json::json!({ "extension": record }))
+    } else {
+        axum::Json(serde_json::json!({ "error": "not found" }))
+    }
+}
+
+async fn extensions_audit_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    match rt.extension_registry.audit_extension(&id) {
+        Ok(res) => axum::Json(serde_json::json!({ "audit": res })),
+        Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
+    }
+}
+
+async fn extensions_install_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    match rt.extension_registry.install_extension(&id) {
+        Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
+        Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
+    }
+}
+
+async fn extensions_enable_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    match rt.extension_registry.enable_extension(&id) {
+        Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
+        Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
+    }
+}
+
+async fn extensions_disable_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> axum::Json<serde_json::Value> {
+    let mut rt = state.runtime.lock().await;
+    let _ = rt.extension_registry.load_state();
+    match rt.extension_registry.disable_extension(&id) {
+        Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
+        Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
+    }
 }
