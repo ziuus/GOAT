@@ -30,6 +30,8 @@ pub enum BrainDocumentKind {
     McpTool,
     ExternalAgentRun,
     CommandHistory,
+    PromptForgeTemplate,
+    PromptForgeHistory,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -170,6 +172,7 @@ impl BrainIndexManager {
 
         self.ingest_skills(&mut docs);
         self.ingest_memory(&mut docs);
+        self.ingest_promptforge(&mut docs);
 
         if self.config.deep_ingestion {
             if self.config.index_recipes {
@@ -320,6 +323,52 @@ impl BrainIndexManager {
         let mut hasher = DefaultHasher::new();
         text.hash(&mut hasher);
         format!("{:x}", hasher.finish())
+    }
+
+
+    fn ingest_promptforge(&self, docs: &mut Vec<BrainDocument>) {
+        let pf_history_file = self.paths.data_dir.join("promptforge").join("history.jsonl");
+        if pf_history_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&pf_history_file) {
+                if !self.contains_secrets(&content) {
+                    docs.push(BrainDocument {
+                        id: "global_promptforge_history".to_string(),
+                        kind: BrainDocumentKind::PromptForgeHistory,
+                        title: "PromptForge History".to_string(),
+                        summary: "Global system PromptForge history".to_string(),
+                        body: self.truncate(&content),
+                        tags: vec!["promptforge".to_string(), "history".to_string()],
+                        source_path: Some(pf_history_file.to_string_lossy().to_string()),
+                        project_id: None,
+                        created_at: chrono::Utc::now().to_rfc3339(),
+                        updated_at: chrono::Utc::now().to_rfc3339(),
+                        redaction_status: "clean".to_string(),
+                        trust_level: TrustLevel::TrustedLocal,
+                    });
+                }
+            }
+        }
+        
+        let pf_templates = crate::promptforge::PromptForgeTemplateLibrary::new();
+        for tpl in pf_templates.templates {
+            let body = format!("Template: {}\nKind: {:?}\nDescription: {}\nStructure:\n{}", tpl.name, tpl.kind, tpl.description, tpl.structure);
+            if !self.contains_secrets(&body) {
+                docs.push(BrainDocument {
+                    id: format!("pf_template_{}", tpl.id),
+                    kind: BrainDocumentKind::PromptForgeTemplate,
+                    title: format!("PromptForge Template: {}", tpl.name),
+                    summary: tpl.description.clone(),
+                    body: self.truncate(&body),
+                    tags: vec!["promptforge".to_string(), "template".to_string(), format!("{:?}", tpl.kind)],
+                    source_path: None,
+                    project_id: None,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    redaction_status: "clean".to_string(),
+                    trust_level: TrustLevel::TrustedLocal,
+                });
+            }
+        }
     }
 
     fn ingest_skills(&self, docs: &mut Vec<BrainDocument>) {

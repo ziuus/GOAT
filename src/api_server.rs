@@ -313,6 +313,11 @@ pub async fn start_server(
         .route("/v1/promptforge/config", get(pf_config_handler))
         .route("/v1/promptforge/refine", post(pf_refine_handler))
         .route("/v1/promptforge/history", get(pf_history_handler))
+        .route("/v1/promptforge/score", post(pf_score_handler))
+        .route("/v1/promptforge/templates", get(pf_templates_handler))
+        .route("/v1/promptforge/mode", post(pf_mode_handler))
+        .route("/v1/promptforge/enable", post(pf_enable_handler))
+        .route("/v1/promptforge/disable", post(pf_disable_handler))
         .route("/v1/reports", get(reports_list_handler))
         .layer(cors)
         .with_state(state);
@@ -3180,4 +3185,73 @@ async fn pf_history_handler(
     let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
     let history = client.get_history();
     Ok(axum::Json(serde_json::json!({ "history": history })))
+}
+#[derive(Debug, serde::Deserialize)]
+pub struct PromptForgeScoreRequest {
+    pub prompt: String,
+}
+
+async fn pf_score_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+    axum::Json(payload): axum::Json<PromptForgeScoreRequest>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    drop(rt);
+    let res = client.score(&payload.prompt).await;
+    Ok(axum::Json(serde_json::json!({ "result": res })))
+}
+
+async fn pf_templates_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let lib = crate::promptforge::PromptForgeTemplateLibrary::new();
+    Ok(axum::Json(serde_json::json!({ "templates": lib.templates })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PromptForgeModeRequest {
+    pub mode: String,
+}
+
+async fn pf_mode_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+    axum::Json(payload): axum::Json<PromptForgeModeRequest>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    let mode = match payload.mode.to_lowercase().as_str() {
+        "mock" => crate::promptforge::PromptForgeMode::Mock,
+        "model" => crate::promptforge::PromptForgeMode::Model,
+        "cli" => crate::promptforge::PromptForgeMode::Cli,
+        "api" => crate::promptforge::PromptForgeMode::Api,
+        _ => return Err((axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({ "error": "Invalid mode" })))),
+    };
+    rt.config.promptforge.mode = mode;
+    Ok(axum::Json(serde_json::json!({ "status": "success" })))
+}
+
+async fn pf_enable_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    rt.config.promptforge.enabled = true;
+    Ok(axum::Json(serde_json::json!({ "status": "success" })))
+}
+
+async fn pf_disable_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    rt.config.promptforge.enabled = false;
+    Ok(axum::Json(serde_json::json!({ "status": "success" })))
 }

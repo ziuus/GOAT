@@ -251,8 +251,7 @@ export default function StudioPage() {
                               </div>
                             </motion.div>
                           )}
-                        </AnimatePresence>
-                        <button 
+                        </AnimatePresence><button 
                           onClick={runPrompt}
                           disabled={isProcessing || !promptText}
                           className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-medium shadow-lg shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
@@ -263,6 +262,56 @@ export default function StudioPage() {
                             <Play className="w-4 h-4 fill-current" />
                           )}
                           <span>{isProcessing ? "Running..." : "Run Prompt"}</span>
+                        </button>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button 
+                          onClick={async () => {
+                            if (!promptText) return;
+                            setIsProcessing(true);
+                            try {
+                               const { promptforgeApi } = await import('@/lib/goat-api');
+                               const res = await promptforgeApi.refine({
+                                  original_prompt: promptText,
+                                  target_agent: 'user',
+                                  target_format: 'goat',
+                                  domain: 'general',
+                                  complexity: 'medium',
+                                  safe_context: '',
+                                  constraints: [],
+                                  mode: 'mock',
+                               });
+                               if (res.result?.refined_prompt) {
+                                  setPromptText(res.result.refined_prompt);
+                               }
+                            } catch (e) {
+                               console.error(e);
+                            } finally {
+                               setIsProcessing(false);
+                            }
+                          }}
+                          disabled={isProcessing || !promptText}
+                          className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 transition-colors"
+                        >
+                          <Wand2 className="w-3.5 h-3.5" /> Refine with PromptForge
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (!promptText) return;
+                            const blob = new Blob([promptText], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'prompt_draft.txt';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }}
+                          disabled={!promptText}
+                          className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-colors"
+                        >
+                          <Save className="w-3.5 h-3.5" /> Save Draft
                         </button>
                       </div>
                     </div>

@@ -184,6 +184,90 @@ impl std::fmt::Display for PromptForgeError {
 
 impl std::error::Error for PromptForgeError {}
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptForgeTemplateKind {
+    CodingFeature,
+    CodingDebug,
+    ProductValidation,
+    ProductMvpScope,
+    ResearchReport,
+    DesignReview,
+    SocialLaunch,
+    OperationsIncident,
+    LearningPlan,
+    GeneralAgentTask,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptForgeTemplate {
+    pub id: String,
+    pub kind: PromptForgeTemplateKind,
+    pub name: String,
+    pub description: String,
+    pub structure: String,
+}
+
+pub struct PromptForgeTemplateLibrary {
+    pub templates: Vec<PromptForgeTemplate>,
+}
+
+impl PromptForgeTemplateLibrary {
+    pub fn new() -> Self {
+        Self {
+            templates: vec![
+                PromptForgeTemplate {
+                    id: "coding_feature".to_string(),
+                    kind: PromptForgeTemplateKind::CodingFeature,
+                    name: "Coding Feature Refinement".to_string(),
+                    description: "Structures a rough coding request into a clear feature spec".to_string(),
+                    structure: "### Goal
+[...]
+### Repo Inspection Steps
+[...]
+### Constraints
+[...]
+### Tests/Checks
+[...]".to_string(),
+                },
+                PromptForgeTemplate {
+                    id: "product_validation".to_string(),
+                    kind: PromptForgeTemplateKind::ProductValidation,
+                    name: "Product Validation".to_string(),
+                    description: "Structures a product idea for cofounder validation".to_string(),
+                    structure: "### Problem Statement
+[...]
+### Assumptions
+[...]
+### Validation Questions
+[...]".to_string(),
+                },
+                // Add more stubs if necessary
+            ]
+        }
+    }
+    
+    pub fn get(&self, id: &str) -> Option<PromptForgeTemplate> {
+        self.templates.iter().find(|t| t.id == id).cloned()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptForgeScoreResult {
+    pub total_score: u8,
+    pub clarity: u8,
+    pub specificity: u8,
+    pub context: u8,
+    pub constraints: u8,
+    pub acceptance_criteria: u8,
+    pub safety: u8,
+    pub agent_fit: u8,
+    pub weak_areas: Vec<String>,
+    pub suggestions: Vec<String>,
+    pub refinement_recommended: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptForgeHistoryEntry {
     pub id: String,
@@ -191,16 +275,20 @@ pub struct PromptForgeHistoryEntry {
     pub agent: String,
     pub target: String,
     pub mode: PromptForgeMode,
+    pub template: Option<String>,
     pub original_prompt: String,
     pub refined_prompt: String,
     pub original_score: Option<u8>,
     pub refined_score: Option<u8>,
     pub improvements: Vec<String>,
     pub warnings: Vec<String>,
+    pub decision_reason: Option<String>,
     pub used_auto_refine: bool,
     pub user_override: Option<bool>,
     pub status: String,
     pub error_if_any: Option<String>,
+    pub timeline_refs: Option<Vec<String>>,
+    pub brain_refs: Option<Vec<String>>,
 }
 
 pub struct PromptForgeClient {
@@ -347,10 +435,14 @@ impl PromptForgeClient {
                     refined_score: response.refined_score,
                     improvements: response.improvements.clone(),
                     warnings: response.warnings.clone(),
-                    used_auto_refine: true, // simplified for now
+                    template: None,
+                    decision_reason: None,
+                    used_auto_refine: true,
                     user_override: None,
                     status: "success".to_string(),
                     error_if_any: None,
+                    timeline_refs: None,
+                    brain_refs: None,
                 };
                 let _ = self.save_history(entry);
             }
@@ -368,10 +460,14 @@ impl PromptForgeClient {
                     refined_score: None,
                     improvements: vec![],
                     warnings: vec![],
+                    template: None,
+                    decision_reason: None,
                     used_auto_refine: true,
                     user_override: None,
                     status: "failed".to_string(),
                     error_if_any: Some(err.message.clone()),
+                    timeline_refs: None,
+                    brain_refs: None,
                 };
                 let _ = self.save_history(entry);
             }
@@ -387,6 +483,54 @@ impl PromptForgeClient {
         let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&history_file)?;
         file.write_all(line.as_bytes())?;
         Ok(())
+    }
+
+    pub async fn score(&self, prompt: &str) -> PromptForgeScoreResult {
+        // Mock scoring logic for phase 5.20
+        let len = prompt.len();
+        let total = if len > 200 { 85 } else { 45 };
+        PromptForgeScoreResult {
+            total_score: total,
+            clarity: if len > 50 { 80 } else { 40 },
+            specificity: if len > 100 { 80 } else { 30 },
+            context: if len > 150 { 90 } else { 20 },
+            constraints: 50,
+            acceptance_criteria: 40,
+            safety: 90,
+            agent_fit: 70,
+            weak_areas: if total < 50 { vec!["Too short".to_string(), "Missing constraints".to_string()] } else { vec![] },
+            suggestions: if total < 50 { vec!["Add more details".to_string()] } else { vec![] },
+            refinement_recommended: total < 75,
+        }
+    }
+
+    pub async fn maybe_refine_for_agent(&self, agent: &str, task: &str, context: &str, is_user_override: Option<bool>) -> String {
+        let decision = self.should_refine(task, agent, is_user_override);
+        if !decision.should_refine {
+            return task.to_string();
+        }
+
+        let req = PromptForgeRefineRequest {
+            original_prompt: task.to_string(),
+            target_agent: agent.to_string(),
+            target_format: decision.promptforge_target.clone(),
+            domain: decision.domain.clone(),
+            complexity: decision.complexity.clone(),
+            safe_context: context.to_string(),
+            constraints: vec![],
+            mode: self.config.mode.clone(),
+        };
+
+        match self.refine(req).await {
+            Ok(resp) => {
+                if !resp.refined_prompt.is_empty() {
+                    resp.refined_prompt
+                } else {
+                    task.to_string()
+                }
+            }
+            Err(_) => task.to_string(),
+        }
     }
 
     pub fn get_history(&self) -> Vec<PromptForgeHistoryEntry> {

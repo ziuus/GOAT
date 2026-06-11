@@ -39,6 +39,8 @@ pub enum TimelineEventKind {
     RecipeRunStarted,
     RecipeRunCompleted,
     StudioDraftCreated,
+    PromptForgeRefined,
+    PromptForgeBypassed,
     BrainIndexCompleted,
     EmbeddingRebuildCompleted,
     DaemonStarted,

@@ -4280,9 +4280,85 @@ impl App {
         for log in hook_logs {
             self.push_log(log);
         }
+let is_first = self.history.iter().all(|m| m.role != "user");
+        
+        // --- PHASE 5.20 PROMPTFORGE DEEP AGENT WIRING ---
+        let mut user_override = None;
+        let mut final_msg = msg.clone();
+        if final_msg.contains("--refine") {
+            user_override = Some(true);
+            final_msg = final_msg.replace("--refine", "").trim().to_string();
+        } else if final_msg.contains("--no-refine") {
+            user_override = Some(false);
+            final_msg = final_msg.replace("--no-refine", "").trim().to_string();
+        }
 
-        let is_first = self.history.iter().all(|m| m.role != "user");
+        let route = self.swarm_router.route(&final_msg);
+        let agent_id = route.profile.name.to_lowercase().replace(" ", "_");
+        
+        let pf_client = crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
+        let refined_msg = pf_client.maybe_refine_for_agent(&agent_id, &final_msg, "context_placeholder", user_override).await;
+        
+        if refined_msg != final_msg {
+            self.push_log(format!("[PROMPTFORGE] Refined prompt for {}: \n{}", agent_id, refined_msg));
+            final_msg = refined_msg.clone();
+            
+            // Timeline Integration
+            let _ = self.timeline_manager.record_event(crate::timeline::TimelineEvent {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp(),
+                project_path: None,
+                session_id: Some(self.session_id.clone()),
+                source: crate::timeline::TimelineSource::System,
+                kind: crate::timeline::TimelineEventKind::PromptForgeRefined,
+                title: "PromptForge Refined".to_string(),
+                summary: format!("Prompt refined for agent {}", agent_id),
+                actor: "promptforge".to_string(),
+                related_ids: vec![],
+                file_refs: vec![],
+                git_refs: vec![],
+                checkpoint_refs: vec![],
+                job_refs: vec![],
+                approval_refs: vec![],
+                skill_refs: vec![],
+                recipe_refs: vec![],
+                memory_refs: vec![],
+                risk_level: crate::timeline::TimelineRiskLevel::Low,
+                privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
+                redaction_status: "none".to_string(),
+            });
+        } else if self.config.promptforge.enabled {
+             // Just record bypass or fail
+             let _ = self.timeline_manager.record_event(crate::timeline::TimelineEvent {
+                id: uuid::Uuid::new_v4().to_string(),
+                timestamp: chrono::Utc::now().timestamp(),
+                project_path: None,
+                session_id: Some(self.session_id.clone()),
+                source: crate::timeline::TimelineSource::System,
+                kind: crate::timeline::TimelineEventKind::PromptForgeBypassed,
+                title: "PromptForge Bypassed".to_string(),
+                summary: "Prompt refinement bypassed or disabled".to_string(),
+                actor: "promptforge".to_string(),
+                related_ids: vec![],
+                file_refs: vec![],
+                git_refs: vec![],
+                checkpoint_refs: vec![],
+                job_refs: vec![],
+                approval_refs: vec![],
+                skill_refs: vec![],
+                recipe_refs: vec![],
+                memory_refs: vec![],
+                risk_level: crate::timeline::TimelineRiskLevel::None,
+                privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
+                redaction_status: "none".to_string(),
+            });
+        }
+        
+        msg = final_msg;
+        // -------------------------------------------------
+
         if is_first {
+
             if let Some(ref brain) = self.brain {
                 let title = crate::app::generate_session_title(&msg);
                 let _ = brain.update_session_title(&self.session_id, &title);

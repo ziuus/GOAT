@@ -6,7 +6,9 @@ import { promptforgeApi, PromptForgeHistoryEntry } from '@/lib/goat-api';
 export default function PromptForgePage() {
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [history, setHistory] = useState<PromptForgeHistoryEntry[]>([]);
+const [history, setHistory] = useState<PromptForgeHistoryEntry[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,14 +23,16 @@ export default function PromptForgePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [sRes, cRes, hRes] = await Promise.all([
+      const [sRes, cRes, hRes, tRes] = await Promise.all([
         promptforgeApi.getStatus(),
         promptforgeApi.getConfig(),
-        promptforgeApi.getHistory()
+        promptforgeApi.getHistory(),
+        fetch('http://127.0.0.1:3000/v1/promptforge/templates', { headers: { 'Authorization': `Bearer ${localStorage.getItem('goat_token')}` } }).then(r => r.json())
       ]);
       setStatus(sRes);
       setConfig(cRes.config);
       setHistory(hRes.history || []);
+      if (tRes.templates) setTemplates(tRes.templates);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -115,6 +119,28 @@ export default function PromptForgePage() {
         <div className="space-y-4">
           <h2 className="text-xl font-bold">Manual Refinement</h2>
           <div className="space-y-4">
+            {templates.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Apply Template</label>
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => {
+                    setSelectedTemplate(e.target.value);
+                    const t = templates.find(x => x.id === e.target.value);
+                    if (t) {
+                      setPrompt(prev => prev ? prev + "\n\n" + t.structure : t.structure);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mb-4"
+                  disabled={!status?.enabled}
+                >
+                  <option value="">-- Select a Template --</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.kind})</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1">Rough Prompt</label>
               <textarea
