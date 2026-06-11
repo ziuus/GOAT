@@ -161,6 +161,7 @@ pub struct App {
     pub context_visible: bool,
     pub checkpoint_manager: crate::checkpoint::CheckpointManager,
     pub browser_manager: crate::browser_adapter::BrowserAdapterManager,
+    pub browser_workflow_manager: crate::browser_workflows::BrowserWorkflowManager,
     /// Selected file context for AI prompting (Phase 3.6)
     pub selected_files: Vec<String>,
     pub mcp_runtime: crate::mcp_runtime::McpRuntimeManager,
@@ -251,6 +252,7 @@ impl App {
             timeline_manager: rt.timeline_manager,
             github_manager: rt.github_manager,
             browser_manager: rt.browser_manager,
+            browser_workflow_manager: rt.browser_workflow_manager,
             brain_disabled,
             pending_approval: None,
             active_skill: None,
@@ -1740,12 +1742,116 @@ impl App {
                     "qa" => {
                         let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
                         self.push_log(format!("[BROWSER] Running QA on {}", url));
-                        let _ = rt.block_on(self.browser_manager.open_url(url));
-                        self.push_log("[BROWSER] Taking screenshot...");
-                        let _ = rt.block_on(self.browser_manager.screenshot(url));
-                        self.push_log("[BROWSER] Reading DOM...");
-                        let _ = rt.block_on(self.browser_manager.read_text(url));
-                        self.push_log("[BROWSER] QA Completed. Check timeline/dashboard.");
+                        let w = self
+                            .browser_workflow_manager
+                            .create_workflow("UI QA", url, "ui-qa");
+                        let _ = self.browser_workflow_manager.save_workflow(&w);
+                        if let Ok(updated) =
+                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
+                        {
+                            self.push_log(format!(
+                                "[BROWSER] QA Completed with status: {:?}",
+                                updated.status
+                            ));
+                        } else {
+                            self.push_log("[BROWSER] QA Failed".to_string());
+                        }
+                    }
+                    "landing-review" => {
+                        let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
+                        self.push_log(format!("[BROWSER] Running Landing Review on {}", url));
+                        let w = self.browser_workflow_manager.create_workflow(
+                            "Landing Review",
+                            url,
+                            "landing-review",
+                        );
+                        let _ = self.browser_workflow_manager.save_workflow(&w);
+                        if let Ok(updated) =
+                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
+                        {
+                            self.push_log(format!(
+                                "[BROWSER] Landing Review Completed: {:?}",
+                                updated.status
+                            ));
+                        } else {
+                            self.push_log("[BROWSER] Landing Review Failed".to_string());
+                        }
+                    }
+                    "dashboard-qa" => {
+                        self.push_log("[BROWSER] Running Dashboard QA");
+                        let w = self.browser_workflow_manager.create_workflow(
+                            "Dashboard QA",
+                            "http://localhost:3000",
+                            "dashboard-qa",
+                        );
+                        let _ = self.browser_workflow_manager.save_workflow(&w);
+                        if let Ok(updated) =
+                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
+                        {
+                            self.push_log(format!(
+                                "[BROWSER] Dashboard QA Completed: {:?}",
+                                updated.status
+                            ));
+                        } else {
+                            self.push_log("[BROWSER] Dashboard QA Failed".to_string());
+                        }
+                    }
+                    "health" => {
+                        let url = parts.get(2).copied().unwrap_or("http://localhost:3000");
+                        self.push_log(format!("[BROWSER] Running Health Check on {}", url));
+                        let w = self.browser_workflow_manager.create_workflow(
+                            "Web Health Check",
+                            url,
+                            "web-health-check",
+                        );
+                        let _ = self.browser_workflow_manager.save_workflow(&w);
+                        if let Ok(updated) =
+                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
+                        {
+                            self.push_log(format!(
+                                "[BROWSER] Web Health Check Completed: {:?}",
+                                updated.status
+                            ));
+                        } else {
+                            self.push_log("[BROWSER] Web Health Check Failed".to_string());
+                        }
+                    }
+                    "workflows" => {
+                        if let Ok(list) = self.browser_workflow_manager.list_workflows() {
+                            self.push_log(format!("[BROWSER] Workflows ({}):", list.len()));
+                            for w in list {
+                                self.push_log(format!(
+                                    "- {} [{}] -> Status: {:?}",
+                                    w.id, w.title, w.status
+                                ));
+                            }
+                        } else {
+                            self.push_log("[BROWSER] Failed to load workflows".to_string());
+                        }
+                    }
+                    "show" => {
+                        if let Some(id) = parts.get(2) {
+                            if let Ok(w) = self.browser_workflow_manager.get_workflow(id) {
+                                self.push_log(format!(
+                                    "[BROWSER] Workflow Details: {} [{}]",
+                                    w.id, w.title
+                                ));
+                                self.push_log(format!(
+                                    "Status: {:?}, Target: {}",
+                                    w.status, w.target_url
+                                ));
+                                for step in w.steps {
+                                    self.push_log(format!(
+                                        "  - Step {:?}: {:?}",
+                                        step.kind, step.status
+                                    ));
+                                }
+                            } else {
+                                self.push_log(format!("[BROWSER] Workflow not found: {}", id));
+                            }
+                        } else {
+                            self.push_log("[BROWSER] Missing workflow ID".to_string());
+                        }
                     }
                     _ => self.push_log(format!("[BROWSER] Unknown action: {}", action)),
                 }

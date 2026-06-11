@@ -163,6 +163,16 @@ pub enum Command {
         args: Vec<String>,
     },
 
+    /// Safe approval-gated browser automation workflows (Phase 6.9)
+    #[command(name = "browser")]
+    Browser {
+        /// Subcommand: workflows, screenshot, inspect, qa, landing-review, dashboard-qa, health
+        action: String,
+        /// URL or workflow-id depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Manage tools, permissions, and tool registry.
     #[command(name = "tools")]
     Tools {
@@ -701,6 +711,10 @@ pub async fn handle_subcommand(
         }
         Command::Extensions { action, args } => {
             handle_extensions_command(paths, config, &action, &args)?;
+            Ok(true)
+        }
+        Command::Browser { action, args } => {
+            handle_browser_command(paths, config, &action, &args)?;
             Ok(true)
         }
 
@@ -2488,4 +2502,101 @@ fn handle_desktop_command(action: &str) {
             );
         }
     }
+}
+
+fn handle_browser_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    use crate::browser_adapter::BrowserAdapterManager;
+    use crate::browser_workflows::BrowserWorkflowManager;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    let manager = BrowserWorkflowManager::new(&paths.data_dir);
+    let browser_config = config.browser.clone();
+    let mut browser_adapter = BrowserAdapterManager::new(browser_config);
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    match action {
+        "workflows" => {
+            let list = manager.list_workflows()?;
+            println!("Browser Workflows ({}):", list.len());
+            for w in list {
+                println!("- {} [{}] -> Status: {:?}", w.id, w.title, w.status);
+            }
+        }
+        "screenshot" => {
+            let url = args
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "http://localhost:3000".to_string());
+            println!("Creating workflow for screenshot of {}", url);
+            let w = manager.create_workflow("Screenshot Capture", &url, "screenshot");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        "inspect" => {
+            let url = args
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "http://localhost:3000".to_string());
+            println!("Creating workflow for inspection of {}", url);
+            let w = manager.create_workflow("DOM Inspection", &url, "inspect");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        "qa" => {
+            let url = args
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "http://localhost:3000".to_string());
+            println!("Creating workflow for QA of {}", url);
+            let w = manager.create_workflow("UI QA", &url, "ui-qa");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        "landing-review" => {
+            let url = args
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "http://localhost:3000".to_string());
+            println!("Creating workflow for Landing Page Review of {}", url);
+            let w = manager.create_workflow("Landing Page Review", &url, "landing-review");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        "dashboard-qa" => {
+            println!("Creating workflow for Dashboard QA");
+            let w =
+                manager.create_workflow("Dashboard QA", "http://localhost:3000", "dashboard-qa");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        "health" => {
+            let url = args
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| "http://localhost:3000".to_string());
+            println!("Creating workflow for Health Check of {}", url);
+            let w = manager.create_workflow("Web Health Check", &url, "web-health-check");
+            manager.save_workflow(&w)?;
+            let updated = rt.block_on(manager.run_workflow(&w.id, &mut browser_adapter))?;
+            println!("Workflow Completed. Status: {:?}", updated.status);
+        }
+        _ => {
+            println!("Unknown action: {}", action);
+        }
+    }
+    Ok(())
 }

@@ -9,6 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Browser Automation Workflows (Phase 6.9)**: Introduced structured browser workflows (`ui-qa`, `landing-review`, `dashboard-qa`, `web-health-check`) allowing GOAT to safely inspect, review, and QA local/remote targets.
+- **Workflow Management API & CLI**: Implemented `/v1/browser/workflows` endpoints and CLI command group `goat browser <action>` (workflows, screenshot, inspect, qa, landing-review, dashboard-qa, health).
+- **Dashboard UI Improvements**: Overhauled `/browser` dashboard page to display execution details, steps trace, and custom workflow creations.
+- **Local Persistence**: Saved workflows, steps, and artifacts to `~/.local/share/goat/browser_workflows/`.
+- **Safety Boundary**: Defined `GOAT_DESKTOP_AUTOMATION_BOUNDARY.md` and safety limits restricting uncontrolled click or type actions.
+
+### Added (Previous)
 - **UI/UX Overhaul (Phase 5.26)**: Completely overhauled the dashboard layout, introducing a unified design system (`PageShell`, `FeatureCard`, `EmptyState`) to enforce a calm, modern, dark-first UI.
 - **Prime Agents Command Center**: Redesigned `/agents` to serve as a command center instead of a simple feature list.
 - **Sidebar Organization**: Reorganized navigation into OS-like groupings (Core, Agents, Intelligence, Workflows, System) with active connection and safety states.

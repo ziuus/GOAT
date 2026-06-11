@@ -58,6 +58,8 @@ pub struct GoatRuntime {
     pub github_manager: crate::github_workflow::GitHubWorkflowManager,
     /// Browser Adapter Manager for the session
     pub browser_manager: crate::browser_adapter::BrowserAdapterManager,
+    /// Browser Workflow Manager for the session
+    pub browser_workflow_manager: crate::browser_workflows::BrowserWorkflowManager,
     /// Whether this session was resumed from the brain (true) or is fresh (false).
     pub session_resumed: bool,
     /// Whether brain (SQLite) is disabled via `--no-brain`.
@@ -298,6 +300,9 @@ impl GoatRuntime {
             ),
             browser_manager: crate::browser_adapter::BrowserAdapterManager::new(
                 config.browser.clone(),
+            ),
+            browser_workflow_manager: crate::browser_workflows::BrowserWorkflowManager::new(
+                &paths.data_dir,
             ),
             session_resumed,
             brain_disabled: no_brain,

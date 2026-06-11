@@ -190,7 +190,7 @@ Status legend:
 | `call_subagent` tool | `partial` | Works but unsafe |
 | MCP tool dispatch | `working` | Via McpManager |
 | Git tools | `planned` | Phase 4 |
-| Browser tools | `planned` | Phase 5 |
+| Browser tools & Workflows | `working` | Phase 6.9 structured workflows |
 | Web search tools | `planned` | Phase 4 |
 | Editor diff tools | `planned` | Phase 2 |
 

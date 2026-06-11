@@ -661,3 +661,18 @@
 * Report generation for founder insights.
 * Added `GET /v1/cofounder/*` and `POST /v1/cofounder/*` endpoints.
 * Added Dashboard `/cofounder` route and `/agents` integration.
+
+## Phase 6.8: Safe Extension Runtime & Plugin Marketplace (✅ COMPLETED)
+* Implemented `ExtensionRegistry` and manifesting systems in `src/extensions.rs`.
+* Created local storage configurations (`enabled.json`, `trust.json`) to enforce explicit permissions.
+* Added `goat extensions` CLI management command block.
+* Implemented `/v1/extensions` API suite.
+* Designed and built `/extensions` Next.js dashboard workspace page.
+
+## Phase 6.9: Real Browser + Desktop Automation Workflows (✅ COMPLETED)
+* Implemented `BrowserWorkflow` and step execution in `src/browser_workflows.rs`.
+* Added predefined workflows (`ui-qa`, `landing-review`, `dashboard-qa`, `web-health-check`).
+* Supported CLI commands under `goat browser` command group.
+* Added `/v1/browser/workflows` endpoints.
+* Overhauled `/browser` Next.js dashboard page with active steps visual trace.
+* Defined safety policies and desktop boundaries (`docs/GOAT_BROWSER_SAFETY.md`, `docs/GOAT_DESKTOP_AUTOMATION_BOUNDARY.md`).

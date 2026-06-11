@@ -410,6 +410,31 @@ pub async fn start_server(
         .route("/v1/browser/screenshot", post(browser_screenshot_handler))
         .route("/v1/browser/read", post(browser_read_handler))
         .route("/v1/browser/qa", post(browser_qa_handler))
+        .route(
+            "/v1/browser/workflows",
+            get(browser_workflows_list_handler).post(browser_workflows_create_handler),
+        )
+        .route(
+            "/v1/browser/workflows/:id",
+            get(browser_workflows_detail_handler),
+        )
+        .route(
+            "/v1/browser/workflows/:id/artifacts",
+            get(browser_workflows_artifacts_handler),
+        )
+        .route(
+            "/v1/browser/workflows/:id/report",
+            get(browser_workflows_report_handler),
+        )
+        .route(
+            "/v1/browser/landing-review",
+            post(browser_landing_review_handler),
+        )
+        .route(
+            "/v1/browser/dashboard-qa",
+            post(browser_dashboard_qa_handler),
+        )
+        .route("/v1/browser/health", post(browser_health_handler))
         .route("/v1/transports/status", get(transports_status_handler))
         .route("/v1/transports/sessions", get(transports_sessions_handler))
         .route("/v1/transports/messages", get(transports_messages_handler))
@@ -2839,6 +2864,237 @@ async fn browser_qa_handler(
     let _ = rt.browser_manager.screenshot(&req.url).await;
     let _ = rt.browser_manager.read_text(&req.url).await;
     Ok(Json(serde_json::json!({ "status": "qa_completed" })))
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BrowserWorkflowCreateReq {
+    title: String,
+    target_url: String,
+    workflow_kind: String,
+}
+
+async fn browser_workflows_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let list = rt.browser_workflow_manager.list_workflows().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!({ "workflows": list })))
+}
+
+async fn browser_workflows_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserWorkflowCreateReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.create_workflow(
+        &req.title,
+        &req.target_url,
+        &req.workflow_kind,
+    );
+    rt.browser_workflow_manager.save_workflow(&w).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // Run the workflow
+    let crate::runtime::GoatRuntime {
+        ref browser_workflow_manager,
+        ref mut browser_manager,
+        ..
+    } = *rt;
+    let updated = browser_workflow_manager
+        .run_workflow(&w.id, browser_manager)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(serde_json::json!(updated)))
+}
+
+async fn browser_workflows_detail_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.get_workflow(&id).map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!(w)))
+}
+
+async fn browser_workflows_artifacts_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.get_workflow(&id).map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!({ "artifacts": w.artifacts })))
+}
+
+async fn browser_workflows_report_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.get_workflow(&id).map_err(|e| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // Generate a simple QA/health report based on the workflow steps
+    let report_content = format!(
+        "# Browser Workflow QA Report\n\nWorkflow: {}\nKind: {}\nTarget: {}\nStatus: {:?}\n\nSteps:\n{}",
+        w.title,
+        w.workflow_kind,
+        w.target_url,
+        w.status,
+        w.steps
+            .iter()
+            .map(|s| format!(
+                "- **{:?}**: {:?} (Errors: {:?})",
+                s.kind, s.status, s.error_message
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    Ok(Json(serde_json::json!({ "report": report_content })))
+}
+
+async fn browser_landing_review_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    let w =
+        rt.browser_workflow_manager
+            .create_workflow("Landing Review", &req.url, "landing-review");
+    rt.browser_workflow_manager.save_workflow(&w).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let crate::runtime::GoatRuntime {
+        ref browser_workflow_manager,
+        ref mut browser_manager,
+        ..
+    } = *rt;
+    let updated = browser_workflow_manager
+        .run_workflow(&w.id, browser_manager)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    Ok(Json(serde_json::json!(updated)))
+}
+
+async fn browser_dashboard_qa_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.create_workflow(
+        "Dashboard QA",
+        "http://localhost:3000",
+        "dashboard-qa",
+    );
+    rt.browser_workflow_manager.save_workflow(&w).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let crate::runtime::GoatRuntime {
+        ref browser_workflow_manager,
+        ref mut browser_manager,
+        ..
+    } = *rt;
+    let updated = browser_workflow_manager
+        .run_workflow(&w.id, browser_manager)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    Ok(Json(serde_json::json!(updated)))
+}
+
+async fn browser_health_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<BrowserUrlReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut rt = state.runtime.lock().await;
+    let w = rt.browser_workflow_manager.create_workflow(
+        "Web Health Check",
+        &req.url,
+        "web-health-check",
+    );
+    rt.browser_workflow_manager.save_workflow(&w).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let crate::runtime::GoatRuntime {
+        ref browser_workflow_manager,
+        ref mut browser_manager,
+        ..
+    } = *rt;
+    let updated = browser_workflow_manager
+        .run_workflow(&w.id, browser_manager)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    Ok(Json(serde_json::json!(updated)))
 }
 
 // ── Transports ─────────────────────────────────────────────────────────────

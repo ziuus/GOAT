@@ -11,6 +11,7 @@ pub mod brain_index;
 pub mod brain_learning;
 pub mod brain_models;
 pub mod browser_adapter;
+pub mod browser_workflows;
 pub mod checkpoint;
 mod cli;
 pub mod command_registry;

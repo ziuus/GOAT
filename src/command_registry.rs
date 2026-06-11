@@ -571,10 +571,15 @@ fn all_commands() -> Vec<CommandMetadata> {
         // ── Browser / QA ───────────────────────────────────────────────────────
         CommandMetadata {
             name: "/browser",
-            aliases: &["\\browser", "\\browser doctor", "\\browser status"],
+            aliases: &[
+                "\\browser",
+                "\\browser doctor",
+                "\\browser status",
+                "\\browser workflows",
+            ],
             category: CommandCategory::Browser,
-            description: "Interact with the browser adapter layer",
-            usage: "/browser <action> [url]",
+            description: "Interact with the browser adapter layer and workflows",
+            usage: "/browser <action> [url/id]",
             examples: &[
                 "/browser status",
                 "/browser doctor",
@@ -582,6 +587,11 @@ fn all_commands() -> Vec<CommandMetadata> {
                 "/browser screenshot",
                 "/browser read",
                 "/browser qa http://localhost:3000",
+                "/browser landing-review http://localhost:3000",
+                "/browser dashboard-qa",
+                "/browser health http://localhost:3000",
+                "/browser workflows",
+                "/browser show <workflow-id>",
             ],
             shortcut: None,
             surface: CommandSurface::both(),
@@ -2321,7 +2331,7 @@ fn all_commands() -> Vec<CommandMetadata> {
             related: None,
         },
         CommandMetadata {
-            name: "/browser",
+            name: "/browser-auto",
             aliases: &[],
             category: CommandCategory::Future,
             description: "Launch browser automation for a web task",
