@@ -23,7 +23,7 @@ pub enum BrainDocumentKind {
     Recipe,
     Memory,
     Unknown,
-    
+
     // Existing kinds for backward compatibility
     MemoryCandidate,
     SkillProvenance,

@@ -158,9 +158,15 @@ impl Default for ModelRoutingConfig {
     }
 }
 
-fn default_true() -> bool { true }
-fn default_local_mock() -> String { "local_mock".to_string() }
-fn default_mock_local() -> String { "mock-local".to_string() }
+fn default_true() -> bool {
+    true
+}
+fn default_local_mock() -> String {
+    "local_mock".to_string()
+}
+fn default_mock_local() -> String {
+    "mock-local".to_string()
+}
 
 #[derive(Debug, Clone)]
 pub struct ModelRouteRequest {
@@ -263,7 +269,10 @@ impl ModelProviderRegistry {
             if let Some(p) = self.providers.get(pref_prov) {
                 if !req.local_only || p.local_only {
                     chosen_provider = p.id.clone();
-                    chosen_model = req.preferred_model.clone().unwrap_or(p.default_model.clone());
+                    chosen_model = req
+                        .preferred_model
+                        .clone()
+                        .unwrap_or(p.default_model.clone());
                     is_local = p.local_only;
                 }
             }

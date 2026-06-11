@@ -1,5 +1,5 @@
-use crate::brain_models::*;
 use crate::brain_index::BrainIndexManager;
+use crate::brain_models::*;
 use anyhow::Result;
 
 pub struct BrainContextPackBuilder<'a> {
@@ -58,7 +58,7 @@ impl<'a> BrainContextPackBuilder<'a> {
         kind_filter.push(BrainDocumentKind::Memory);
         kind_filter.push(BrainDocumentKind::Skill);
         kind_filter.push(BrainDocumentKind::Recipe);
-        
+
         if self.include_reports {
             kind_filter.push(BrainDocumentKind::Report);
             kind_filter.push(BrainDocumentKind::OperatorReport);
@@ -107,14 +107,22 @@ impl<'a> BrainContextPackBuilder<'a> {
                 continue;
             }
             current_chars += res.document.body.len();
-            source_refs.push(format!("{}::{}", res.document.source.source_kind.clone() as u8, res.document.source.source_id.clone()));
+            source_refs.push(format!(
+                "{}::{}",
+                res.document.source.source_kind.clone() as u8,
+                res.document.source.source_id.clone()
+            ));
             items.push(res.document);
             if items.len() >= self.max_items {
                 break;
             }
         }
 
-        let summary = format!("Context Pack generated for query '{}'. Included {} items.", self.query, items.len());
+        let summary = format!(
+            "Context Pack generated for query '{}'. Included {} items.",
+            self.query,
+            items.len()
+        );
 
         let trace = BrainRecallTrace {
             query: self.query.clone(),

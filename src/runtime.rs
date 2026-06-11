@@ -62,7 +62,7 @@ pub struct GoatRuntime {
     pub session_resumed: bool,
     /// Whether brain (SQLite) is disabled via `--no-brain`.
     pub brain_disabled: bool,
-    
+
     /// Extension Registry for Phase 6.8
     pub extension_registry: crate::extensions::ExtensionRegistry,
 
@@ -268,7 +268,20 @@ impl GoatRuntime {
         );
         external_agent_manager.detect_all(&config);
 
-        let mut extension_registry = crate::extensions::ExtensionRegistry::new(paths.config_file.parent().unwrap_or(std::path::Path::new("/")), &paths.data_dir).unwrap_or_else(|_| crate::extensions::ExtensionRegistry::new(std::path::Path::new("/tmp"), std::path::Path::new("/tmp")).unwrap());
+        let mut extension_registry = crate::extensions::ExtensionRegistry::new(
+            paths
+                .config_file
+                .parent()
+                .unwrap_or(std::path::Path::new("/")),
+            &paths.data_dir,
+        )
+        .unwrap_or_else(|_| {
+            crate::extensions::ExtensionRegistry::new(
+                std::path::Path::new("/tmp"),
+                std::path::Path::new("/tmp"),
+            )
+            .unwrap()
+        });
         let _ = extension_registry.load_state();
 
         let runtime = GoatRuntime {

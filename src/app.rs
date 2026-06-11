@@ -4000,8 +4000,7 @@ impl App {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("status");
                 let target = parts.get(1).copied().unwrap_or("").trim();
-                let pf_client =
-                    crate::promptforge::PromptForgeClient::new(self.config.clone());
+                let pf_client = crate::promptforge::PromptForgeClient::new(self.config.clone());
 
                 match subcmd {
                     "status" => {

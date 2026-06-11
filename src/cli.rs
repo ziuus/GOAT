@@ -468,7 +468,10 @@ pub async fn handle_subcommand(
                 "dedupe" => {
                     println!("[BRAIN] Starting deduplication...");
                     let count = manager.dedupe()?;
-                    println!("[BRAIN] Deduplication complete. Removed {} duplicates.", count);
+                    println!(
+                        "[BRAIN] Deduplication complete. Removed {} duplicates.",
+                        count
+                    );
                 }
                 "pack" => {
                     let query = args.join(" ");
@@ -476,8 +479,9 @@ pub async fn handle_subcommand(
                         println!("[BRAIN] Please provide a query for the context pack.");
                         return Ok(true);
                     }
-                    let builder = crate::brain_context::BrainContextPackBuilder::new(&manager, query)
-                        .limit_items(5);
+                    let builder =
+                        crate::brain_context::BrainContextPackBuilder::new(&manager, query)
+                            .limit_items(5);
                     let pack = builder.build().await?;
                     println!("[BRAIN] Context Pack Generated:");
                     println!("Title: {}", pack.title);
@@ -818,7 +822,10 @@ fn handle_sessions_command(paths: &crate::paths::GoatPaths) -> anyhow::Result<()
 
 // ── new-session command ────────────────────────────────────────────────────────
 
-async fn handle_seed_demo_command(paths: &crate::paths::GoatPaths, clear: bool) -> anyhow::Result<()> {
+async fn handle_seed_demo_command(
+    paths: &crate::paths::GoatPaths,
+    clear: bool,
+) -> anyhow::Result<()> {
     use std::fs;
     println!("Seeding demo data for dashboard flows...");
 
@@ -860,7 +867,7 @@ async fn handle_seed_demo_command(paths: &crate::paths::GoatPaths, clear: bool) 
     if let Ok(learner) = crate::agents::learner::LearnerAgent::new() {
         if let Ok(goal) = learner.create_goal(
             "Master Rust Concurrency",
-            crate::agents::learner::LearningDomain::Rust
+            crate::agents::learner::LearningDomain::Rust,
         ) {
             let _ = learner.create_roadmap(&goal.id);
         }
@@ -872,22 +879,18 @@ async fn handle_seed_demo_command(paths: &crate::paths::GoatPaths, clear: bool) 
     let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
         kind: crate::reports::ReportKind::Research,
         title: "Rust Async Ecosystem".into(),
-        sections: vec![
-            crate::reports::ReportSection {
-                heading: "Overview".into(),
-                body: "Tokio remains the dominant runtime for async Rust.".into(),
-            }
-        ]
+        sections: vec![crate::reports::ReportSection {
+            heading: "Overview".into(),
+            body: "Tokio remains the dominant runtime for async Rust.".into(),
+        }],
     });
     let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
         kind: crate::reports::ReportKind::CodeReview,
         title: "Phase 6.5 Audit".into(),
-        sections: vec![
-            crate::reports::ReportSection {
-                heading: "Security".into(),
-                body: "Passed all automated checks.".into(),
-            }
-        ]
+        sections: vec![crate::reports::ReportSection {
+            heading: "Security".into(),
+            body: "Passed all automated checks.".into(),
+        }],
     });
 
     println!("Demo seed complete! Run `goat dashboard` to see the changes.");
@@ -931,19 +934,28 @@ fn handle_extensions_command(
     args: &[String],
 ) -> anyhow::Result<()> {
     use crate::extensions::ExtensionRegistry;
-    let mut registry = ExtensionRegistry::new(paths.config_file.parent().unwrap_or(std::path::Path::new("/")), &paths.data_dir)?;
+    let mut registry = ExtensionRegistry::new(
+        paths
+            .config_file
+            .parent()
+            .unwrap_or(std::path::Path::new("/")),
+        &paths.data_dir,
+    )?;
     registry.load_state()?;
 
     match action {
         "list" => {
             println!("Extension Registry (Phase 6.8)");
             println!("{:-<80}", "");
-            println!("{:<30} | {:<15} | {:<15} | {:<10}", "ID", "Kind", "Status", "Trust");
+            println!(
+                "{:<30} | {:<15} | {:<15} | {:<10}",
+                "ID", "Kind", "Status", "Trust"
+            );
             println!("{:-<80}", "");
-            
+
             let mut records = registry.list_extensions();
             records.sort_by_key(|r| r.manifest.id.clone());
-            
+
             for r in records {
                 println!(
                     "{:<30} | {:<15?} | {:<15?} | {:<10?}",
@@ -988,14 +1000,14 @@ fn handle_extensions_command(
                 return Ok(());
             }
             let id = &args[0];
-            
+
             // For CLI we assume user interaction is outside or explicitly trusted
             if let Some(record) = registry.get_extension(id) {
                 if record.trust_level != crate::extensions::ExtensionTrustLevel::LocalBuiltin {
                     println!("Warning: Installing untrusted extension.");
                 }
             }
-            
+
             match registry.install_extension(id) {
                 Ok(_) => println!("Successfully installed {}. It is currently DISABLED.", id),
                 Err(e) => println!("Error installing: {}", e),
@@ -1365,8 +1377,8 @@ fn handle_models_command(
     action: &str,
     args: &[String],
 ) -> anyhow::Result<()> {
-    use crate::providers::{ModelProviderRegistry, ModelRouteRequest, ModelProviderCapability};
-    
+    use crate::providers::{ModelProviderCapability, ModelProviderRegistry, ModelRouteRequest};
+
     let mut registry = ModelProviderRegistry::new(config.model_routing.clone());
     for (_, p_cfg) in &config.providers {
         registry.register(p_cfg.clone());
@@ -1377,11 +1389,16 @@ fn handle_models_command(
             println!("GOAT Available Models");
             println!("{}", "─".repeat(72));
             for provider in registry.providers.values() {
-                if !provider.enabled { continue; }
+                if !provider.enabled {
+                    continue;
+                }
                 println!("Provider: {} ({})", provider.name, provider.id);
                 println!("  Default Model: {}", provider.default_model);
                 if !provider.available_models.is_empty() {
-                    println!("  Available Models: {}", provider.available_models.join(", "));
+                    println!(
+                        "  Available Models: {}",
+                        provider.available_models.join(", ")
+                    );
                 }
                 println!();
             }
@@ -1416,11 +1433,10 @@ fn handle_models_command(
     Ok(())
 }
 
-fn handle_providers_command(
-    config: &crate::config::Config,
-    action: &str,
-) -> anyhow::Result<()> {
-    use crate::providers::{ModelProviderRegistry, ModelProviderAdapter, OpenAiCompatibleAdapter, ModelProviderStatus};
+fn handle_providers_command(config: &crate::config::Config, action: &str) -> anyhow::Result<()> {
+    use crate::providers::{
+        ModelProviderAdapter, ModelProviderRegistry, ModelProviderStatus, OpenAiCompatibleAdapter,
+    };
 
     let mut registry = ModelProviderRegistry::new(config.model_routing.clone());
     for (_, p_cfg) in &config.providers {
@@ -1440,7 +1456,9 @@ fn handle_providers_command(
             println!("GOAT Provider Doctor");
             println!("{}", "─".repeat(72));
             for provider in registry.providers.values() {
-                if !provider.enabled { continue; }
+                if !provider.enabled {
+                    continue;
+                }
                 let adapter = OpenAiCompatibleAdapter::new(
                     provider.base_url.clone().unwrap_or_default(),
                     config.provider_api_key(&provider.id),
@@ -1454,7 +1472,11 @@ fn handle_providers_command(
                     ModelProviderStatus::Unreachable => "Unreachable",
                     ModelProviderStatus::Unknown => "Unknown",
                 };
-                let status_icon = if status == ModelProviderStatus::Ready { "✓" } else { "!" };
+                let status_icon = if status == ModelProviderStatus::Ready {
+                    "✓"
+                } else {
+                    "!"
+                };
                 println!("  {} {:15} {}", status_icon, provider.name, status_str);
             }
         }

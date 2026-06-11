@@ -452,7 +452,11 @@ impl BrainIndexManager {
             .into_iter()
             .filter_map(|e| e.ok())
         {
-            if entry.path().extension().map_or(false, |e| e == "md" || e == "json") {
+            if entry
+                .path()
+                .extension()
+                .map_or(false, |e| e == "md" || e == "json")
+            {
                 if let Ok(content) = fs::read_to_string(entry.path()) {
                     if !self.contains_secrets(&content) {
                         docs.push(BrainDocument {
@@ -529,7 +533,7 @@ impl BrainIndexManager {
     fn ingest_runtime(&self, docs: &mut Vec<BrainDocument>) {
         let jobs_dir = self.paths.data_dir.join("runtime_jobs");
         let artifacts_dir = self.paths.data_dir.join("runtime_artifacts");
-        
+
         // Ingest Jobs
         for entry in walkdir::WalkDir::new(&jobs_dir)
             .into_iter()
@@ -703,11 +707,14 @@ impl BrainIndexManager {
                     keyword_score + 2.0
                 }
                 BrainSearchMode::Agent => {
-                    let is_agent = doc.source.source_agent.as_deref() == query.agent_id.as_deref() && query.agent_id.is_some();
+                    let is_agent = doc.source.source_agent.as_deref() == query.agent_id.as_deref()
+                        && query.agent_id.is_some();
                     keyword_score + if is_agent { 20.0 } else { 0.0 }
                 }
                 BrainSearchMode::Project => {
-                    let is_project = doc.source.source_project.as_deref() == query.project_id.as_deref() && query.project_id.is_some();
+                    let is_project = doc.source.source_project.as_deref()
+                        == query.project_id.as_deref()
+                        && query.project_id.is_some();
                     keyword_score + if is_project { 20.0 } else { 0.0 }
                 }
             };

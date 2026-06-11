@@ -601,9 +601,15 @@ pub async fn start_server(
         .route("/v1/extensions", get(extensions_list_handler))
         .route("/v1/extensions/:id", get(extensions_get_handler))
         .route("/v1/extensions/:id/audit", get(extensions_audit_handler))
-        .route("/v1/extensions/:id/install", post(extensions_install_handler))
+        .route(
+            "/v1/extensions/:id/install",
+            post(extensions_install_handler),
+        )
         .route("/v1/extensions/:id/enable", post(extensions_enable_handler))
-        .route("/v1/extensions/:id/disable", post(extensions_disable_handler))
+        .route(
+            "/v1/extensions/:id/disable",
+            post(extensions_disable_handler),
+        )
         .layer(cors)
         .with_state(state);
 
@@ -4728,7 +4734,7 @@ async fn providers_list_handler(
     for (_, p_cfg) in &rt.config.providers {
         registry.register(p_cfg.clone());
     }
-    
+
     let mut providers: Vec<_> = registry.providers.values().cloned().collect();
     providers.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -4740,7 +4746,9 @@ async fn providers_list_handler(
 async fn providers_doctor_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    use crate::providers::{ModelProviderRegistry, ModelProviderAdapter, OpenAiCompatibleAdapter, ModelProviderStatus};
+    use crate::providers::{
+        ModelProviderAdapter, ModelProviderRegistry, ModelProviderStatus, OpenAiCompatibleAdapter,
+    };
     let rt = state.runtime.lock().await;
     let mut registry = ModelProviderRegistry::new(rt.config.model_routing.clone());
     for (_, p_cfg) in &rt.config.providers {
@@ -4749,7 +4757,9 @@ async fn providers_doctor_handler(
 
     let mut results = Vec::new();
     for provider in registry.providers.values() {
-        if !provider.enabled { continue; }
+        if !provider.enabled {
+            continue;
+        }
         let adapter = OpenAiCompatibleAdapter::new(
             provider.base_url.clone().unwrap_or_default(),
             rt.config.provider_api_key(&provider.id),
@@ -4805,7 +4815,7 @@ async fn models_route_handler(
         cost_preference: "balanced".to_string(),
         fallback_allowed: true,
     };
-    
+
     let decision = registry.route(&route_req);
     axum::Json(serde_json::json!({ "routed_to": decision }))
 }

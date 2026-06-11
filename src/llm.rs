@@ -111,7 +111,8 @@ impl LlmRouter {
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        let mut registry = crate::providers::ModelProviderRegistry::new(config.model_routing.clone());
+        let mut registry =
+            crate::providers::ModelProviderRegistry::new(config.model_routing.clone());
         for (_, p_cfg) in &config.providers {
             registry.register(p_cfg.clone());
         }
@@ -255,18 +256,24 @@ impl LlmRouter {
         messages: Vec<Message>,
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, ProviderError> {
-        let p_cfg = self.registry.get_provider(provider).ok_or_else(|| ProviderError::UnknownProvider {
-            provider: provider.to_string(),
-        })?;
+        let p_cfg =
+            self.registry
+                .get_provider(provider)
+                .ok_or_else(|| ProviderError::UnknownProvider {
+                    provider: provider.to_string(),
+                })?;
 
         // Extract base URL and API key
         let base_url = p_cfg.base_url.clone().unwrap_or_default();
         let api_key = self.config.provider_api_key(provider).unwrap_or_default();
 
         let mut url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-        
+
         // OpenRouter needs /api/v1
-        if p_cfg.kind == crate::providers::ModelProviderKind::Openrouter && !url.contains("/api/v1") && !url.contains("/chat/completions") {
+        if p_cfg.kind == crate::providers::ModelProviderKind::Openrouter
+            && !url.contains("/api/v1")
+            && !url.contains("/chat/completions")
+        {
             // we assume openrouter uses openai compatible url if the url is default
             if url.is_empty() {
                 url = "https://openrouter.ai/api/v1/chat/completions".to_string();
@@ -281,7 +288,8 @@ impl LlmRouter {
             url = "https://api.groq.com/openai/v1/chat/completions".to_string();
         }
 
-        self.call_openai_compatible(provider, &url, &api_key, model, messages, tools).await
+        self.call_openai_compatible(provider, &url, &api_key, model, messages, tools)
+            .await
     }
 
     // ── Provider status helpers ───────────────────────────────────────────────
@@ -313,7 +321,10 @@ impl LlmRouter {
                 if self.config.provider_api_key(provider).is_some() {
                     "ready".to_string()
                 } else {
-                    format!("not configured (set {}_API_KEY in env or config)", provider.to_uppercase())
+                    format!(
+                        "not configured (set {}_API_KEY in env or config)",
+                        provider.to_uppercase()
+                    )
                 }
             }
         } else {
@@ -322,7 +333,6 @@ impl LlmRouter {
     }
 
     // ── Provider implementations (removed, now uses call_openai_compatible dynamically) ──────────────────────────────────────────────
-
 
     // ── Shared HTTP helpers ───────────────────────────────────────────────────
 

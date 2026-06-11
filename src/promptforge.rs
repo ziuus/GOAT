@@ -353,10 +353,10 @@ impl PromptForgeClient {
         let _ = fs::create_dir_all(base_dir.join("sessions"));
         let _ = fs::create_dir_all(base_dir.join("logs"));
 
-        Self { 
-            pf_config: global_config.promptforge.clone(), 
+        Self {
+            pf_config: global_config.promptforge.clone(),
             global_config,
-            base_dir 
+            base_dir,
         }
     }
 
@@ -374,7 +374,10 @@ impl PromptForgeClient {
             target_agent: agent.to_string(),
             promptforge_target: self.pf_config.default_target.clone(),
             risk_level: "low".to_string(),
-            user_confirmation_required: self.pf_config.rules.require_confirmation_for_refined_prompt,
+            user_confirmation_required: self
+                .pf_config
+                .rules
+                .require_confirmation_for_refined_prompt,
             mode_used: self.pf_config.mode.clone(),
         };
 
@@ -460,7 +463,8 @@ impl PromptForgeClient {
             }
             PromptForgeMode::Model => {
                 use crate::providers::{ModelProviderRegistry, ModelRouteRequest};
-                let mut registry = ModelProviderRegistry::new(self.global_config.model_routing.clone());
+                let mut registry =
+                    ModelProviderRegistry::new(self.global_config.model_routing.clone());
                 for (_, p_cfg) in &self.global_config.providers {
                     registry.register(p_cfg.clone());
                 }
@@ -483,7 +487,10 @@ impl PromptForgeClient {
 
                 let sys_msg = crate::llm::Message {
                     role: "system".to_string(),
-                    content: Some(format!("You are a prompt refinement specialist. Refine the given prompt for {} (domain: {}). Output ONLY the refined prompt text.", req.target_format, req.domain)),
+                    content: Some(format!(
+                        "You are a prompt refinement specialist. Refine the given prompt for {} (domain: {}). Output ONLY the refined prompt text.",
+                        req.target_format, req.domain
+                    )),
                     tool_calls: None,
                     tool_call_id: None,
                 };
@@ -496,21 +503,27 @@ impl PromptForgeClient {
 
                 let provider_used = decision.provider_id.clone();
 
-                match llm.completion(&decision.provider_id, &decision.model, vec![sys_msg, user_msg], None).await {
-                    Ok(content) => {
-                        Ok(PromptForgeRefineResponse {
-                            original_prompt: req.original_prompt.clone(),
-                            refined_prompt: content.content.unwrap_or_default(),
-                            original_score: None,
-                            refined_score: None,
-                            target_agent: req.target_agent.clone(),
-                            target: req.target_format.clone(),
-                            improvements: vec!["Refined by model".to_string()],
-                            warnings: vec![],
-                            provider_used,
-                            mode_used: PromptForgeMode::Model,
-                        })
-                    }
+                match llm
+                    .completion(
+                        &decision.provider_id,
+                        &decision.model,
+                        vec![sys_msg, user_msg],
+                        None,
+                    )
+                    .await
+                {
+                    Ok(content) => Ok(PromptForgeRefineResponse {
+                        original_prompt: req.original_prompt.clone(),
+                        refined_prompt: content.content.unwrap_or_default(),
+                        original_score: None,
+                        refined_score: None,
+                        target_agent: req.target_agent.clone(),
+                        target: req.target_format.clone(),
+                        improvements: vec!["Refined by model".to_string()],
+                        warnings: vec![],
+                        provider_used,
+                        mode_used: PromptForgeMode::Model,
+                    }),
                     Err(e) => {
                         if self.pf_config.fail_open {
                             Ok(PromptForgeRefineResponse {
@@ -521,12 +534,17 @@ impl PromptForgeClient {
                                 target_agent: req.target_agent.clone(),
                                 target: req.target_format.clone(),
                                 improvements: vec![],
-                                warnings: vec![format!("Model refinement failed, falling back: {}", e)],
+                                warnings: vec![format!(
+                                    "Model refinement failed, falling back: {}",
+                                    e
+                                )],
                                 provider_used: "fallback".to_string(),
                                 mode_used: PromptForgeMode::Model,
                             })
                         } else {
-                            Err(PromptForgeError { message: e.to_string() })
+                            Err(PromptForgeError {
+                                message: e.to_string(),
+                            })
                         }
                     }
                 }

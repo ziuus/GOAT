@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -163,16 +163,16 @@ impl ExtensionRegistry {
     pub fn load_state(&mut self) -> Result<()> {
         let enabled_path = self.config_dir.join("enabled.json");
         let trust_path = self.config_dir.join("trust.json");
-        
+
         // This is a stub for loading the state from disk
         // In a real implementation we would load all ExtensionRecords
-        
+
         // Let's add some built-in extensions for demonstration
         self.add_builtin_catalog();
-        
+
         Ok(())
     }
-    
+
     pub fn save_state(&self) -> Result<()> {
         // Stub for saving
         Ok(())
@@ -192,7 +192,10 @@ impl ExtensionRegistry {
                 license: Some("MIT".to_string()),
                 entry_type: None,
                 entry_ref: None,
-                permissions: vec![ExtensionPermission::GithubAccess, ExtensionPermission::ReadProject],
+                permissions: vec![
+                    ExtensionPermission::GithubAccess,
+                    ExtensionPermission::ReadProject,
+                ],
                 commands: vec![],
                 tools: vec![],
                 skills: vec!["github_pr_reviewer".to_string()],
@@ -256,7 +259,7 @@ impl ExtensionRegistry {
         if !path.exists() {
             return Err(anyhow!("Path does not exist"));
         }
-        
+
         let manifest_path = if path.is_file() {
             path.to_path_buf()
         } else {
@@ -267,33 +270,42 @@ impl ExtensionRegistry {
             } else if toml_path.exists() {
                 toml_path
             } else {
-                return Err(anyhow!("No manifest.json or manifest.toml found in directory"));
+                return Err(anyhow!(
+                    "No manifest.json or manifest.toml found in directory"
+                ));
             }
         };
 
         let content = fs::read_to_string(&manifest_path)?;
-        let manifest: ExtensionManifest = if manifest_path.extension().and_then(|e| e.to_str()) == Some("toml") {
-            toml::from_str(&content)?
-        } else {
-            serde_json::from_str(&content)?
-        };
+        let manifest: ExtensionManifest =
+            if manifest_path.extension().and_then(|e| e.to_str()) == Some("toml") {
+                toml::from_str(&content)?
+            } else {
+                serde_json::from_str(&content)?
+            };
 
         let id = manifest.id.clone();
-        
-        self.records.insert(id.clone(), ExtensionRecord {
-            manifest,
-            status: ExtensionStatus::Discovered,
-            trust_level: ExtensionTrustLevel::LocalUser,
-            source: ExtensionSource::LocalFolder(path.to_path_buf()),
-            install_path: None,
-        });
+
+        self.records.insert(
+            id.clone(),
+            ExtensionRecord {
+                manifest,
+                status: ExtensionStatus::Discovered,
+                trust_level: ExtensionTrustLevel::LocalUser,
+                source: ExtensionSource::LocalFolder(path.to_path_buf()),
+                install_path: None,
+            },
+        );
 
         self.save_state()?;
         Ok(id)
     }
 
     pub fn audit_extension(&self, id: &str) -> Result<ExtensionAuditResult> {
-        let record = self.records.get(id).ok_or_else(|| anyhow!("Extension not found"))?;
+        let record = self
+            .records
+            .get(id)
+            .ok_or_else(|| anyhow!("Extension not found"))?;
         let mut findings = Vec::new();
 
         if record.manifest.author.is_none() {
@@ -350,57 +362,76 @@ impl ExtensionRegistry {
     }
 
     pub fn install_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self.records.get_mut(id).ok_or_else(|| anyhow!("Extension not found"))?;
-        
-        if record.status != ExtensionStatus::Discovered && record.status != ExtensionStatus::Disabled {
+        let mut record = self
+            .records
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("Extension not found"))?;
+
+        if record.status != ExtensionStatus::Discovered
+            && record.status != ExtensionStatus::Disabled
+        {
             return Err(anyhow!("Extension is not in a state to be installed"));
         }
 
         // Simulating install logic
         let target_path = self.data_dir.join("installed").join(&record.manifest.id);
         fs::create_dir_all(&target_path)?;
-        
+
         record.install_path = Some(target_path);
         record.status = ExtensionStatus::Disabled; // Always default to disabled
-        
+
         self.save_state()?;
         Ok(())
     }
 
     pub fn enable_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self.records.get_mut(id).ok_or_else(|| anyhow!("Extension not found"))?;
-        if record.status != ExtensionStatus::Disabled && record.status != ExtensionStatus::Installed {
-            return Err(anyhow!("Extension must be installed and disabled before enabling"));
+        let mut record = self
+            .records
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("Extension not found"))?;
+        if record.status != ExtensionStatus::Disabled && record.status != ExtensionStatus::Installed
+        {
+            return Err(anyhow!(
+                "Extension must be installed and disabled before enabling"
+            ));
         }
-        
+
         record.status = ExtensionStatus::Enabled;
         self.save_state()?;
         Ok(())
     }
 
     pub fn disable_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self.records.get_mut(id).ok_or_else(|| anyhow!("Extension not found"))?;
+        let mut record = self
+            .records
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("Extension not found"))?;
         if record.status != ExtensionStatus::Enabled {
             return Err(anyhow!("Extension is not enabled"));
         }
-        
+
         record.status = ExtensionStatus::Disabled;
         self.save_state()?;
         Ok(())
     }
 
     pub fn remove_extension(&mut self, id: &str) -> Result<()> {
-        let record = self.records.get(id).ok_or_else(|| anyhow!("Extension not found"))?;
+        let record = self
+            .records
+            .get(id)
+            .ok_or_else(|| anyhow!("Extension not found"))?;
         if record.status == ExtensionStatus::Enabled {
-            return Err(anyhow!("Cannot remove an enabled extension. Disable it first."));
+            return Err(anyhow!(
+                "Cannot remove an enabled extension. Disable it first."
+            ));
         }
-        
+
         if let Some(path) = &record.install_path {
             if path.exists() {
                 fs::remove_dir_all(path)?;
             }
         }
-        
+
         self.records.remove(id);
         self.save_state()?;
         Ok(())
