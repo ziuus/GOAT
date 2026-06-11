@@ -183,3 +183,20 @@ export const socializerApi = {
   generateFeedback: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/feedback`, { method: 'POST' }).then(r => r.json()),
   generateReport: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/report`, { method: 'POST' }).then(r => r.json()),
 };
+
+export interface PromptForgeHistoryEntry {
+  id: string;
+  timestamp: number;
+  original_prompt: string;
+  refined_prompt: string;
+  status: string;
+  mode: string;
+}
+
+export const promptforgeApi = {
+  getStatus: () => daemonFetch('/v1/promptforge/status').then(r => r.json()),
+  getDoctor: () => daemonFetch('/v1/promptforge/doctor').then(r => r.json()),
+  getConfig: () => daemonFetch('/v1/promptforge/config').then(r => r.json()),
+  getHistory: () => daemonFetch('/v1/promptforge/history').then(r => r.json()),
+  refine: (data: any) => daemonFetch('/v1/promptforge/refine', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
+};

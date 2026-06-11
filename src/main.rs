@@ -29,6 +29,7 @@ pub mod onboarding;
 pub mod paths;
 pub mod project;
 pub mod project_profiles;
+pub mod promptforge;
 pub mod provider;
 pub mod quick_access;
 pub mod recipe_marketplace;

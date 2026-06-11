@@ -468,7 +468,26 @@ fn all_commands() -> Vec<CommandMetadata> {
             risk: CommandRisk::Low,
             related: None,
         },
-        // ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
+        CommandMetadata {
+            name: "/promptforge",
+            aliases: &["\\pf", "\\refine"],
+            category: CommandCategory::System,
+            description: "PromptForge optional refinement layer",
+            usage: "/promptforge [status | enable | disable | doctor | refine <prompt> | score <prompt> | history | config | mode <mode> | test]",
+            examples: &[
+                "/promptforge status",
+                "/promptforge refine \"make dashboard better\"",
+                "\\pf status",
+                "\\refine \"validate AI security audit agency\"",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            status: CommandStatus::Working,
+            risk: CommandRisk::Low,
+            related: None,
+        },
+// ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
         CommandMetadata {
             name: "/mode",
             aliases: &[

@@ -1,5 +1,5 @@
 use crate::config::EmbeddingsConfig;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

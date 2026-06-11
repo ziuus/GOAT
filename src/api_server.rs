@@ -308,6 +308,11 @@ pub async fn start_server(
         .route("/v1/socializer/campaigns/:id/outreach", post(socializer_campaign_outreach_handler))
         .route("/v1/socializer/campaigns/:id/feedback", post(socializer_campaign_feedback_handler))
         .route("/v1/socializer/campaigns/:id/report", post(socializer_campaign_report_handler))
+        .route("/v1/promptforge/status", get(pf_status_handler))
+        .route("/v1/promptforge/doctor", get(pf_doctor_handler))
+        .route("/v1/promptforge/config", get(pf_config_handler))
+        .route("/v1/promptforge/refine", post(pf_refine_handler))
+        .route("/v1/promptforge/history", get(pf_history_handler))
         .route("/v1/reports", get(reports_list_handler))
         .layer(cors)
         .with_state(state);
@@ -3109,4 +3114,70 @@ async fn socializer_campaign_report_handler(
     let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
     let res = mgr.generate_report(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
     Ok(axum::Json(serde_json::json!({ "report": res })))
+}
+
+// ── Phase 5.19: PromptForge ─────────────────────────────────────────────────
+async fn pf_status_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(axum::Json(serde_json::json!({
+        "enabled": rt.config.promptforge.enabled,
+        "mode": rt.config.promptforge.mode,
+        "auto_refine": rt.config.promptforge.auto_refine
+    })))
+}
+
+async fn pf_doctor_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(axum::Json(serde_json::json!({
+        "enabled": rt.config.promptforge.enabled,
+        "mode": rt.config.promptforge.mode,
+        "fail_open": rt.config.promptforge.fail_open,
+        "allow_browser_chat": rt.config.promptforge.allow_browser_chat
+    })))
+}
+
+async fn pf_config_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    Ok(axum::Json(serde_json::json!({
+        "config": rt.config.promptforge
+    })))
+}
+
+async fn pf_refine_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+    axum::Json(payload): axum::Json<crate::promptforge::PromptForgeRefineRequest>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    if !rt.config.promptforge.enabled {
+        return Err((axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({ "error": "PromptForge is disabled" }))));
+    }
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    drop(rt);
+    let res = client.refine(payload).await.map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(axum::Json(serde_json::json!({ "result": res })))
+}
+
+async fn pf_history_handler(
+    headers: axum::http::HeaderMap,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+    crate::api_server::check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    let history = client.get_history();
+    Ok(axum::Json(serde_json::json!({ "history": history })))
 }

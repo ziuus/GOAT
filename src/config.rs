@@ -98,6 +98,8 @@ pub struct Config {
     /// Brain index config.
     #[serde(default)]
     pub brain_index: BrainIndexConfig,
+    #[serde(default)]
+    pub promptforge: crate::promptforge::PromptForgeConfig,
     /// GitHub Workflow config.
     #[serde(default)]
     pub github: crate::github_workflow::GitHubWorkflowConfig,

@@ -12,6 +12,7 @@ const navItems = [
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Cofounder', href: '/cofounder', icon: Sparkles },
   { name: 'Socializer', href: '/socializer', icon: Users },
+  { name: 'PromptForge', href: '/promptforge', icon: Sparkles },
   { name: 'Commands', href: '/commands', icon: Command },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Skill Directory', href: '/skills', icon: Library },

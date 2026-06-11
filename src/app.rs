@@ -3908,6 +3908,81 @@ impl App {
                 true
             }
 
+            "/promptforge" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = parts.get(0).copied().unwrap_or("status");
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let pf_client = crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
+
+                match subcmd {
+                    "status" => {
+                        self.push_log(format!("[PROMPTFORGE] Enabled: {}", self.config.promptforge.enabled));
+                        self.push_log(format!("[PROMPTFORGE] Mode: {:?}", self.config.promptforge.mode));
+                        self.push_log(format!("[PROMPTFORGE] Auto-refine: {}", self.config.promptforge.auto_refine));
+                        if !self.config.promptforge.enabled {
+                            self.push_log("PromptForge is currently disabled. Use '/promptforge enable' to enable it.".to_string());
+                        }
+                    }
+                    "enable" => {
+                        self.push_log("[PROMPTFORGE] Enabled PromptForge for this session (ephemeral). Update goat.toml to persist.".to_string());
+                        self.config.promptforge.enabled = true;
+                    }
+                    "disable" => {
+                        self.push_log("[PROMPTFORGE] Disabled PromptForge for this session (ephemeral).".to_string());
+                        self.config.promptforge.enabled = false;
+                    }
+                    "doctor" => {
+                        self.push_log("[PROMPTFORGE] Doctor check:".to_string());
+                        self.push_log(format!("  Enabled: {}", self.config.promptforge.enabled));
+                        self.push_log(format!("  Mode: {:?}", self.config.promptforge.mode));
+                        self.push_log(format!("  Fail Open: {}", self.config.promptforge.fail_open));
+                        self.push_log(format!("  Auto-refine: {}", self.config.promptforge.auto_refine));
+                        self.push_log(format!("  Browser Chat: {}", self.config.promptforge.allow_browser_chat));
+                        if self.config.promptforge.allow_browser_chat {
+                            self.push_log("  WARNING: Browser web-chat integration is not implemented/recommended now.".to_string());
+                        }
+                    }
+                    "refine" => {
+                        if !self.config.promptforge.enabled {
+                            self.push_log("[PROMPTFORGE] Disabled. Enable it first to refine prompts.".to_string());
+                        } else if target.is_empty() {
+                            self.push_log("[PROMPTFORGE] Please provide a prompt to refine.".to_string());
+                        } else {
+                            self.push_log(format!("[PROMPTFORGE] Refinining: '{}'", target));
+                            let req = crate::promptforge::PromptForgeRefineRequest {
+                                original_prompt: target.to_string(),
+                                target_agent: "user".to_string(),
+                                target_format: self.config.promptforge.default_target.clone(),
+                                domain: "general".to_string(),
+                                complexity: "medium".to_string(),
+                                safe_context: "".to_string(),
+                                constraints: vec![],
+                                mode: self.config.promptforge.mode.clone(),
+                            };
+                            let rt = tokio::runtime::Runtime::new().unwrap();
+                            match rt.block_on(pf_client.refine(req)) {
+                                Ok(resp) => {
+                                    self.push_log(format!("[PROMPTFORGE] Refined: '{}'", resp.refined_prompt));
+                                    if !resp.improvements.is_empty() {
+                                        self.push_log(format!("[PROMPTFORGE] Improvements: {:?}", resp.improvements));
+                                    }
+                                }
+                                Err(e) => self.push_log(format!("[PROMPTFORGE] Error: {}", e)),
+                            }
+                        }
+                    }
+                    "history" => {
+                        let hist = pf_client.get_history();
+                        self.push_log(format!("[PROMPTFORGE] History: {} entries", hist.len()));
+                        for entry in hist.iter().take(5) {
+                            self.push_log(format!("  [{}] {} -> {}", entry.timestamp, entry.original_prompt, entry.refined_prompt));
+                        }
+                    }
+                    _ => self.push_log(format!("[PROMPTFORGE] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");
