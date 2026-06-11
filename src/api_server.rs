@@ -595,6 +595,9 @@ pub async fn start_server(
         .route("/v1/promptforge/enable", post(pf_enable_handler))
         .route("/v1/promptforge/disable", post(pf_disable_handler))
         .route("/v1/reports", get(reports_list_handler))
+        .route("/v1/providers", get(providers_list_handler))
+        .route("/v1/providers/doctor", get(providers_doctor_handler))
+        .route("/v1/models/route", post(models_route_handler))
         .layer(cors)
         .with_state(state);
 
@@ -3700,7 +3703,7 @@ async fn pf_refine_handler(
             axum::Json(serde_json::json!({ "error": "PromptForge is disabled" })),
         ));
     }
-    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.clone());
     drop(rt);
     let res = client.refine(payload).await.map_err(|e| {
         (
@@ -3718,7 +3721,7 @@ async fn pf_history_handler(
 {
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.clone());
     let history = client.get_history();
     Ok(axum::Json(serde_json::json!({ "history": history })))
 }
@@ -3735,7 +3738,7 @@ async fn pf_score_handler(
 {
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
-    let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
+    let client = crate::promptforge::PromptForgeClient::new(rt.config.clone());
     drop(rt);
     let res = client.score(&payload.prompt).await;
     Ok(axum::Json(serde_json::json!({ "result": res })))
@@ -4704,4 +4707,99 @@ async fn runtime_job_report_handler(
     } else {
         Err(axum::http::StatusCode::NOT_FOUND)
     }
+}
+
+// ── Providers and Models ──────────────────────────────────────────────────────
+
+async fn providers_list_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    use crate::providers::ModelProviderRegistry;
+    let rt = state.runtime.lock().await;
+    let mut registry = ModelProviderRegistry::new(rt.config.model_routing.clone());
+    for (_, p_cfg) in &rt.config.providers {
+        registry.register(p_cfg.clone());
+    }
+    
+    let mut providers: Vec<_> = registry.providers.values().cloned().collect();
+    providers.sort_by(|a, b| a.id.cmp(&b.id));
+
+    Ok(axum::Json(serde_json::json!({
+        "providers": providers
+    })))
+}
+
+async fn providers_doctor_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    use crate::providers::{ModelProviderRegistry, ModelProviderAdapter, OpenAiCompatibleAdapter, ModelProviderStatus};
+    let rt = state.runtime.lock().await;
+    let mut registry = ModelProviderRegistry::new(rt.config.model_routing.clone());
+    for (_, p_cfg) in &rt.config.providers {
+        registry.register(p_cfg.clone());
+    }
+
+    let mut results = Vec::new();
+    for provider in registry.providers.values() {
+        if !provider.enabled { continue; }
+        let adapter = OpenAiCompatibleAdapter::new(
+            provider.base_url.clone().unwrap_or_default(),
+            rt.config.provider_api_key(&provider.id),
+            provider.timeout_secs,
+        );
+        let status = adapter.status();
+        let status_str = match status {
+            ModelProviderStatus::Ready => "Ready",
+            ModelProviderStatus::NotConfigured => "Not Configured",
+            ModelProviderStatus::MissingKey => "Missing API Key",
+            ModelProviderStatus::Unreachable => "Unreachable",
+            ModelProviderStatus::Unknown => "Unknown",
+        };
+        results.push(serde_json::json!({
+            "id": provider.id,
+            "name": provider.name,
+            "status": status_str,
+            "is_ready": status == ModelProviderStatus::Ready
+        }));
+    }
+
+    Ok(axum::Json(serde_json::json!({
+        "doctor_results": results
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct RouteRequest {
+    task_kind: String,
+}
+
+async fn models_route_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Json(req): axum::extract::Json<RouteRequest>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    use crate::providers::{ModelProviderRegistry, ModelRouteRequest};
+    let rt = state.runtime.lock().await;
+    let mut registry = ModelProviderRegistry::new(rt.config.model_routing.clone());
+    for (_, p_cfg) in &rt.config.providers {
+        registry.register(p_cfg.clone());
+    }
+
+    let route_req = ModelRouteRequest {
+        agent_id: "api_user".to_string(),
+        task_kind: req.task_kind,
+        required_capabilities: vec![],
+        local_only: false,
+        allow_external: true,
+        preferred_provider: None,
+        preferred_model: None,
+        quality_preference: "balanced".to_string(),
+        latency_preference: "balanced".to_string(),
+        cost_preference: "balanced".to_string(),
+        fallback_allowed: true,
+    };
+    
+    let decision = registry.route(&route_req);
+    Ok(axum::Json(serde_json::json!({
+        "decision": decision
+    })))
 }

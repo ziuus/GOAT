@@ -126,8 +126,20 @@ pub enum Command {
     /// List and switch model profiles and providers.
     #[command(name = "models")]
     Models {
-        /// Optional specific action (e.g., 'list', 'status')
-        action: Option<String>,
+        /// Optional specific action (e.g., 'list', 'route')
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Manage Universal Model Providers (Phase 6.6)
+    #[command(name = "providers")]
+    Providers {
+        /// Action to perform: list, doctor
+        #[arg(default_value = "list")]
+        action: String,
     },
 
     /// Manage tools, permissions, and tool registry.
@@ -417,8 +429,12 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Models { action: _ } => {
-            handle_models_command(config);
+        Command::Models { action, args } => {
+            handle_models_command(config, action, args)?;
+            Ok(true)
+        }
+        Command::Providers { action } => {
+            handle_providers_command(config, action)?;
             Ok(true)
         }
         Command::Project { action } => {
@@ -1167,109 +1183,110 @@ fn handle_migrate_db(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
 
 // ── models command ────────────────────────────────────────────────────────────
 
-fn handle_models_command(config: &crate::config::Config) {
-    use crate::models::ProfileRegistry;
-
-    let registry = ProfileRegistry::from_config(&config.profiles);
-
-    // Build router from full config (includes OpenRouter, Ollama keys).
-    let router = crate::llm::LlmRouter::from_config(config);
-
-    println!("GOAT Model Providers & Profiles");
-    println!("{}", "─".repeat(72));
-
-    // Provider status (never print keys).
-    println!("Providers:");
-    for provider in &["openai", "groq", "openrouter", "ollama"] {
-        let implemented = router.is_provider_implemented(provider);
-        let available = router.is_provider_available(provider);
-        let status_icon = if available {
-            "✓"
-        } else if implemented {
-            "✗"
-        } else {
-            "~"
-        };
-        println!(
-            "  {} {:12} {}",
-            status_icon,
-            provider,
-            router.provider_status_label(provider)
-        );
+fn handle_models_command(
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    use crate::providers::{ModelProviderRegistry, ModelRouteRequest, ModelProviderCapability};
+    
+    let mut registry = ModelProviderRegistry::new(config.model_routing.clone());
+    for (_, p_cfg) in &config.providers {
+        registry.register(p_cfg.clone());
     }
-    println!("  ~ {:12} planned — not implemented", "anthropic");
-    println!("  ~ {:12} planned — not implemented", "gemini");
-    println!();
 
-    // LLM retry/timeout config.
-    println!("LLM config:");
-    println!(
-        "  max_retries           : {}",
-        config.llm.effective_max_retries()
-    );
-    println!(
-        "  timeout_secs          : {}",
-        config.llm.effective_timeout_secs()
-    );
-    println!(
-        "  fallback_on_rate_limit: {}",
-        config.llm.fallback_on_rate_limit
-    );
-    println!(
-        "  fallback_on_network   : {}",
-        config.llm.fallback_on_network
-    );
-    println!(
-        "  fallback_on_5xx       : {}",
-        config.llm.fallback_on_server_error
-    );
-    println!();
-
-    // Profile list.
-    println!("Default profile: {}", registry.default_profile);
-    println!();
-    println!("Profiles:");
-    println!("{}", "─".repeat(72));
-    for name in registry.profile_names() {
-        let (_, chain) = registry.resolve(name);
-        let primary = chain.primary_display();
-        let fallback = chain.fallback_display();
-        let primary_status = if let Some(e) = chain.entries.first() {
-            if router.is_provider_available(&e.provider) {
-                "✓"
-            } else {
-                "✗"
-            }
-        } else {
-            "✗"
-        };
-        let default_marker = if name == registry.default_profile {
-            " (default)"
-        } else {
-            ""
-        };
-        println!(
-            "  {:12} primary: {} {}{}",
-            name, primary_status, primary, default_marker
-        );
-        if fallback != "none" {
-            let fallback_status = if let Some(e) = chain.entries.get(1) {
-                if router.is_provider_available(&e.provider) {
-                    "✓"
-                } else {
-                    "✗"
+    match action {
+        "list" => {
+            println!("GOAT Available Models");
+            println!("{}", "─".repeat(72));
+            for provider in registry.providers.values() {
+                if !provider.enabled { continue; }
+                println!("Provider: {} ({})", provider.name, provider.id);
+                println!("  Default Model: {}", provider.default_model);
+                if !provider.available_models.is_empty() {
+                    println!("  Available Models: {}", provider.available_models.join(", "));
                 }
-            } else {
-                "✗"
+                println!();
+            }
+        }
+        "route" => {
+            let task_kind = args.get(0).map(|s| s.as_str()).unwrap_or("general");
+            let req = ModelRouteRequest {
+                agent_id: "cli_user".to_string(),
+                task_kind: task_kind.to_string(),
+                required_capabilities: vec![],
+                local_only: false,
+                allow_external: true,
+                preferred_provider: None,
+                preferred_model: None,
+                quality_preference: "balanced".to_string(),
+                latency_preference: "balanced".to_string(),
+                cost_preference: "balanced".to_string(),
+                fallback_allowed: true,
             };
-            println!("  {:12} fallback: {} {}", "", fallback_status, fallback);
+            let decision = registry.route(&req);
+            println!("Routing decision for task '{}':", task_kind);
+            println!("  Provider: {}", decision.provider_id);
+            println!("  Model: {}", decision.model);
+            println!("  Local Only: {}", decision.local_only);
+            println!("  Notes: {}", decision.notes);
+        }
+        _ => {
+            println!("Unknown action: {}", action);
+            println!("Usage: goat models <list|route>");
         }
     }
-    println!("{}", "─".repeat(72));
-    println!();
-    println!("Legend: ✓ = ready  ✗ = key missing  ~ = planned/not-implemented");
-    println!("Config:  {}", "~/.config/goat/goat.toml");
-    println!("Usage:   goat --profile <name>  |  TUI: /profile <name>  |  /profiles");
+    Ok(())
+}
+
+fn handle_providers_command(
+    config: &crate::config::Config,
+    action: &str,
+) -> anyhow::Result<()> {
+    use crate::providers::{ModelProviderRegistry, ModelProviderAdapter, OpenAiCompatibleAdapter, ModelProviderStatus};
+
+    let mut registry = ModelProviderRegistry::new(config.model_routing.clone());
+    for (_, p_cfg) in &config.providers {
+        registry.register(p_cfg.clone());
+    }
+
+    match action {
+        "list" => {
+            println!("GOAT Model Providers");
+            println!("{}", "─".repeat(72));
+            for provider in registry.providers.values() {
+                let status_icon = if provider.enabled { "✓" } else { "✗" };
+                println!("  {} {:15} ({})", status_icon, provider.name, provider.id);
+            }
+        }
+        "doctor" => {
+            println!("GOAT Provider Doctor");
+            println!("{}", "─".repeat(72));
+            for provider in registry.providers.values() {
+                if !provider.enabled { continue; }
+                let adapter = OpenAiCompatibleAdapter::new(
+                    provider.base_url.clone().unwrap_or_default(),
+                    config.provider_api_key(&provider.id),
+                    provider.timeout_secs,
+                );
+                let status = adapter.status();
+                let status_str = match status {
+                    ModelProviderStatus::Ready => "Ready",
+                    ModelProviderStatus::NotConfigured => "Not Configured",
+                    ModelProviderStatus::MissingKey => "Missing API Key",
+                    ModelProviderStatus::Unreachable => "Unreachable",
+                    ModelProviderStatus::Unknown => "Unknown",
+                };
+                let status_icon = if status == ModelProviderStatus::Ready { "✓" } else { "!" };
+                println!("  {} {:15} {}", status_icon, provider.name, status_str);
+            }
+        }
+        _ => {
+            println!("Unknown action: {}", action);
+            println!("Usage: goat providers <list|doctor>");
+        }
+    }
+    Ok(())
 }
 
 fn handle_project_command(

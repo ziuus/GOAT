@@ -4001,7 +4001,7 @@ impl App {
                 let subcmd = parts.get(0).copied().unwrap_or("status");
                 let target = parts.get(1).copied().unwrap_or("").trim();
                 let pf_client =
-                    crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
+                    crate::promptforge::PromptForgeClient::new(self.config.clone());
 
                 match subcmd {
                     "status" => {
@@ -5037,7 +5037,7 @@ impl App {
         let route = self.swarm_router.route(&final_msg);
         let agent_id = route.profile.name.to_lowercase().replace(" ", "_");
 
-        let pf_client = crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
+        let pf_client = crate::promptforge::PromptForgeClient::new(self.config.clone());
         let refined_msg = pf_client
             .maybe_refine_for_agent(&agent_id, &final_msg, "context_placeholder", user_override)
             .await;

@@ -340,19 +340,24 @@ pub struct PromptForgeHistoryEntry {
 }
 
 pub struct PromptForgeClient {
-    config: PromptForgeConfig,
-    base_dir: PathBuf,
+    pub pf_config: PromptForgeConfig,
+    pub global_config: crate::config::Config,
+    pub base_dir: PathBuf,
 }
 
 impl PromptForgeClient {
-    pub fn new(config: PromptForgeConfig) -> Self {
+    pub fn new(global_config: crate::config::Config) -> Self {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
         let base_dir = home.join(".local/share/goat/promptforge");
         let _ = fs::create_dir_all(&base_dir);
         let _ = fs::create_dir_all(base_dir.join("sessions"));
         let _ = fs::create_dir_all(base_dir.join("logs"));
 
-        Self { config, base_dir }
+        Self { 
+            pf_config: global_config.promptforge.clone(), 
+            global_config,
+            base_dir 
+        }
     }
 
     pub fn should_refine(
@@ -367,13 +372,13 @@ impl PromptForgeClient {
             complexity: "simple".to_string(),
             domain: "general".to_string(),
             target_agent: agent.to_string(),
-            promptforge_target: self.config.default_target.clone(),
+            promptforge_target: self.pf_config.default_target.clone(),
             risk_level: "low".to_string(),
-            user_confirmation_required: self.config.rules.require_confirmation_for_refined_prompt,
-            mode_used: self.config.mode.clone(),
+            user_confirmation_required: self.pf_config.rules.require_confirmation_for_refined_prompt,
+            mode_used: self.pf_config.mode.clone(),
         };
 
-        if let Some(mapping) = self.config.agents.get(agent) {
+        if let Some(mapping) = self.pf_config.agents.get(agent) {
             if !mapping.enabled {
                 decision.reason = format!("Agent {} has PromptForge disabled.", agent);
                 return decision;
@@ -397,12 +402,12 @@ impl PromptForgeClient {
         }
 
         let is_simple = decision.complexity == "simple";
-        if self.config.rules.skip_simple_commands && is_simple {
+        if self.pf_config.rules.skip_simple_commands && is_simple {
             decision.reason = "Simple command, bypassing refinement.".to_string();
             return decision;
         }
 
-        if !self.config.enabled {
+        if !self.pf_config.enabled {
             decision.reason = "PromptForge is globally disabled.".to_string();
             return decision;
         }
@@ -417,7 +422,7 @@ impl PromptForgeClient {
             return decision;
         }
 
-        if self.config.auto_refine {
+        if self.pf_config.auto_refine {
             decision.should_refine = true;
             decision.reason =
                 "Auto-refine is enabled and task meets complexity threshold.".to_string();
@@ -454,27 +459,80 @@ impl PromptForgeClient {
                 })
             }
             PromptForgeMode::Model => {
-                // Uses internal provider in real implementation.
-                // For now, doing a safe deterministic fallback.
-                let mut refined = format!(
-                    "{}\n\n### Constraints & Context\n- Target: {}\n- Domain: {}",
-                    req.original_prompt, req.target_format, req.domain
-                );
-                Ok(PromptForgeRefineResponse {
-                    original_prompt: req.original_prompt.clone(),
-                    refined_prompt: refined.clone(),
-                    original_score: None,
-                    refined_score: None,
-                    target_agent: req.target_agent.clone(),
-                    target: req.target_format.clone(),
-                    improvements: vec!["Added context".to_string()],
-                    warnings: vec![],
-                    provider_used: "model_fallback".to_string(),
-                    mode_used: PromptForgeMode::Model,
-                })
+                use crate::providers::{ModelProviderRegistry, ModelRouteRequest};
+                let mut registry = ModelProviderRegistry::new(self.global_config.model_routing.clone());
+                for (_, p_cfg) in &self.global_config.providers {
+                    registry.register(p_cfg.clone());
+                }
+
+                let route_req = ModelRouteRequest {
+                    agent_id: req.target_agent.clone(),
+                    task_kind: "prompt_refinement".to_string(),
+                    required_capabilities: vec![],
+                    local_only: false,
+                    allow_external: true,
+                    preferred_provider: None,
+                    preferred_model: None,
+                    quality_preference: "balanced".to_string(),
+                    latency_preference: "balanced".to_string(),
+                    cost_preference: "balanced".to_string(),
+                    fallback_allowed: true,
+                };
+                let decision = registry.route(&route_req);
+                let llm = crate::llm::LlmRouter::from_config(&self.global_config);
+
+                let sys_msg = crate::llm::Message {
+                    role: "system".to_string(),
+                    content: Some(format!("You are a prompt refinement specialist. Refine the given prompt for {} (domain: {}). Output ONLY the refined prompt text.", req.target_format, req.domain)),
+                    tool_calls: None,
+                    tool_call_id: None,
+                };
+                let user_msg = crate::llm::Message {
+                    role: "user".to_string(),
+                    content: Some(req.original_prompt.clone()),
+                    tool_calls: None,
+                    tool_call_id: None,
+                };
+
+                let provider_used = decision.provider_id.clone();
+
+                match llm.completion(&decision.provider_id, &decision.model, vec![sys_msg, user_msg], None).await {
+                    Ok(content) => {
+                        Ok(PromptForgeRefineResponse {
+                            original_prompt: req.original_prompt.clone(),
+                            refined_prompt: content.content.unwrap_or_default(),
+                            original_score: None,
+                            refined_score: None,
+                            target_agent: req.target_agent.clone(),
+                            target: req.target_format.clone(),
+                            improvements: vec!["Refined by model".to_string()],
+                            warnings: vec![],
+                            provider_used,
+                            mode_used: PromptForgeMode::Model,
+                        })
+                    }
+                    Err(e) => {
+                        if self.pf_config.fail_open {
+                            Ok(PromptForgeRefineResponse {
+                                original_prompt: req.original_prompt.clone(),
+                                refined_prompt: req.original_prompt.clone(),
+                                original_score: None,
+                                refined_score: None,
+                                target_agent: req.target_agent.clone(),
+                                target: req.target_format.clone(),
+                                improvements: vec![],
+                                warnings: vec![format!("Model refinement failed, falling back: {}", e)],
+                                provider_used: "fallback".to_string(),
+                                mode_used: PromptForgeMode::Model,
+                            })
+                        } else {
+                            Err(PromptForgeError { message: e.to_string() })
+                        }
+                    }
+                }
             }
             _ => {
-                if self.config.fail_open {
+                if self.pf_config.fail_open {
                     Ok(PromptForgeRefineResponse {
                         original_prompt: req.original_prompt.clone(),
                         refined_prompt: req.original_prompt.clone(),
@@ -502,7 +560,7 @@ impl PromptForgeClient {
         };
 
         if let Ok(ref response) = res {
-            if self.config.store_history {
+            if self.pf_config.store_history {
                 let entry = PromptForgeHistoryEntry {
                     id: uuid::Uuid::new_v4().to_string(),
                     timestamp: start,
@@ -527,7 +585,7 @@ impl PromptForgeClient {
                 let _ = self.save_history(entry);
             }
         } else if let Err(ref err) = res {
-            if self.config.store_history {
+            if self.pf_config.store_history {
                 let entry = PromptForgeHistoryEntry {
                     id: uuid::Uuid::new_v4().to_string(),
                     timestamp: start,
@@ -615,7 +673,7 @@ impl PromptForgeClient {
             complexity: decision.complexity.clone(),
             safe_context: context.to_string(),
             constraints: vec![],
-            mode: self.config.mode.clone(),
+            mode: self.pf_config.mode.clone(),
         };
 
         match self.refine(req).await {

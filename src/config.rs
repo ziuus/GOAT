@@ -61,7 +61,10 @@ pub struct Config {
     pub llm: LlmConfig,
     /// Per-provider custom settings (OpenRouter, Ollama, etc.).
     #[serde(default)]
-    pub providers: HashMap<String, ProviderCustomConfig>,
+    pub providers: HashMap<String, crate::providers::ModelProviderConfig>,
+    /// Model routing configuration.
+    #[serde(default)]
+    pub model_routing: crate::providers::ModelRoutingConfig,
     /// Model profile configuration.  Optional — built-in defaults used if absent.
     #[serde(default)]
     pub profiles: ProfilesConfig,
@@ -462,31 +465,6 @@ fn default_max_candidates_per_session() -> usize {
 /// enabled  = true
 /// base_url = "http://localhost:11434"
 /// ```
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ProviderCustomConfig {
-    /// Whether this provider is enabled.  Default: true.
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-
-    /// Base URL for the provider's API.
-    /// For Ollama: "http://localhost:11434"
-    /// For OpenRouter: "https://openrouter.ai/api/v1"
-    pub base_url: Option<String>,
-
-    /// Environment variable name containing the API key.
-    /// If not set, uses the standard name for the provider.
-    pub api_key_env: Option<String>,
-}
-
-impl Default for ProviderCustomConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            base_url: None,
-            api_key_env: None,
-        }
-    }
-}
 
 impl Config {
     /// Return the effective base URL for a provider.
@@ -867,10 +845,20 @@ mod tests {
         let mut config = Config::default();
         config.providers.insert(
             "openrouter".to_string(),
-            ProviderCustomConfig {
+            crate::providers::ModelProviderConfig {
+                id: "openrouter".to_string(),
+                name: "OpenRouter".to_string(),
+                kind: crate::providers::ModelProviderKind::Openrouter,
                 enabled: false,
                 base_url: None,
                 api_key_env: None,
+                default_model: "test".to_string(),
+                available_models: vec![],
+                capabilities: crate::providers::ModelCapabilitySet::default(),
+                timeout_secs: 60,
+                local_only: false,
+                privacy_level: "".to_string(),
+                notes: "".to_string(),
             },
         );
         assert!(!config.provider_enabled("openrouter"));
@@ -881,10 +869,20 @@ mod tests {
         let mut config = Config::default();
         config.providers.insert(
             "ollama".to_string(),
-            ProviderCustomConfig {
+            crate::providers::ModelProviderConfig {
+                id: "ollama".to_string(),
+                name: "Ollama".to_string(),
+                kind: crate::providers::ModelProviderKind::Ollama,
                 enabled: true,
                 base_url: Some("http://localhost:11434".to_string()),
                 api_key_env: None,
+                default_model: "test".to_string(),
+                available_models: vec![],
+                capabilities: crate::providers::ModelCapabilitySet::default(),
+                timeout_secs: 60,
+                local_only: true,
+                privacy_level: "".to_string(),
+                notes: "".to_string(),
             },
         );
         assert_eq!(

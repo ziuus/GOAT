@@ -33,6 +33,7 @@ pub mod project;
 pub mod project_profiles;
 pub mod promptforge;
 pub mod provider;
+pub mod providers;
 pub mod quick_access;
 pub mod recipe_marketplace;
 pub mod repo_map;

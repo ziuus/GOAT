@@ -55,6 +55,7 @@ const navGroups = [
     label: "System",
     items: [
       { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
+      { name: 'Providers', href: '/providers', icon: Workflow },
       { name: 'Settings', href: '/settings', icon: Settings },
       { name: 'Logs', href: '/logs', icon: ScrollText },
     ]

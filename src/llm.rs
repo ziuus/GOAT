@@ -96,19 +96,11 @@ pub struct MessageContent {
 // ── LlmRouter ─────────────────────────────────────────────────────────────────
 
 pub struct LlmRouter {
-    client: Client,
-    /// Configuration for LLM retries, timeouts, and fallback policy.
+    pub client: Client,
     pub llm_config: LlmConfig,
-    // ── OpenAI ────────────────────────────────────────────────────────────────
-    pub openai_key: Option<String>,
-    pub openai_base_url: Option<String>,
-    // ── Groq ─────────────────────────────────────────────────────────────────
-    pub groq_key: Option<String>,
-    // ── OpenRouter ────────────────────────────────────────────────────────────
-    pub openrouter_key: Option<String>,
-    pub openrouter_base_url: String,
-    // ── Ollama ────────────────────────────────────────────────────────────────
-    pub ollama_base_url: String,
+    pub registry: crate::providers::ModelProviderRegistry,
+    // We keep config around to resolve API keys dynamically at request time
+    pub config: Config,
 }
 
 impl LlmRouter {
@@ -119,36 +111,16 @@ impl LlmRouter {
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        // OpenAI key — config → env → OpenCode fallback.
-        let mut openai_key = config.provider_api_key("openai");
-        let mut openai_base_url = config.provider_base_url("openai");
-
-        if openai_key.is_none() {
-            if let Some((key, url)) = Config::get_fallback_api_key() {
-                openai_key = Some(key);
-                openai_base_url = Some(url);
-            }
+        let mut registry = crate::providers::ModelProviderRegistry::new(config.model_routing.clone());
+        for (_, p_cfg) in &config.providers {
+            registry.register(p_cfg.clone());
         }
-
-        // OpenRouter defaults.
-        let openrouter_base_url = config
-            .provider_base_url("openrouter")
-            .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-
-        // Ollama defaults.
-        let ollama_base_url = config
-            .provider_base_url("ollama")
-            .unwrap_or_else(|| "http://localhost:11434".to_string());
 
         Self {
             client,
             llm_config: config.llm.clone(),
-            openai_key,
-            openai_base_url,
-            groq_key: config.provider_api_key("groq"),
-            openrouter_key: config.provider_api_key("openrouter"),
-            openrouter_base_url,
-            ollama_base_url,
+            registry,
+            config: config.clone(),
         }
     }
 
@@ -283,194 +255,74 @@ impl LlmRouter {
         messages: Vec<Message>,
         tools: Option<Vec<Tool>>,
     ) -> Result<MessageContent, ProviderError> {
-        match provider {
-            "openai" => self.openai_completion(model, messages, tools).await,
-            "groq" => self.groq_completion(model, messages, tools).await,
-            "openrouter" => self.openrouter_completion(model, messages, tools).await,
-            "ollama" => self.ollama_completion(model, messages, tools).await,
-            other => Err(ProviderError::UnknownProvider {
-                provider: other.to_string(),
-            }),
+        let p_cfg = self.registry.get_provider(provider).ok_or_else(|| ProviderError::UnknownProvider {
+            provider: provider.to_string(),
+        })?;
+
+        // Extract base URL and API key
+        let base_url = p_cfg.base_url.clone().unwrap_or_default();
+        let api_key = self.config.provider_api_key(provider).unwrap_or_default();
+
+        let mut url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+        
+        // OpenRouter needs /api/v1
+        if p_cfg.kind == crate::providers::ModelProviderKind::Openrouter && !url.contains("/api/v1") && !url.contains("/chat/completions") {
+            // we assume openrouter uses openai compatible url if the url is default
+            if url.is_empty() {
+                url = "https://openrouter.ai/api/v1/chat/completions".to_string();
+            }
         }
+        // OpenAI default
+        if p_cfg.kind == crate::providers::ModelProviderKind::Openai && url == "/chat/completions" {
+            url = "https://api.openai.com/v1/chat/completions".to_string();
+        }
+        // Groq default
+        if p_cfg.kind == crate::providers::ModelProviderKind::Groq && url == "/chat/completions" {
+            url = "https://api.groq.com/openai/v1/chat/completions".to_string();
+        }
+
+        self.call_openai_compatible(provider, &url, &api_key, model, messages, tools).await
     }
 
     // ── Provider status helpers ───────────────────────────────────────────────
 
     /// Whether a provider is coded and can receive requests.
     pub fn is_provider_implemented(&self, provider: &str) -> bool {
-        matches!(provider, "openai" | "groq" | "openrouter" | "ollama")
+        self.registry.get_provider(provider).is_some()
     }
 
     /// Whether a provider has a key (or no key needed) and is ready to use.
     pub fn is_provider_available(&self, provider: &str) -> bool {
-        match provider {
-            "openai" => self.openai_key.is_some(),
-            "groq" => self.groq_key.is_some(),
-            "openrouter" => self.openrouter_key.is_some(),
-            "ollama" => true, // local — no key needed; may still fail at call time
-            _ => false,
+        if let Some(p_cfg) = self.registry.get_provider(provider) {
+            if p_cfg.local_only || p_cfg.kind == crate::providers::ModelProviderKind::Ollama {
+                true
+            } else {
+                self.config.provider_api_key(provider).is_some()
+            }
+        } else {
+            false
         }
     }
 
     /// Human-readable status label for a provider (no secrets).
-    pub fn provider_status_label(&self, provider: &str) -> &'static str {
-        match provider {
-            "openai" => {
-                if self.openai_key.is_some() {
-                    "ready"
+    pub fn provider_status_label(&self, provider: &str) -> String {
+        if let Some(p_cfg) = self.registry.get_provider(provider) {
+            if p_cfg.local_only || p_cfg.kind == crate::providers::ModelProviderKind::Ollama {
+                "local (no key required — server must be running)".to_string()
+            } else {
+                if self.config.provider_api_key(provider).is_some() {
+                    "ready".to_string()
                 } else {
-                    "not configured (set OPENAI_API_KEY or openai_api_key in config)"
+                    format!("not configured (set {}_API_KEY in env or config)", provider.to_uppercase())
                 }
             }
-            "groq" => {
-                if self.groq_key.is_some() {
-                    "ready"
-                } else {
-                    "not configured (set GROQ_API_KEY or groq_api_key in config)"
-                }
-            }
-            "openrouter" => {
-                if self.openrouter_key.is_some() {
-                    "ready"
-                } else {
-                    "not configured (set OPENROUTER_API_KEY or openrouter_api_key in config)"
-                }
-            }
-            "ollama" => "local (no key required — server must be running)",
-            "anthropic" => "planned — not implemented",
-            "gemini" => "planned — not implemented",
-            _ => "unknown provider",
+        } else {
+            "unknown provider".to_string()
         }
     }
 
-    // ── Provider implementations ──────────────────────────────────────────────
+    // ── Provider implementations (removed, now uses call_openai_compatible dynamically) ──────────────────────────────────────────────
 
-    async fn openai_completion(
-        &self,
-        model: &str,
-        messages: Vec<Message>,
-        tools: Option<Vec<Tool>>,
-    ) -> Result<MessageContent, ProviderError> {
-        let key = self
-            .openai_key
-            .as_ref()
-            .ok_or(ProviderError::NotConfigured {
-                provider: "openai".to_string(),
-            })?;
-        let base_url = self
-            .openai_base_url
-            .as_deref()
-            .unwrap_or("https://api.openai.com/v1");
-        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-        self.call_openai_compatible("openai", &url, key, model, messages, tools)
-            .await
-    }
-
-    async fn groq_completion(
-        &self,
-        model: &str,
-        messages: Vec<Message>,
-        tools: Option<Vec<Tool>>,
-    ) -> Result<MessageContent, ProviderError> {
-        let key = self.groq_key.as_ref().ok_or(ProviderError::NotConfigured {
-            provider: "groq".to_string(),
-        })?;
-        self.call_openai_compatible(
-            "groq",
-            "https://api.groq.com/openai/v1/chat/completions",
-            key,
-            model,
-            messages,
-            tools,
-        )
-        .await
-    }
-
-    /// OpenRouter — OpenAI-compatible API with required HTTP headers.
-    ///
-    /// OpenRouter requires `HTTP-Referer` and `X-Title` headers for routing.
-    async fn openrouter_completion(
-        &self,
-        model: &str,
-        messages: Vec<Message>,
-        tools: Option<Vec<Tool>>,
-    ) -> Result<MessageContent, ProviderError> {
-        let key = self
-            .openrouter_key
-            .as_ref()
-            .ok_or(ProviderError::NotConfigured {
-                provider: "openrouter".to_string(),
-            })?;
-        let url = format!(
-            "{}/chat/completions",
-            self.openrouter_base_url.trim_end_matches('/')
-        );
-
-        let req_body = OpenAiRequest {
-            model: model.to_string(),
-            messages,
-            tools,
-        };
-
-        let response = self
-            .client
-            .post(&url)
-            .bearer_auth(key)
-            .header("HTTP-Referer", "https://github.com/ziuus/GOAT")
-            .header("X-Title", "GOAT")
-            .json(&req_body)
-            .send()
-            .await
-            .map_err(|e| self.classify_network_error("openrouter", e))?;
-
-        self.parse_openai_response("openrouter", model, response)
-            .await
-    }
-
-    /// Ollama — OpenAI-compatible endpoint at `/v1/chat/completions`.
-    ///
-    /// Ollama must be running locally. No API key required.
-    async fn ollama_completion(
-        &self,
-        model: &str,
-        messages: Vec<Message>,
-        tools: Option<Vec<Tool>>,
-    ) -> Result<MessageContent, ProviderError> {
-        let url = format!(
-            "{}/v1/chat/completions",
-            self.ollama_base_url.trim_end_matches('/')
-        );
-
-        let req_body = OpenAiRequest {
-            model: model.to_string(),
-            messages,
-            // Ollama tool call support varies by model — pass through.
-            tools,
-        };
-
-        let response = self
-            .client
-            .post(&url)
-            .json(&req_body)
-            .send()
-            .await
-            .map_err(|e| {
-                // Connection refused → Ollama is not running.
-                if e.is_connect() {
-                    ProviderError::NetworkError {
-                        provider: "ollama".to_string(),
-                        detail: format!(
-                            "cannot connect to Ollama at {} — is Ollama running?",
-                            self.ollama_base_url
-                        ),
-                    }
-                } else {
-                    self.classify_network_error("ollama", e)
-                }
-            })?;
-
-        self.parse_openai_response("ollama", model, response).await
-    }
 
     // ── Shared HTTP helpers ───────────────────────────────────────────────────
 
