@@ -200,3 +200,25 @@ export const promptforgeApi = {
   getHistory: () => daemonFetch('/v1/promptforge/history').then(r => r.json()),
   refine: (data: any) => daemonFetch('/v1/promptforge/refine', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
 };
+
+export interface DesignerReview {
+  id: string;
+  target_type: string;
+  path_or_url: string;
+  state: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export const designerApi = {
+  getStatus: () => daemonFetch('/v1/designer/status').then(r => r.json()),
+  listReviews: () => daemonFetch('/v1/designer/reviews').then(r => r.json()),
+  createReview: (data: any) => daemonFetch('/v1/designer/reviews', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
+  getReview: (id: string) => daemonFetch(`/v1/designer/reviews/${id}`).then(r => r.json()),
+  scoreReview: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/score`, { method: 'POST' }).then(r => r.json()),
+  checkAccessibility: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/accessibility`, { method: 'POST' }).then(r => r.json()),
+  checkResponsive: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/responsive`, { method: 'POST' }).then(r => r.json()),
+  createPlan: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/plan`, { method: 'POST' }).then(r => r.json()),
+  createHandoff: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/handoff`, { method: 'POST' }).then(r => r.json()),
+  generateReport: (id: string) => daemonFetch(`/v1/designer/reviews/${id}/report`, { method: 'POST' }).then(r => r.json()),
+};

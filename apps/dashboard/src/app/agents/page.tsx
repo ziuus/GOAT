@@ -229,7 +229,35 @@ export default function AgentsPage() {
                     </div>
 
                     {/* Actions */}
-                    {agent.id === "agent-5" ? (
+                    
+                    {agent.id === "agent-6" ? (
+                      <div className="grid grid-cols-2 gap-2 pt-4 border-t border-white/5 mt-auto">
+                        <button 
+                          onClick={() => window.location.href = '/designer'}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-medium transition-colors border border-indigo-500/20"
+                        >
+                          <Zap className="w-3.5 h-3.5" /> Start Review
+                        </button>
+                        <button 
+                          onClick={() => alert(`Reviewing Dashboard`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" /> Review Dashboard
+                        </button>
+                        <button 
+                          onClick={() => alert(`Reviewing Landing Page`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Review Landing
+                        </button>
+                        <button 
+                          onClick={() => window.location.href = '/designer'}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <Workflow className="w-3.5 h-3.5" /> Open Designer
+                        </button>
+                      </div>
+                    ) : agent.id === "agent-5" ? (
                       <div className="grid grid-cols-2 gap-2 pt-4 border-t border-white/5 mt-auto">
                         <button 
                           onClick={() => alert(`Creating new idea`)}

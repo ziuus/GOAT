@@ -3983,6 +3983,76 @@ impl App {
                 true
             }
 
+            "/designer" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = parts.get(0).copied().unwrap_or("list");
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let agent = match crate::agents::designer::DesignerAgent::new() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        self.push_log(format!("[DESIGNER] Init error: {}", e));
+                        return true;
+                    }
+                };
+
+                match subcmd {
+                    "list" => {
+                        if let Ok(revs) = agent.list_reviews() {
+                            self.push_log(format!("[DESIGNER] {} reviews found.", revs.len()));
+                            for r in revs {
+                                self.push_log(format!("  [{}] {} (State: {:?})", r.id, r.title, r.state));
+                            }
+                        }
+                    }
+                    "review" | "dashboard" | "landing" | "onboarding" | "form" | "mobile" => {
+                        let kind = match subcmd {
+                            "dashboard" => crate::agents::designer::DesignerTargetType::Dashboard,
+                            "landing" => crate::agents::designer::DesignerTargetType::LandingPage,
+                            "onboarding" => crate::agents::designer::DesignerTargetType::Onboarding,
+                            "form" => crate::agents::designer::DesignerTargetType::Form,
+                            "mobile" => crate::agents::designer::DesignerTargetType::Mobile,
+                            _ => crate::agents::designer::DesignerTargetType::GeneralUI,
+                        };
+                        match agent.create_review(kind, target, None) {
+                            Ok(rev) => self.push_log(format!("[DESIGNER] Review created: {}", rev.id)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    "accessibility" => {
+                        match agent.run_accessibility_check(target) {
+                            Ok(_) => self.push_log(format!("[DESIGNER] Accessibility check complete for {}", target)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    "responsive" => {
+                        match agent.run_responsive_check(target) {
+                            Ok(_) => self.push_log(format!("[DESIGNER] Responsive check complete for {}", target)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    "plan" => {
+                        match agent.create_improvement_plan(target) {
+                            Ok(_) => self.push_log(format!("[DESIGNER] Improvement plan created for {}", target)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    "handoff" => {
+                        match agent.create_handoff_brief(target) {
+                            Ok(_) => self.push_log(format!("[DESIGNER] Builder handoff created for {}", target)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    "report" => {
+                        match agent.generate_report(target) {
+                            Ok(id) => self.push_log(format!("[DESIGNER] Report generated: {}", id)),
+                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                        }
+                    }
+                    _ => self.push_log(format!("[DESIGNER] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");

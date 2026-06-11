@@ -38,6 +38,15 @@ pub async fn start_server(
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/v1/designer/status", get(designer_status_handler))
+        .route("/v1/designer/reviews", get(designer_list_reviews_handler).post(designer_create_review_handler))
+        .route("/v1/designer/reviews/:id", get(designer_get_review_handler))
+        .route("/v1/designer/reviews/:id/score", post(designer_score_handler))
+        .route("/v1/designer/reviews/:id/accessibility", post(designer_accessibility_handler))
+        .route("/v1/designer/reviews/:id/responsive", post(designer_responsive_handler))
+        .route("/v1/designer/reviews/:id/plan", post(designer_plan_handler))
+        .route("/v1/designer/reviews/:id/handoff", post(designer_handoff_handler))
+        .route("/v1/designer/reviews/:id/report", post(designer_report_handler))
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -3255,3 +3264,102 @@ async fn pf_disable_handler(
     rt.config.promptforge.enabled = false;
     Ok(axum::Json(serde_json::json!({ "status": "success" })))
 }
+// -----------------------------------------------------------------------------
+// Designer Endpoints
+// -----------------------------------------------------------------------------
+
+async fn designer_status_handler() -> impl axum::response::IntoResponse {
+    let mut status = serde_json::Map::new();
+    status.insert("enabled".to_string(), serde_json::Value::Bool(true));
+    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    axum::Json(status)
+}
+
+async fn designer_list_reviews_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let reviews = agent.list_reviews().unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "reviews": reviews })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateDesignerReviewReq {
+    target_type: String,
+    path_or_url: String,
+    description: Option<String>,
+}
+
+async fn designer_create_review_handler(
+    axum::Json(req): axum::Json<CreateDesignerReviewReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let kind = match req.target_type.as_str() {
+        "dashboard" => crate::agents::designer::DesignerTargetType::Dashboard,
+        "landing" => crate::agents::designer::DesignerTargetType::LandingPage,
+        "onboarding" => crate::agents::designer::DesignerTargetType::Onboarding,
+        "form" => crate::agents::designer::DesignerTargetType::Form,
+        "mobile" => crate::agents::designer::DesignerTargetType::Mobile,
+        _ => crate::agents::designer::DesignerTargetType::GeneralUI,
+    };
+    let review = agent.create_review(kind, &req.path_or_url, req.description).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_get_review_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Ok(Some(r)) = agent.get_review(&id) {
+        Ok(axum::Json(serde_json::json!({ "review": r })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn designer_score_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent.run_scorecard(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_accessibility_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent.run_accessibility_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_responsive_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent.run_responsive_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_plan_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent.create_improvement_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_handoff_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent.create_handoff_brief(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "review": review })))
+}
+
+async fn designer_report_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let report_id = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "report_id": report_id })))
+}
+
