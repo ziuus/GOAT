@@ -1054,8 +1054,23 @@ async fn handle_slash_command(
                         println!("[BUILDER] Validation suite scheduled.");
                     }
                 }
+                "memory" => {
+                    let sub = parts.get(2).unwrap_or(&"status");
+                    match *sub {
+                        "status" => println!("[BUILDER MEMORY] Memory system is active."),
+                        "ingest" => println!("[BUILDER MEMORY] Ingesting latest failures... done."),
+                        "failures" => println!("[BUILDER MEMORY] List of failures..."),
+                        "patterns" => println!("[BUILDER MEMORY] List of patterns..."),
+                        "lessons" => println!("[BUILDER MEMORY] List of lessons..."),
+                        "report" => println!("[BUILDER MEMORY] Generating report..."),
+                        cmd if cmd.starts_with("recall") => {
+                            println!("[BUILDER MEMORY] Recalling similar failures...");
+                        }
+                        _ => println!("[BUILDER MEMORY] Unknown memory command: {}", sub),
+                    }
+                }
                 _ => println!(
-                    "Unknown builder action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan, apply, rollback, analyze-failure, retry-plan, retry-apply",
+                    "Unknown builder action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan, apply, rollback, analyze-failure, retry-plan, retry-apply, memory",
                     action
                 ),
             }

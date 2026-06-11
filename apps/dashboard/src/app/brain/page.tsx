@@ -98,6 +98,13 @@ export default function BrainSearchPage() {
       case "memory": return <BrainCircuit className="w-5 h-5 text-blue-400" />;
       case "job": return <TerminalSquare className="w-5 h-5 text-emerald-400" />;
       case "installed": return <Download className="w-5 h-5 text-slate-400" />;
+      case "builder_validation_failure": 
+      case "builder_retry_plan":
+      case "builder_fix_outcome":
+      case "builder_fix_lesson":
+      case "builder_recurring_mistake":
+      case "builder_project_learning":
+        return <BrainCircuit className="w-5 h-5 text-amber-400" />;
       default: return <Database className="w-5 h-5 text-slate-400" />;
     }
   };

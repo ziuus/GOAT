@@ -25,6 +25,7 @@ pub mod error;
 pub mod events;
 pub mod extensions;
 pub mod external_agents;
+pub mod failure_memory;
 pub mod github_workflow;
 pub mod headless;
 pub mod hooks;

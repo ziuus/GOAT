@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { 
   TerminalSquare, FolderTree, AlertTriangle, ShieldCheck, 
-  Play, RotateCcw, FileText, CheckCircle2, Cpu, FileCode2
+  Play, RotateCcw, FileText, CheckCircle2, Cpu, FileCode2, Brain
 } from 'lucide-react';
 
 interface FileSummary {
@@ -394,6 +394,25 @@ export default function BuilderPage() {
             ) : (
               <p className="text-xs text-slate-500">Run repository inspection to scan the workspace and detect tech stack.</p>
             )}
+          </div>
+
+          {/* Builder Memory Panel */}
+          <div className="bg-[#0b0b0c] border border-white/5 rounded-xl p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Brain className="w-4 h-4 text-indigo-400" />
+              Failure Memory
+            </h3>
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500">Recalls similar past failures and successful fixes to avoid repeating mistakes.</p>
+              <div className="flex gap-2">
+                <button className="flex-1 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-medium rounded transition-colors">
+                  Check Known Mistakes
+                </button>
+                <button className="flex-1 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-medium rounded transition-colors">
+                  Generate Report
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Test & Validation Panel */}

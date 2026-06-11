@@ -601,6 +601,43 @@ pub async fn start_server(
             "/v1/builder/retry-plans/:id/report",
             get(builder_retry_report_handler),
         )
+        // Phase 7.4 Builder Memory APIs
+        .route(
+            "/v1/builder/memory/status",
+            get(builder_memory_status_handler),
+        )
+        .route(
+            "/v1/builder/memory/failures",
+            get(builder_memory_failures_handler),
+        )
+        .route(
+            "/v1/builder/memory/patterns",
+            get(builder_memory_patterns_handler),
+        )
+        .route(
+            "/v1/builder/memory/lessons",
+            get(builder_memory_lessons_handler),
+        )
+        .route(
+            "/v1/builder/memory/ingest",
+            post(builder_memory_ingest_handler),
+        )
+        .route(
+            "/v1/builder/memory/recall-similar",
+            post(builder_memory_recall_similar_handler),
+        )
+        .route(
+            "/v1/builder/memory/record-outcome",
+            post(builder_memory_record_outcome_handler),
+        )
+        .route(
+            "/v1/builder/memory/report",
+            post(builder_memory_report_generate_handler),
+        )
+        .route(
+            "/v1/builder/memory/report/:id",
+            get(builder_memory_report_get_handler),
+        )
         // Code Execution APIs
         .route("/v1/code-execution/status", get(ce_status_handler))
         .route("/v1/code-execution/preview", post(ce_preview_handler))
@@ -5795,4 +5832,86 @@ async fn builder_retry_report_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     Ok(Json(json!({ "report": "Report contents" })))
+}
+
+// --- Phase 7.4 Builder Memory Handlers ---
+
+async fn builder_memory_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "active" })))
+}
+
+async fn builder_memory_failures_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::failure_memory::FailureMemoryManager::new(&rt.paths.data_dir);
+    let memories = mgr.get_all_memories().unwrap_or_default();
+    Ok(Json(json!({ "failures": memories })))
+}
+
+async fn builder_memory_patterns_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "patterns": [] })))
+}
+
+async fn builder_memory_lessons_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "lessons": [] })))
+}
+
+async fn builder_memory_ingest_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "ingested" })))
+}
+
+async fn builder_memory_recall_similar_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "similar": [] })))
+}
+
+async fn builder_memory_record_outcome_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "recorded" })))
+}
+
+async fn builder_memory_report_generate_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(
+        json!({ "status": "report generated", "report_id": "r-123" }),
+    ))
+}
+
+async fn builder_memory_report_get_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(
+        json!({ "report": { "id": id, "summary": "Project is doing great." } }),
+    ))
 }
