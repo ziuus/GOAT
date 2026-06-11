@@ -4243,6 +4243,116 @@ impl App {
                 true
             }
 
+            "/learner" | "@learner" | "@learn" | "@study" | "@dsa" | "@ml" | "@rust" | "@web3" | "@today" | "@revise" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = if cmd.starts_with("@") {
+                    cmd.trim_start_matches('@')
+                } else {
+                    parts.get(0).copied().unwrap_or("list")
+                };
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let agent = match crate::agents::learner::LearnerAgent::new() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        self.push_log(format!("[LEARNER] Init error: {}", e));
+                        return true;
+                    }
+                };
+
+                let domain = match subcmd {
+                    "dsa" => crate::agents::learner::LearningDomain::DSA,
+                    "ml" => crate::agents::learner::LearningDomain::AIML,
+                    "rust" => crate::agents::learner::LearningDomain::Rust,
+                    "web3" => crate::agents::learner::LearningDomain::Web3,
+                    _ => crate::agents::learner::LearningDomain::General,
+                };
+
+                match subcmd {
+                    "list" | "learner" => {
+                        if let Ok(goals) = agent.list_goals() {
+                            self.push_log(format!("[LEARNER] {} goals found.", goals.len()));
+                            for g in goals {
+                                self.push_log(format!("  [{}] {} (Domain: {:?})", g.id, g.title, g.domain));
+                            }
+                        }
+                    }
+                    "new-goal" | "learn" | "study" | "dsa" | "ml" | "rust" | "web3" => {
+                        let title = if target.is_empty() { "New Learning Goal" } else { target };
+                        match agent.create_goal(title, domain) {
+                            Ok(g) => self.push_log(format!("[LEARNER] Goal created: {} (Level: {:?})", g.id, g.current_level)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "assess" => {
+                        self.push_log(format!("[LEARNER] Level assessed for goal {}.", target));
+                    }
+                    "roadmap" => {
+                        match agent.create_roadmap(if target.is_empty() { "default" } else { target }) {
+                            Ok(rm) => self.push_log(format!("[LEARNER] Roadmap created with {} phases.", rm.phases.len())),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "week" => {
+                        match agent.generate_weekly_plan(if target.is_empty() { "default" } else { target }) {
+                            Ok(tasks) => self.push_log(format!("[LEARNER] Weekly plan created: {} tasks.", tasks.len())),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "today" => {
+                        match agent.generate_daily_plan(if target.is_empty() { "default" } else { target }) {
+                            Ok(tasks) => self.push_log(format!("[LEARNER] Today's plan: {} tasks.", tasks.len())),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "practice" => {
+                        match agent.generate_practice_task(if target.is_empty() { "default" } else { target }) {
+                            Ok(pt) => self.push_log(format!("[LEARNER] Practice task generated.")),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "revise" => {
+                        let topic = if target.is_empty() { "General Revision" } else { target };
+                        match agent.create_revision_checkpoint("default", topic) {
+                            Ok(cp) => self.push_log(format!("[LEARNER] Revision checkpoint generated for {}.", cp.topic)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "project" => {
+                        match agent.create_project_plan(if target.is_empty() { "default" } else { target }) {
+                            Ok(plan) => self.push_log(format!("[LEARNER] Project plan generated:\n{}", plan)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "exam" => {
+                        match agent.generate_exam_prep(if target.is_empty() { "default" } else { target }) {
+                            Ok(plan) => self.push_log(format!("[LEARNER] Exam prep strategy generated:\n{}", plan)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "progress" => {
+                        match agent.log_progress(if target.is_empty() { "default" } else { target }) {
+                            Ok(pe) => self.push_log(format!("[LEARNER] Progress updated: {} mins spent.", pe.time_spent_minutes)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "report" => {
+                        match agent.generate_report(if target.is_empty() { "default" } else { target }) {
+                            Ok(r) => self.push_log(format!("[LEARNER] Learning report generated: {}", r.id)),
+                            Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
+                        }
+                    }
+                    "show" => {
+                        if let Ok(Some(g)) = agent.get_goal(target) {
+                            self.push_log(format!("[LEARNER] Goal: {} ({:?})", g.title, g.status));
+                        } else {
+                            self.push_log(format!("[LEARNER] Goal not found."));
+                        }
+                    }
+                    _ => self.push_log(format!("[LEARNER] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");

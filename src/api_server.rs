@@ -70,6 +70,19 @@ pub async fn start_server(
         .route("/v1/operator/systems/:id/runbook", post(operator_runbook_handler))
         .route("/v1/operator/systems/:id/reliability", post(operator_reliability_handler))
         .route("/v1/operator/systems/:id/report", post(operator_report_handler))
+        .route("/v1/learner/status", get(learner_status_handler))
+        .route("/v1/learner/goals", get(learner_list_goals_handler).post(learner_create_goal_handler))
+        .route("/v1/learner/goals/:id", get(learner_get_goal_handler))
+        .route("/v1/learner/goals/:id/assess", post(learner_assess_handler))
+        .route("/v1/learner/goals/:id/roadmap", post(learner_roadmap_handler))
+        .route("/v1/learner/goals/:id/week", post(learner_week_handler))
+        .route("/v1/learner/goals/:id/today", post(learner_today_handler))
+        .route("/v1/learner/goals/:id/practice", post(learner_practice_handler))
+        .route("/v1/learner/goals/:id/revise", post(learner_revise_handler))
+        .route("/v1/learner/goals/:id/project", post(learner_project_handler))
+        .route("/v1/learner/goals/:id/exam", post(learner_exam_handler))
+        .route("/v1/learner/goals/:id/progress", post(learner_progress_handler))
+        .route("/v1/learner/goals/:id/report", post(learner_report_handler))
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -3636,6 +3649,135 @@ async fn operator_report_handler(
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let r = agent.create_report(&id, "operator_health_report").map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "report": r })))
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Learner Endpoints
+// -----------------------------------------------------------------------------
+
+async fn learner_status_handler() -> impl axum::response::IntoResponse {
+    let mut status = serde_json::Map::new();
+    status.insert("enabled".to_string(), serde_json::Value::Bool(true));
+    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    axum::Json(status)
+}
+
+async fn learner_list_goals_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let goals = agent.list_goals().unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "goals": goals })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateLearnerGoalReq {
+    title: String,
+    domain: String,
+}
+
+async fn learner_create_goal_handler(
+    axum::Json(req): axum::Json<CreateLearnerGoalReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let domain = match req.domain.as_str() {
+        "DSA" => crate::agents::learner::LearningDomain::DSA,
+        "AIML" => crate::agents::learner::LearningDomain::AIML,
+        "Rust" => crate::agents::learner::LearningDomain::Rust,
+        "Web3" => crate::agents::learner::LearningDomain::Web3,
+        _ => crate::agents::learner::LearningDomain::General,
+    };
+    let g = agent.create_goal(&req.title, domain).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "goal": g })))
+}
+
+async fn learner_get_goal_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Ok(Some(g)) = agent.get_goal(&id) {
+        Ok(axum::Json(serde_json::json!({ "goal": g })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn learner_assess_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "assessed", "goal_id": id })))
+}
+
+async fn learner_roadmap_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rm = agent.create_roadmap(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "roadmap": rm })))
+}
+
+async fn learner_week_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tasks = agent.generate_weekly_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "tasks": tasks })))
+}
+
+async fn learner_today_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tasks = agent.generate_daily_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "tasks": tasks })))
+}
+
+async fn learner_practice_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let pt = agent.generate_practice_task(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "practice_task": pt })))
+}
+
+async fn learner_revise_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let cp = agent.create_revision_checkpoint(&id, "General").map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "checkpoint": cp })))
+}
+
+async fn learner_project_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let p = agent.create_project_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "project_plan": p })))
+}
+
+async fn learner_exam_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let e = agent.generate_exam_prep(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "exam_prep": e })))
+}
+
+async fn learner_progress_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let pe = agent.log_progress(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "progress": pe })))
+}
+
+async fn learner_report_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
 

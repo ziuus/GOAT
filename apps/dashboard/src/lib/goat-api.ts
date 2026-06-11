@@ -255,3 +255,20 @@ export const operatorApi = {
   reliability: (id: string) => daemonFetch(`/v1/operator/systems/${id}/reliability`, { method: "POST" }).then(r => r.json()),
   report: (id: string) => daemonFetch(`/v1/operator/systems/${id}/report`, { method: "POST" }).then(r => r.json()),
 };
+
+export const learnerApi = {
+  getStatus: () => daemonFetch("/v1/learner/status").then(r => r.json()),
+  listGoals: () => daemonFetch("/v1/learner/goals").then(r => r.json()),
+  createGoal: (data: any) => daemonFetch("/v1/learner/goals", { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  getGoal: (id: string) => daemonFetch(`/v1/learner/goals/${id}`).then(r => r.json()),
+  assess: (id: string) => daemonFetch(`/v1/learner/goals/${id}/assess`, { method: "POST" }).then(r => r.json()),
+  roadmap: (id: string) => daemonFetch(`/v1/learner/goals/${id}/roadmap`, { method: "POST" }).then(r => r.json()),
+  week: (id: string) => daemonFetch(`/v1/learner/goals/${id}/week`, { method: "POST" }).then(r => r.json()),
+  today: (id: string) => daemonFetch(`/v1/learner/goals/${id}/today`, { method: "POST" }).then(r => r.json()),
+  practice: (id: string) => daemonFetch(`/v1/learner/goals/${id}/practice`, { method: "POST" }).then(r => r.json()),
+  revise: (id: string) => daemonFetch(`/v1/learner/goals/${id}/revise`, { method: "POST" }).then(r => r.json()),
+  project: (id: string) => daemonFetch(`/v1/learner/goals/${id}/project`, { method: "POST" }).then(r => r.json()),
+  exam: (id: string) => daemonFetch(`/v1/learner/goals/${id}/exam`, { method: "POST" }).then(r => r.json()),
+  progress: (id: string) => daemonFetch(`/v1/learner/goals/${id}/progress`, { method: "POST" }).then(r => r.json()),
+  report: (id: string) => daemonFetch(`/v1/learner/goals/${id}/report`, { method: "POST" }).then(r => r.json()),
+};

@@ -72,6 +72,15 @@ const MOCK_AGENTS = [
     description: "System Health, Logs, Safe Deployments, Rollbacks, and Incident Analysis.",
     domainResponsibilities: ["Deployments", "Rollbacks", "Health Checks"],
     parentPrime: null
+  },
+  {
+    id: "agent-8",
+    name: "Learner Prime",
+    tier: "Prime",
+    status: "active",
+    description: "Structured Learning Plans, DSA/AI/Rust/Web3 Roadmaps, and Practice Tasks.",
+    domainResponsibilities: ["Learning", "Roadmaps", "Practice"],
+    parentPrime: null
   }
 ];
 

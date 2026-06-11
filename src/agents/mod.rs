@@ -5,6 +5,7 @@ pub mod socializer;
 pub mod designer;
 pub mod researcher;
 pub mod operator;
+pub mod learner;
 
 pub use manifest::*;
 pub use registry::*;
@@ -12,3 +13,4 @@ pub use cofounder::*;
 pub use socializer::*;
 pub use researcher::*;
 pub use operator::*;
+pub use learner::*;
