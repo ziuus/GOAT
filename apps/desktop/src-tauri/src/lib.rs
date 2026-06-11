@@ -43,6 +43,7 @@ pub fn run() {
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::TrayIconBuilder;
+                use tauri::Manager;
 
                 // Simple scaffold for menu items
                 let show_i = MenuItem::with_id(app, "show", "Show GOAT", true, None::<&str>)?;
@@ -84,7 +85,7 @@ pub fn run() {
 
 #[tauri::command]
 fn get_app_version() -> String {
-    "0.13.0".to_string()
+    "0.14.0-alpha.1".to_string()
 }
 
 #[tauri::command]

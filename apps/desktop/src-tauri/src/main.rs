@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    goat_desktop_lib::run()
+    goat_desktop::run()
 }
