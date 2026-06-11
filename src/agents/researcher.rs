@@ -1,10 +1,10 @@
+use crate::paths::GoatPaths;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use anyhow::Result;
-use crate::paths::GoatPaths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ResearchWorkflowState {
@@ -189,7 +189,9 @@ pub struct ResearcherAgent {
 
 impl Default for ResearcherAgent {
     fn default() -> Self {
-        Self::new().unwrap_or_else(|_| Self { topics_dir: PathBuf::new() })
+        Self::new().unwrap_or_else(|_| Self {
+            topics_dir: PathBuf::new(),
+        })
     }
 }
 
@@ -354,7 +356,11 @@ impl ResearcherAgent {
             .append(true)
             .open(self.sources_file())?;
         use std::io::Write;
-        writeln!(file, "{}", serde_json::to_string(&(topic_id.to_string(), source.clone()))?)?;
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&(topic_id.to_string(), source.clone()))?
+        )?;
 
         Ok(source)
     }
@@ -394,7 +400,11 @@ impl ResearcherAgent {
             .append(true)
             .open(self.evidence_notes_file())?;
         use std::io::Write;
-        writeln!(file, "{}", serde_json::to_string(&(topic_id.to_string(), note.clone()))?)?;
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&(topic_id.to_string(), note.clone()))?
+        )?;
 
         Ok(note)
     }

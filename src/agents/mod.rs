@@ -1,16 +1,16 @@
-pub mod manifest;
-pub mod registry;
 pub mod cofounder;
-pub mod socializer;
 pub mod designer;
-pub mod researcher;
-pub mod operator;
 pub mod learner;
+pub mod manifest;
+pub mod operator;
+pub mod registry;
+pub mod researcher;
+pub mod socializer;
 
-pub use manifest::*;
-pub use registry::*;
 pub use cofounder::*;
-pub use socializer::*;
-pub use researcher::*;
-pub use operator::*;
 pub use learner::*;
+pub use manifest::*;
+pub use operator::*;
+pub use registry::*;
+pub use researcher::*;
+pub use socializer::*;

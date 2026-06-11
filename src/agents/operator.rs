@@ -1,10 +1,10 @@
+use crate::paths::GoatPaths;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use anyhow::Result;
-use crate::paths::GoatPaths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum OperatorWorkflowState {
@@ -248,7 +248,12 @@ impl OperatorAgent {
         Ok(systems.into_iter().find(|s| s.id == id))
     }
 
-    pub fn create_system(&self, name: &str, system_type: &str, environment: &str) -> Result<OperatorSystem> {
+    pub fn create_system(
+        &self,
+        name: &str,
+        system_type: &str,
+        environment: &str,
+    ) -> Result<OperatorSystem> {
         let mut systems = self.list_systems()?;
         let sys = OperatorSystem {
             id: Uuid::new_v4().to_string(),
@@ -273,7 +278,8 @@ impl OperatorAgent {
     }
 
     pub fn create_health_check(&self, system_id: &str) -> Result<OperatorHealthCheck> {
-        let mut checks: Vec<OperatorHealthCheck> = self.read_jsonl("health_checks.jsonl").unwrap_or_default();
+        let mut checks: Vec<OperatorHealthCheck> =
+            self.read_jsonl("health_checks.jsonl").unwrap_or_default();
         let hc = OperatorHealthCheck {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -295,7 +301,8 @@ impl OperatorAgent {
     }
 
     pub fn create_log_finding(&self, system_id: &str) -> Result<OperatorLogFinding> {
-        let mut finds: Vec<OperatorLogFinding> = self.read_jsonl("log_findings.jsonl").unwrap_or_default();
+        let mut finds: Vec<OperatorLogFinding> =
+            self.read_jsonl("log_findings.jsonl").unwrap_or_default();
         let finding = OperatorLogFinding {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -316,7 +323,8 @@ impl OperatorAgent {
     }
 
     pub fn create_incident(&self, system_id: &str) -> Result<OperatorIncident> {
-        let mut incs: Vec<OperatorIncident> = self.read_jsonl("incidents.jsonl").unwrap_or_default();
+        let mut incs: Vec<OperatorIncident> =
+            self.read_jsonl("incidents.jsonl").unwrap_or_default();
         let inc = OperatorIncident {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -340,7 +348,9 @@ impl OperatorAgent {
     }
 
     pub fn create_deployment_plan(&self, system_id: &str) -> Result<OperatorDeploymentPlan> {
-        let mut plans: Vec<OperatorDeploymentPlan> = self.read_jsonl("deployment_plans.jsonl").unwrap_or_default();
+        let mut plans: Vec<OperatorDeploymentPlan> = self
+            .read_jsonl("deployment_plans.jsonl")
+            .unwrap_or_default();
         let plan = OperatorDeploymentPlan {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -363,7 +373,8 @@ impl OperatorAgent {
     }
 
     pub fn create_ci_review(&self, system_id: &str) -> Result<OperatorCiCdReview> {
-        let mut revs: Vec<OperatorCiCdReview> = self.read_jsonl("ci_reviews.jsonl").unwrap_or_default();
+        let mut revs: Vec<OperatorCiCdReview> =
+            self.read_jsonl("ci_reviews.jsonl").unwrap_or_default();
         let rev = OperatorCiCdReview {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -384,7 +395,8 @@ impl OperatorAgent {
     }
 
     pub fn create_rollback_plan(&self, system_id: &str) -> Result<OperatorRollbackPlan> {
-        let mut plans: Vec<OperatorRollbackPlan> = self.read_jsonl("rollback_plans.jsonl").unwrap_or_default();
+        let mut plans: Vec<OperatorRollbackPlan> =
+            self.read_jsonl("rollback_plans.jsonl").unwrap_or_default();
         let plan = OperatorRollbackPlan {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
@@ -418,7 +430,9 @@ impl OperatorAgent {
             deployment_procedure: "npm run deploy".to_string(),
             rollback_procedure: "npm run rollback".to_string(),
             escalation_notes: "Call on-call engineer".to_string(),
-            safety_warnings: vec!["Do NOT run migrations directly on prod db without approval".to_string()],
+            safety_warnings: vec![
+                "Do NOT run migrations directly on prod db without approval".to_string(),
+            ],
             created_at: chrono::Utc::now().timestamp() as u64,
         };
         books.push(book.clone());

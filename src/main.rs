@@ -1,3 +1,4 @@
+pub mod agent_collaboration;
 pub mod agent_profiles;
 pub mod agents;
 pub mod api_server;

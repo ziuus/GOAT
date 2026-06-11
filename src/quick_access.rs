@@ -39,8 +39,8 @@ impl QuickAccessParser {
                             format!("/cofounder {}", args)
                         }
                     }
-                    "socializer" | "designer" | "researcher" | "builder"
-                    | "operator" | "learner" | "finance" | "reddit" | "ui" | "reviewer" => {
+                    "socializer" | "designer" | "researcher" | "builder" | "operator"
+                    | "learner" | "finance" | "reddit" | "ui" | "reviewer" => {
                         if args.is_empty() {
                             format!("/agents show {}", cmd)
                         } else {

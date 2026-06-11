@@ -469,6 +469,24 @@ fn all_commands() -> Vec<CommandMetadata> {
             related: None,
         },
         CommandMetadata {
+            name: "/collab",
+            aliases: &["@collab", "@team", "@handoff", "@workflow", "@agentflow"],
+            category: CommandCategory::System,
+            description: "Prime Agent Collaboration Layer",
+            usage: "/collab [list | new | plan <goal> | show <id> | start <id> | step <id> | pause <id> | resume <id> | cancel <id> | handoffs <id> | report <id>]",
+            examples: &[
+                "/collab list",
+                "/collab plan \"launch startup\"",
+                "@team \"make GOAT launch-ready\"",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            status: CommandStatus::Working,
+            risk: CommandRisk::Low,
+            related: None,
+        },
+        CommandMetadata {
             name: "/promptforge",
             aliases: &["\\pf", "\\refine"],
             category: CommandCategory::System,
@@ -487,7 +505,7 @@ fn all_commands() -> Vec<CommandMetadata> {
             risk: CommandRisk::Low,
             related: None,
         },
-// ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
+        // ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
         CommandMetadata {
             name: "/mode",
             aliases: &[

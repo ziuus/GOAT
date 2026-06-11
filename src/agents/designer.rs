@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -173,7 +173,12 @@ impl DesignerAgent {
         Ok(())
     }
 
-    pub fn create_review(&self, target_type: DesignerTargetType, path: &str, desc: Option<String>) -> Result<DesignerReview> {
+    pub fn create_review(
+        &self,
+        target_type: DesignerTargetType,
+        path: &str,
+        desc: Option<String>,
+    ) -> Result<DesignerReview> {
         let review = DesignerReview {
             id: Uuid::new_v4().to_string(),
             title: format!("{:?} Review: {}", target_type, path),
@@ -197,10 +202,12 @@ impl DesignerAgent {
     }
 
     pub fn run_scorecard(&self, review_id: &str) -> Result<DesignerReview> {
-        let mut rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let mut rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         rev.state = DesignerWorkflowState::Scoring;
         rev.updated_at = Utc::now().to_rfc3339();
-        
+
         let scorecard = DesignerScorecard {
             clarity: 4,
             visual_hierarchy: 3,
@@ -216,7 +223,11 @@ impl DesignerAgent {
             empty_error_states: 2,
             total_score: 3.0,
             strongest_areas: vec!["Typography".into(), "Clarity".into()],
-            weakest_areas: vec!["Accessibility".into(), "Empty States".into(), "Responsiveness".into()],
+            weakest_areas: vec![
+                "Accessibility".into(),
+                "Empty States".into(),
+                "Responsiveness".into(),
+            ],
         };
         rev.scorecard = Some(scorecard);
         self.save_review(&rev)?;
@@ -224,7 +235,9 @@ impl DesignerAgent {
     }
 
     pub fn run_accessibility_check(&self, review_id: &str) -> Result<DesignerReview> {
-        let mut rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let mut rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         rev.state = DesignerWorkflowState::AccessibilityCheck;
         rev.updated_at = Utc::now().to_rfc3339();
 
@@ -242,7 +255,9 @@ impl DesignerAgent {
     }
 
     pub fn run_responsive_check(&self, review_id: &str) -> Result<DesignerReview> {
-        let mut rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let mut rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         rev.updated_at = Utc::now().to_rfc3339();
 
         rev.issues.push(DesignerIssue {
@@ -250,7 +265,8 @@ impl DesignerAgent {
             severity: DesignerIssueSeverity::Medium,
             category: "responsive".to_string(),
             description: "Data table overflows screen on mobile widths.".to_string(),
-            suggestion: "Wrap table in overflow-x-auto or use card-based mobile layout.".to_string(),
+            suggestion: "Wrap table in overflow-x-auto or use card-based mobile layout."
+                .to_string(),
             element_ref: Some("Main Dashboard View".to_string()),
         });
 
@@ -259,15 +275,22 @@ impl DesignerAgent {
     }
 
     pub fn create_improvement_plan(&self, review_id: &str) -> Result<DesignerReview> {
-        let mut rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let mut rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         rev.state = DesignerWorkflowState::Planning;
         rev.updated_at = Utc::now().to_rfc3339();
 
         let plan = DesignerImprovementPlan {
             review_id: rev.id.clone(),
-            quick_wins: vec!["Add aria-labels to icons".into(), "Fix contrast on secondary text".into()],
+            quick_wins: vec![
+                "Add aria-labels to icons".into(),
+                "Fix contrast on secondary text".into(),
+            ],
             medium_improvements: vec!["Make data tables scrollable on mobile".into()],
-            larger_redesigns: vec!["Refactor dashboard sidebar to collapsible drawer for mobile".into()],
+            larger_redesigns: vec![
+                "Refactor dashboard sidebar to collapsible drawer for mobile".into(),
+            ],
             files_involved: vec!["apps/dashboard/src/app/page.tsx".into()],
             non_goals: vec!["Do not rewrite the entire theme system".into()],
             acceptance_criteria: vec!["Mobile view passes standard accessibility testing".into()],
@@ -280,7 +303,9 @@ impl DesignerAgent {
     }
 
     pub fn create_handoff_brief(&self, review_id: &str) -> Result<DesignerReview> {
-        let mut rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let mut rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         rev.state = DesignerWorkflowState::HandoffReady;
         rev.updated_at = Utc::now().to_rfc3339();
 
@@ -288,14 +313,41 @@ impl DesignerAgent {
             review_id: rev.id.clone(),
             goal: "Improve accessibility and mobile responsiveness of dashboard".to_string(),
             target_files: vec!["apps/dashboard/src/components/layout.tsx".into()],
-            current_issues: vec!["Missing ARIA labels", "Table overflow"].into_iter().map(String::from).collect(),
-            exact_ui_changes: vec!["Add overflow-x-auto to table wrappers", "Add aria-label to sidebar toggles"].into_iter().map(String::from).collect(),
-            constraints: vec!["Do not break existing layouts on desktop"].into_iter().map(String::from).collect(),
-            non_goals: vec!["No new dependencies"].into_iter().map(String::from).collect(),
-            accessibility_requirements: vec!["WCAG AA contrast", "Keyboard navigation"].into_iter().map(String::from).collect(),
-            responsive_requirements: vec!["Functional down to 320px width"].into_iter().map(String::from).collect(),
-            empty_error_states: vec!["Ensure empty tables display a placeholder"].into_iter().map(String::from).collect(),
-            acceptance_criteria: vec!["Build passes", "No new lint errors"].into_iter().map(String::from).collect(),
+            current_issues: vec!["Missing ARIA labels", "Table overflow"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            exact_ui_changes: vec![
+                "Add overflow-x-auto to table wrappers",
+                "Add aria-label to sidebar toggles",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            constraints: vec!["Do not break existing layouts on desktop"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            non_goals: vec!["No new dependencies"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            accessibility_requirements: vec!["WCAG AA contrast", "Keyboard navigation"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            responsive_requirements: vec!["Functional down to 320px width"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            empty_error_states: vec!["Ensure empty tables display a placeholder"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            acceptance_criteria: vec!["Build passes", "No new lint errors"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
         };
 
         rev.handoff_brief = Some(brief);
@@ -304,9 +356,11 @@ impl DesignerAgent {
     }
 
     pub fn generate_report(&self, review_id: &str) -> Result<String> {
-        let rev = self.get_review(review_id)?.ok_or_else(|| anyhow!("Review not found"))?;
+        let rev = self
+            .get_review(review_id)?
+            .ok_or_else(|| anyhow!("Review not found"))?;
         let report_id = Uuid::new_v4().to_string();
-        
+
         let mut body = format!("# Designer Report: {}\n\n", rev.title);
         body.push_str(&format!("**Target:** {}\n", rev.target.path_or_url));
         if let Some(desc) = &rev.target.description {
@@ -321,13 +375,19 @@ impl DesignerAgent {
 
         body.push_str("\n## Issues\n");
         for issue in &rev.issues {
-            body.push_str(&format!("- [{:?}] {}: {} -> {}\n", issue.severity, issue.category, issue.description, issue.suggestion));
+            body.push_str(&format!(
+                "- [{:?}] {}: {} -> {}\n",
+                issue.severity, issue.category, issue.description, issue.suggestion
+            ));
         }
 
         if let Some(plan) = &rev.improvement_plan {
             body.push_str("\n## Improvement Plan\n");
             body.push_str(&format!("- Quick Wins: {:?}\n", plan.quick_wins));
-            body.push_str(&format!("- Medium Improvements: {:?}\n", plan.medium_improvements));
+            body.push_str(&format!(
+                "- Medium Improvements: {:?}\n",
+                plan.medium_improvements
+            ));
         }
 
         if let Some(brief) = &rev.handoff_brief {
@@ -343,7 +403,7 @@ impl DesignerAgent {
         }
         let out_file = report_path.join(format!("{}.md", report_id));
         fs::write(&out_file, body)?;
-        
+
         Ok(report_id)
     }
 }

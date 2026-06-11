@@ -1,10 +1,10 @@
+use crate::paths::GoatPaths;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use anyhow::Result;
-use crate::paths::GoatPaths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum LearningDomain {
@@ -219,23 +219,23 @@ impl LearnerAgent {
     }
 
     pub fn create_roadmap(&self, goal_id: &str) -> Result<LearningRoadmap> {
-        let mut roadmaps: Vec<LearningRoadmap> = self.read_jsonl("roadmaps.jsonl").unwrap_or_default();
+        let mut roadmaps: Vec<LearningRoadmap> =
+            self.read_jsonl("roadmaps.jsonl").unwrap_or_default();
         let roadmap = LearningRoadmap {
             id: Uuid::new_v4().to_string(),
             goal_id: goal_id.to_string(),
-            phases: vec![
-                LearningPhase {
-                    title: "Phase 1: Foundations".to_string(),
-                    description: "Establish core concepts without burnout.".to_string(),
-                    modules: vec![
-                        LearningModule {
-                            title: "Introductory Concepts".to_string(),
-                            estimated_hours: 5,
-                            objectives: vec!["Understand basics".to_string(), "Setup environment".to_string()],
-                        }
+            phases: vec![LearningPhase {
+                title: "Phase 1: Foundations".to_string(),
+                description: "Establish core concepts without burnout.".to_string(),
+                modules: vec![LearningModule {
+                    title: "Introductory Concepts".to_string(),
+                    estimated_hours: 5,
+                    objectives: vec![
+                        "Understand basics".to_string(),
+                        "Setup environment".to_string(),
                     ],
-                }
-            ],
+                }],
+            }],
             created_at: chrono::Utc::now().timestamp() as u64,
         };
         roadmaps.push(roadmap.clone());
@@ -263,29 +263,28 @@ impl LearnerAgent {
                 task_type: "practice".to_string(),
                 difficulty: LearningDifficulty::Beginner,
                 status: "pending".to_string(),
-            }
+            },
         ];
         // In a real app we'd append to tasks.jsonl
         Ok(tasks)
     }
 
     pub fn generate_daily_plan(&self, goal_id: &str) -> Result<Vec<LearningTask>> {
-        let tasks = vec![
-            LearningTask {
-                id: Uuid::new_v4().to_string(),
-                goal_id: goal_id.to_string(),
-                title: "1-hour concentrated study".to_string(),
-                description: "Focus on one module".to_string(),
-                task_type: "study".to_string(),
-                difficulty: LearningDifficulty::Beginner,
-                status: "pending".to_string(),
-            }
-        ];
+        let tasks = vec![LearningTask {
+            id: Uuid::new_v4().to_string(),
+            goal_id: goal_id.to_string(),
+            title: "1-hour concentrated study".to_string(),
+            description: "Focus on one module".to_string(),
+            task_type: "study".to_string(),
+            difficulty: LearningDifficulty::Beginner,
+            status: "pending".to_string(),
+        }];
         Ok(tasks)
     }
 
     pub fn generate_practice_task(&self, goal_id: &str) -> Result<PracticeTask> {
-        let mut tasks: Vec<PracticeTask> = self.read_jsonl("practice_tasks.jsonl").unwrap_or_default();
+        let mut tasks: Vec<PracticeTask> =
+            self.read_jsonl("practice_tasks.jsonl").unwrap_or_default();
         let pt = PracticeTask {
             id: Uuid::new_v4().to_string(),
             goal_id: goal_id.to_string(),
@@ -300,8 +299,14 @@ impl LearnerAgent {
         Ok(pt)
     }
 
-    pub fn create_revision_checkpoint(&self, goal_id: &str, topic: &str) -> Result<RevisionCheckpoint> {
-        let mut cps: Vec<RevisionCheckpoint> = self.read_jsonl("revision_checkpoints.jsonl").unwrap_or_default();
+    pub fn create_revision_checkpoint(
+        &self,
+        goal_id: &str,
+        topic: &str,
+    ) -> Result<RevisionCheckpoint> {
+        let mut cps: Vec<RevisionCheckpoint> = self
+            .read_jsonl("revision_checkpoints.jsonl")
+            .unwrap_or_default();
         let cp = RevisionCheckpoint {
             id: Uuid::new_v4().to_string(),
             goal_id: goal_id.to_string(),

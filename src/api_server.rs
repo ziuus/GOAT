@@ -39,50 +39,177 @@ pub async fn start_server(
 
     let app = Router::new()
         .route("/v1/designer/status", get(designer_status_handler))
-        .route("/v1/designer/reviews", get(designer_list_reviews_handler).post(designer_create_review_handler))
+        .route(
+            "/v1/designer/reviews",
+            get(designer_list_reviews_handler).post(designer_create_review_handler),
+        )
         .route("/v1/designer/reviews/:id", get(designer_get_review_handler))
-        .route("/v1/designer/reviews/:id/score", post(designer_score_handler))
-        .route("/v1/designer/reviews/:id/accessibility", post(designer_accessibility_handler))
-        .route("/v1/designer/reviews/:id/responsive", post(designer_responsive_handler))
+        .route(
+            "/v1/designer/reviews/:id/score",
+            post(designer_score_handler),
+        )
+        .route(
+            "/v1/designer/reviews/:id/accessibility",
+            post(designer_accessibility_handler),
+        )
+        .route(
+            "/v1/designer/reviews/:id/responsive",
+            post(designer_responsive_handler),
+        )
         .route("/v1/designer/reviews/:id/plan", post(designer_plan_handler))
-        .route("/v1/designer/reviews/:id/handoff", post(designer_handoff_handler))
-        .route("/v1/designer/reviews/:id/report", post(designer_report_handler))
+        .route(
+            "/v1/designer/reviews/:id/handoff",
+            post(designer_handoff_handler),
+        )
+        .route(
+            "/v1/designer/reviews/:id/report",
+            post(designer_report_handler),
+        )
         .route("/v1/researcher/status", get(researcher_status_handler))
-        .route("/v1/researcher/topics", get(researcher_list_topics_handler).post(researcher_create_topic_handler))
-        .route("/v1/researcher/topics/:id", get(researcher_get_topic_handler))
-        .route("/v1/researcher/topics/:id/plan", post(researcher_plan_handler))
-        .route("/v1/researcher/topics/:id/sources", get(researcher_list_sources_handler).post(researcher_add_source_handler))
-        .route("/v1/researcher/topics/:id/notes", get(researcher_list_notes_handler).post(researcher_add_note_handler))
-        .route("/v1/researcher/topics/:id/competitors", post(researcher_competitors_handler))
-        .route("/v1/researcher/topics/:id/compare", post(researcher_compare_handler))
-        .route("/v1/researcher/topics/:id/market", post(researcher_market_handler))
-        .route("/v1/researcher/topics/:id/brief", post(researcher_brief_handler))
-        .route("/v1/researcher/topics/:id/report", post(researcher_report_handler))
+        .route(
+            "/v1/researcher/topics",
+            get(researcher_list_topics_handler).post(researcher_create_topic_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id",
+            get(researcher_get_topic_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/plan",
+            post(researcher_plan_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/sources",
+            get(researcher_list_sources_handler).post(researcher_add_source_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/notes",
+            get(researcher_list_notes_handler).post(researcher_add_note_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/competitors",
+            post(researcher_competitors_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/compare",
+            post(researcher_compare_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/market",
+            post(researcher_market_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/brief",
+            post(researcher_brief_handler),
+        )
+        .route(
+            "/v1/researcher/topics/:id/report",
+            post(researcher_report_handler),
+        )
         .route("/v1/operator/status", get(operator_status_handler))
-        .route("/v1/operator/systems", get(operator_list_systems_handler).post(operator_create_system_handler))
+        .route(
+            "/v1/operator/systems",
+            get(operator_list_systems_handler).post(operator_create_system_handler),
+        )
         .route("/v1/operator/systems/:id", get(operator_get_system_handler))
-        .route("/v1/operator/systems/:id/health", post(operator_health_handler))
+        .route(
+            "/v1/operator/systems/:id/health",
+            post(operator_health_handler),
+        )
         .route("/v1/operator/systems/:id/logs", post(operator_logs_handler))
-        .route("/v1/operator/systems/:id/incident", post(operator_incident_handler))
-        .route("/v1/operator/systems/:id/deploy-plan", post(operator_deploy_plan_handler))
+        .route(
+            "/v1/operator/systems/:id/incident",
+            post(operator_incident_handler),
+        )
+        .route(
+            "/v1/operator/systems/:id/deploy-plan",
+            post(operator_deploy_plan_handler),
+        )
         .route("/v1/operator/systems/:id/ci", post(operator_ci_handler))
-        .route("/v1/operator/systems/:id/rollback", post(operator_rollback_handler))
-        .route("/v1/operator/systems/:id/runbook", post(operator_runbook_handler))
-        .route("/v1/operator/systems/:id/reliability", post(operator_reliability_handler))
-        .route("/v1/operator/systems/:id/report", post(operator_report_handler))
+        .route(
+            "/v1/operator/systems/:id/rollback",
+            post(operator_rollback_handler),
+        )
+        .route(
+            "/v1/operator/systems/:id/runbook",
+            post(operator_runbook_handler),
+        )
+        .route(
+            "/v1/operator/systems/:id/reliability",
+            post(operator_reliability_handler),
+        )
+        .route(
+            "/v1/operator/systems/:id/report",
+            post(operator_report_handler),
+        )
         .route("/v1/learner/status", get(learner_status_handler))
-        .route("/v1/learner/goals", get(learner_list_goals_handler).post(learner_create_goal_handler))
+        .route(
+            "/v1/learner/goals",
+            get(learner_list_goals_handler).post(learner_create_goal_handler),
+        )
         .route("/v1/learner/goals/:id", get(learner_get_goal_handler))
         .route("/v1/learner/goals/:id/assess", post(learner_assess_handler))
-        .route("/v1/learner/goals/:id/roadmap", post(learner_roadmap_handler))
+        .route(
+            "/v1/learner/goals/:id/roadmap",
+            post(learner_roadmap_handler),
+        )
         .route("/v1/learner/goals/:id/week", post(learner_week_handler))
         .route("/v1/learner/goals/:id/today", post(learner_today_handler))
-        .route("/v1/learner/goals/:id/practice", post(learner_practice_handler))
+        .route(
+            "/v1/learner/goals/:id/practice",
+            post(learner_practice_handler),
+        )
         .route("/v1/learner/goals/:id/revise", post(learner_revise_handler))
-        .route("/v1/learner/goals/:id/project", post(learner_project_handler))
+        .route(
+            "/v1/learner/goals/:id/project",
+            post(learner_project_handler),
+        )
         .route("/v1/learner/goals/:id/exam", post(learner_exam_handler))
-        .route("/v1/learner/goals/:id/progress", post(learner_progress_handler))
+        .route(
+            "/v1/learner/goals/:id/progress",
+            post(learner_progress_handler),
+        )
         .route("/v1/learner/goals/:id/report", post(learner_report_handler))
+        .route(
+            "/v1/collaboration/status",
+            get(collaboration_status_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions",
+            get(collaboration_list_sessions_handler).post(collaboration_create_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id",
+            get(collaboration_get_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/start",
+            post(collaboration_start_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/step",
+            post(collaboration_step_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/pause",
+            post(collaboration_pause_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/resume",
+            post(collaboration_resume_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/cancel",
+            post(collaboration_cancel_session_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/handoffs",
+            get(collaboration_handoffs_handler),
+        )
+        .route(
+            "/v1/collaboration/sessions/:id/report",
+            post(collaboration_report_handler),
+        )
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -330,29 +457,95 @@ pub async fn start_server(
         // ── Phase 5.16: Agents ──────────────────────────────────────────────
         .route("/v1/agents", get(agents_list_handler))
         .route("/v1/cofounder/status", get(cofounder_status_handler))
-        .route("/v1/cofounder/ideas", get(cofounder_ideas_handler).post(cofounder_idea_create_handler))
-        .route("/v1/cofounder/ideas/:id", get(cofounder_idea_detail_handler))
-        .route("/v1/cofounder/ideas/:id/validate", post(cofounder_idea_validate_handler))
-        .route("/v1/cofounder/ideas/:id/score", post(cofounder_idea_score_handler))
-        .route("/v1/cofounder/ideas/:id/mvp", post(cofounder_idea_mvp_handler))
-        .route("/v1/cofounder/ideas/:id/competitors", post(cofounder_idea_competitors_handler))
-        .route("/v1/cofounder/ideas/:id/landing", post(cofounder_idea_landing_handler))
-        .route("/v1/cofounder/ideas/:id/outreach", post(cofounder_idea_outreach_handler))
-        .route("/v1/cofounder/ideas/:id/report", post(cofounder_idea_report_handler))
+        .route(
+            "/v1/cofounder/ideas",
+            get(cofounder_ideas_handler).post(cofounder_idea_create_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id",
+            get(cofounder_idea_detail_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/validate",
+            post(cofounder_idea_validate_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/score",
+            post(cofounder_idea_score_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/mvp",
+            post(cofounder_idea_mvp_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/competitors",
+            post(cofounder_idea_competitors_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/landing",
+            post(cofounder_idea_landing_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/outreach",
+            post(cofounder_idea_outreach_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/report",
+            post(cofounder_idea_report_handler),
+        )
         .route("/v1/socializer/status", get(socializer_status_handler))
-        .route("/v1/socializer/campaigns", get(socializer_campaigns_handler).post(socializer_campaign_create_handler))
-        .route("/v1/socializer/campaigns/:id", get(socializer_campaign_detail_handler))
-        .route("/v1/socializer/campaigns/:id/audience", post(socializer_campaign_audience_handler))
-        .route("/v1/socializer/campaigns/:id/channels", post(socializer_campaign_channels_handler))
-        .route("/v1/socializer/campaigns/:id/angles", post(socializer_campaign_angles_handler))
-        .route("/v1/socializer/campaigns/:id/reddit", post(socializer_campaign_reddit_handler))
-        .route("/v1/socializer/campaigns/:id/linkedin", post(socializer_campaign_linkedin_handler))
-        .route("/v1/socializer/campaigns/:id/x", post(socializer_campaign_x_handler))
-        .route("/v1/socializer/campaigns/:id/launch", post(socializer_campaign_launch_handler))
-        .route("/v1/socializer/campaigns/:id/calendar", post(socializer_campaign_calendar_handler))
-        .route("/v1/socializer/campaigns/:id/outreach", post(socializer_campaign_outreach_handler))
-        .route("/v1/socializer/campaigns/:id/feedback", post(socializer_campaign_feedback_handler))
-        .route("/v1/socializer/campaigns/:id/report", post(socializer_campaign_report_handler))
+        .route(
+            "/v1/socializer/campaigns",
+            get(socializer_campaigns_handler).post(socializer_campaign_create_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id",
+            get(socializer_campaign_detail_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/audience",
+            post(socializer_campaign_audience_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/channels",
+            post(socializer_campaign_channels_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/angles",
+            post(socializer_campaign_angles_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/reddit",
+            post(socializer_campaign_reddit_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/linkedin",
+            post(socializer_campaign_linkedin_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/x",
+            post(socializer_campaign_x_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/launch",
+            post(socializer_campaign_launch_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/calendar",
+            post(socializer_campaign_calendar_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/outreach",
+            post(socializer_campaign_outreach_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/feedback",
+            post(socializer_campaign_feedback_handler),
+        )
+        .route(
+            "/v1/socializer/campaigns/:id/report",
+            post(socializer_campaign_report_handler),
+        )
         .route("/v1/promptforge/status", get(pf_status_handler))
         .route("/v1/promptforge/doctor", get(pf_doctor_handler))
         .route("/v1/promptforge/config", get(pf_config_handler))
@@ -2876,7 +3069,12 @@ async fn cofounder_ideas_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     let ideas = mgr.list_ideas();
     Ok(Json(serde_json::json!({ "ideas": ideas })))
 }
@@ -2894,8 +3092,20 @@ async fn cofounder_idea_create_handler(
     Json(payload): Json<CofounderIdeaCreatePayload>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let idea = mgr.add_idea(payload.title, payload.description, payload.target_audience).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let idea = mgr
+        .add_idea(payload.title, payload.description, payload.target_audience)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(Json(serde_json::json!({ "idea": idea })))
 }
 
@@ -2905,11 +3115,19 @@ async fn cofounder_idea_detail_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     if let Some(idea) = mgr.get_idea(&id) {
         Ok(Json(serde_json::json!({ "idea": idea })))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "not found" }))))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "not found" })),
+        ))
     }
 }
 
@@ -2919,8 +3137,18 @@ async fn cofounder_idea_validate_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let plan = mgr.generate_validation_plan(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let plan = mgr.generate_validation_plan(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "plan": plan })))
 }
 
@@ -2930,8 +3158,18 @@ async fn cofounder_idea_score_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let score = mgr.generate_scorecard(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let score = mgr.generate_scorecard(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "score": score })))
 }
 
@@ -2941,8 +3179,18 @@ async fn cofounder_idea_mvp_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let mvp = mgr.generate_mvp_scope(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let mvp = mgr.generate_mvp_scope(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "mvp": mvp })))
 }
 
@@ -2952,8 +3200,18 @@ async fn cofounder_idea_competitors_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let comps = mgr.generate_competitors(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let comps = mgr.generate_competitors(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "competitors": comps })))
 }
 
@@ -2963,8 +3221,18 @@ async fn cofounder_idea_landing_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let brief = mgr.generate_landing_page_brief(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let brief = mgr.generate_landing_page_brief(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "brief": brief })))
 }
 
@@ -2974,8 +3242,18 @@ async fn cofounder_idea_outreach_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let plan = mgr.generate_outreach_plan(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let plan = mgr.generate_outreach_plan(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "plan": plan })))
 }
 
@@ -2985,18 +3263,27 @@ async fn cofounder_idea_report_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let report = mgr.generate_report(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let report = mgr.generate_report(&id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(Json(serde_json::json!({ "report": report })))
 }
-
-
 
 // ── Phase 5.18: Socializer Agent ──────────────────────────────────────────────
 async fn socializer_status_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     Ok(axum::Json(serde_json::json!({ "status": "active" })))
 }
@@ -3004,9 +3291,15 @@ async fn socializer_status_handler(
 async fn socializer_campaigns_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     let campaigns = mgr.list_campaigns();
     Ok(axum::Json(serde_json::json!({ "campaigns": campaigns })))
 }
@@ -3023,11 +3316,28 @@ async fn socializer_campaign_create_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
     axum::Json(payload): axum::Json<SocializerCampaignCreateReq>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let campaign = mgr.add_campaign(payload.title, payload.target_audience, payload.value_proposition, payload.project_or_idea_ref)
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let campaign = mgr
+        .add_campaign(
+            payload.title,
+            payload.target_audience,
+            payload.value_proposition,
+            payload.project_or_idea_ref,
+        )
+        .map_err(|e| {
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(axum::Json(serde_json::json!({ "campaign": campaign })))
 }
 
@@ -3035,13 +3345,22 @@ async fn socializer_campaign_detail_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     if let Some(campaign) = mgr.get_campaign(&id) {
         Ok(axum::Json(serde_json::json!({ "campaign": campaign })))
     } else {
-        Err((axum::http::StatusCode::NOT_FOUND, axum::Json(serde_json::json!({ "error": "Not found" }))))
+        Err((
+            axum::http::StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({ "error": "Not found" })),
+        ))
     }
 }
 
@@ -3049,10 +3368,21 @@ async fn socializer_campaign_audience_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_audience_map(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_audience_map(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "audience": res })))
 }
 
@@ -3060,10 +3390,21 @@ async fn socializer_campaign_channels_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_channel_strategy(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_channel_strategy(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "channels": res })))
 }
 
@@ -3071,10 +3412,21 @@ async fn socializer_campaign_angles_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_content_angles(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_content_angles(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "angles": res })))
 }
 
@@ -3082,10 +3434,21 @@ async fn socializer_campaign_reddit_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_draft(&id, "Reddit").map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_draft(&id, "Reddit").map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "draft": res })))
 }
 
@@ -3093,10 +3456,21 @@ async fn socializer_campaign_linkedin_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_draft(&id, "LinkedIn").map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_draft(&id, "LinkedIn").map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "draft": res })))
 }
 
@@ -3104,10 +3478,21 @@ async fn socializer_campaign_x_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_draft(&id, "X").map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_draft(&id, "X").map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "draft": res })))
 }
 
@@ -3115,10 +3500,21 @@ async fn socializer_campaign_launch_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_launch_plan(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_launch_plan(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "plan": res })))
 }
 
@@ -3126,10 +3522,21 @@ async fn socializer_campaign_calendar_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_calendar(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_calendar(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "calendar": res })))
 }
 
@@ -3137,10 +3544,21 @@ async fn socializer_campaign_outreach_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_outreach(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_outreach(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "draft": res })))
 }
 
@@ -3148,10 +3566,21 @@ async fn socializer_campaign_feedback_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.track_feedback(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.track_feedback(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "feedback": res })))
 }
 
@@ -3159,10 +3588,21 @@ async fn socializer_campaign_report_handler(
     headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
-    let res = mgr.generate_report(&id).map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let res = mgr.generate_report(&id).map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "report": res })))
 }
 
@@ -3170,7 +3610,8 @@ async fn socializer_campaign_report_handler(
 async fn pf_status_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     Ok(axum::Json(serde_json::json!({
@@ -3183,7 +3624,8 @@ async fn pf_status_handler(
 async fn pf_doctor_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     Ok(axum::Json(serde_json::json!({
@@ -3197,7 +3639,8 @@ async fn pf_doctor_handler(
 async fn pf_config_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     Ok(axum::Json(serde_json::json!({
@@ -3209,22 +3652,32 @@ async fn pf_refine_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
     axum::Json(payload): axum::Json<crate::promptforge::PromptForgeRefineRequest>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     if !rt.config.promptforge.enabled {
-        return Err((axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({ "error": "PromptForge is disabled" }))));
+        return Err((
+            axum::http::StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "error": "PromptForge is disabled" })),
+        ));
     }
     let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
     drop(rt);
-    let res = client.refine(payload).await.map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let res = client.refine(payload).await.map_err(|e| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
     Ok(axum::Json(serde_json::json!({ "result": res })))
 }
 
 async fn pf_history_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
@@ -3240,7 +3693,8 @@ async fn pf_score_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
     axum::Json(payload): axum::Json<PromptForgeScoreRequest>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let rt = state.runtime.lock().await;
     let client = crate::promptforge::PromptForgeClient::new(rt.config.promptforge.clone());
@@ -3252,10 +3706,13 @@ async fn pf_score_handler(
 async fn pf_templates_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let lib = crate::promptforge::PromptForgeTemplateLibrary::new();
-    Ok(axum::Json(serde_json::json!({ "templates": lib.templates })))
+    Ok(axum::Json(
+        serde_json::json!({ "templates": lib.templates }),
+    ))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -3267,7 +3724,8 @@ async fn pf_mode_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
     axum::Json(payload): axum::Json<PromptForgeModeRequest>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let mut rt = state.runtime.lock().await;
     let mode = match payload.mode.to_lowercase().as_str() {
@@ -3275,7 +3733,12 @@ async fn pf_mode_handler(
         "model" => crate::promptforge::PromptForgeMode::Model,
         "cli" => crate::promptforge::PromptForgeMode::Cli,
         "api" => crate::promptforge::PromptForgeMode::Api,
-        _ => return Err((axum::http::StatusCode::BAD_REQUEST, axum::Json(serde_json::json!({ "error": "Invalid mode" })))),
+        _ => {
+            return Err((
+                axum::http::StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({ "error": "Invalid mode" })),
+            ));
+        }
     };
     rt.config.promptforge.mode = mode;
     Ok(axum::Json(serde_json::json!({ "status": "success" })))
@@ -3284,7 +3747,8 @@ async fn pf_mode_handler(
 async fn pf_enable_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let mut rt = state.runtime.lock().await;
     rt.config.promptforge.enabled = true;
@@ -3294,7 +3758,8 @@ async fn pf_enable_handler(
 async fn pf_disable_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)> {
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
+{
     crate::api_server::check_auth(&headers, &state)?;
     let mut rt = state.runtime.lock().await;
     rt.config.promptforge.enabled = false;
@@ -3307,12 +3772,17 @@ async fn pf_disable_handler(
 async fn designer_status_handler() -> impl axum::response::IntoResponse {
     let mut status = serde_json::Map::new();
     status.insert("enabled".to_string(), serde_json::Value::Bool(true));
-    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    status.insert(
+        "version".to_string(),
+        serde_json::Value::String("1.0".to_string()),
+    );
     axum::Json(status)
 }
 
-async fn designer_list_reviews_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+async fn designer_list_reviews_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let reviews = agent.list_reviews().unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "reviews": reviews })))
 }
@@ -3325,9 +3795,10 @@ struct CreateDesignerReviewReq {
 }
 
 async fn designer_create_review_handler(
-    axum::Json(req): axum::Json<CreateDesignerReviewReq>
+    axum::Json(req): axum::Json<CreateDesignerReviewReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let kind = match req.target_type.as_str() {
         "dashboard" => crate::agents::designer::DesignerTargetType::Dashboard,
         "landing" => crate::agents::designer::DesignerTargetType::LandingPage,
@@ -3336,14 +3807,17 @@ async fn designer_create_review_handler(
         "mobile" => crate::agents::designer::DesignerTargetType::Mobile,
         _ => crate::agents::designer::DesignerTargetType::GeneralUI,
     };
-    let review = agent.create_review(kind, &req.path_or_url, req.description).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .create_review(kind, &req.path_or_url, req.description)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_get_review_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     if let Ok(Some(r)) = agent.get_review(&id) {
         Ok(axum::Json(serde_json::json!({ "review": r })))
     } else {
@@ -3352,54 +3826,70 @@ async fn designer_get_review_handler(
 }
 
 async fn designer_score_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent.run_scorecard(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .run_scorecard(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_accessibility_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent.run_accessibility_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .run_accessibility_check(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_responsive_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent.run_responsive_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .run_responsive_check(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_plan_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent.create_improvement_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .create_improvement_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_handoff_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent.create_handoff_brief(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let review = agent
+        .create_handoff_brief(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "review": review })))
 }
 
 async fn designer_report_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let report_id = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::designer::DesignerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let report_id = agent
+        .generate_report(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report_id": report_id })))
 }
-
-
 
 // -----------------------------------------------------------------------------
 // Researcher Endpoints
@@ -3408,12 +3898,17 @@ async fn designer_report_handler(
 async fn researcher_status_handler() -> impl axum::response::IntoResponse {
     let mut status = serde_json::Map::new();
     status.insert("enabled".to_string(), serde_json::Value::Bool(true));
-    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    status.insert(
+        "version".to_string(),
+        serde_json::Value::String("1.0".to_string()),
+    );
     axum::Json(status)
 }
 
-async fn researcher_list_topics_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+async fn researcher_list_topics_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let topics = agent.list_topics().unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "topics": topics })))
 }
@@ -3426,17 +3921,21 @@ struct CreateResearchTopicReq {
 }
 
 async fn researcher_create_topic_handler(
-    axum::Json(req): axum::Json<CreateResearchTopicReq>
+    axum::Json(req): axum::Json<CreateResearchTopicReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let topic = agent.create_topic(&req.title, &req.research_question, &req.domain).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let topic = agent
+        .create_topic(&req.title, &req.research_question, &req.domain)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "topic": topic })))
 }
 
 async fn researcher_get_topic_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     if let Ok(Some(r)) = agent.get_topic(&id) {
         Ok(axum::Json(serde_json::json!({ "topic": r })))
     } else {
@@ -3445,17 +3944,21 @@ async fn researcher_get_topic_handler(
 }
 
 async fn researcher_plan_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let plan = agent.create_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let plan = agent
+        .create_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "plan": plan })))
 }
 
 async fn researcher_list_sources_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let sources = agent.list_sources(&id).unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "sources": sources })))
 }
@@ -3467,17 +3970,21 @@ struct AddResearchSourceReq {
 
 async fn researcher_add_source_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
-    axum::Json(req): axum::Json<AddResearchSourceReq>
+    axum::Json(req): axum::Json<AddResearchSourceReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let source = agent.add_source(&id, &req.title).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let source = agent
+        .add_source(&id, &req.title)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "source": source })))
 }
 
 async fn researcher_list_notes_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let notes = agent.list_notes(&id).unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "notes": notes })))
 }
@@ -3489,54 +3996,70 @@ struct AddResearchNoteReq {
 
 async fn researcher_add_note_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
-    axum::Json(req): axum::Json<AddResearchNoteReq>
+    axum::Json(req): axum::Json<AddResearchNoteReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let note = agent.add_note(&id, &req.claim).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let note = agent
+        .add_note(&id, &req.claim)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "note": note })))
 }
 
 async fn researcher_competitors_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let scans = agent.generate_competitors(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let scans = agent
+        .generate_competitors(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "scans": scans })))
 }
 
 async fn researcher_compare_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let comp = agent.generate_compare(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let comp = agent
+        .generate_compare(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "comparison": comp })))
 }
 
 async fn researcher_market_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let m = agent.generate_market(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let m = agent
+        .generate_market(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "market_brief": m })))
 }
 
 async fn researcher_brief_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let b = agent.generate_brief(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let b = agent
+        .generate_brief(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "brief": b })))
 }
 
 async fn researcher_report_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let r = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::researcher::ResearcherAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent
+        .generate_report(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
-
-
 
 // -----------------------------------------------------------------------------
 // Operator Endpoints
@@ -3545,12 +4068,17 @@ async fn researcher_report_handler(
 async fn operator_status_handler() -> impl axum::response::IntoResponse {
     let mut status = serde_json::Map::new();
     status.insert("enabled".to_string(), serde_json::Value::Bool(true));
-    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    status.insert(
+        "version".to_string(),
+        serde_json::Value::String("1.0".to_string()),
+    );
     axum::Json(status)
 }
 
-async fn operator_list_systems_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+async fn operator_list_systems_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let systems = agent.list_systems().unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "systems": systems })))
 }
@@ -3563,17 +4091,21 @@ struct CreateOperatorSystemReq {
 }
 
 async fn operator_create_system_handler(
-    axum::Json(req): axum::Json<CreateOperatorSystemReq>
+    axum::Json(req): axum::Json<CreateOperatorSystemReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let sys = agent.create_system(&req.name, &req.system_type, &req.environment).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sys = agent
+        .create_system(&req.name, &req.system_type, &req.environment)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "system": sys })))
 }
 
 async fn operator_get_system_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     if let Ok(Some(s)) = agent.get_system(&id) {
         Ok(axum::Json(serde_json::json!({ "system": s })))
     } else {
@@ -3582,77 +4114,101 @@ async fn operator_get_system_handler(
 }
 
 async fn operator_health_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let hc = agent.create_health_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hc = agent
+        .create_health_check(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "health_check": hc })))
 }
 
 async fn operator_logs_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let lf = agent.create_log_finding(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let lf = agent
+        .create_log_finding(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "log_finding": lf })))
 }
 
 async fn operator_incident_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let inc = agent.create_incident(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let inc = agent
+        .create_incident(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "incident": inc })))
 }
 
 async fn operator_deploy_plan_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let plan = agent.create_deployment_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let plan = agent
+        .create_deployment_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "plan": plan })))
 }
 
 async fn operator_ci_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let ci = agent.create_ci_review(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let ci = agent
+        .create_ci_review(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "ci_review": ci })))
 }
 
 async fn operator_rollback_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let rp = agent.create_rollback_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rp = agent
+        .create_rollback_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "rollback_plan": rp })))
 }
 
 async fn operator_runbook_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let rb = agent.create_runbook(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rb = agent
+        .create_runbook(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "runbook": rb })))
 }
 
 async fn operator_reliability_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     // Currently returns a basic response, future iterations will create full OperatorReliabilityCheck
-    Ok(axum::Json(serde_json::json!({ "status": "initiated", "system_id": id })))
+    Ok(axum::Json(
+        serde_json::json!({ "status": "initiated", "system_id": id }),
+    ))
 }
 
 async fn operator_report_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let r = agent.create_report(&id, "operator_health_report").map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::operator::OperatorAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent
+        .create_report(&id, "operator_health_report")
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
-
-
 
 // -----------------------------------------------------------------------------
 // Learner Endpoints
@@ -3661,12 +4217,17 @@ async fn operator_report_handler(
 async fn learner_status_handler() -> impl axum::response::IntoResponse {
     let mut status = serde_json::Map::new();
     status.insert("enabled".to_string(), serde_json::Value::Bool(true));
-    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    status.insert(
+        "version".to_string(),
+        serde_json::Value::String("1.0".to_string()),
+    );
     axum::Json(status)
 }
 
-async fn learner_list_goals_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+async fn learner_list_goals_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let goals = agent.list_goals().unwrap_or_default();
     Ok(axum::Json(serde_json::json!({ "goals": goals })))
 }
@@ -3678,9 +4239,10 @@ struct CreateLearnerGoalReq {
 }
 
 async fn learner_create_goal_handler(
-    axum::Json(req): axum::Json<CreateLearnerGoalReq>
+    axum::Json(req): axum::Json<CreateLearnerGoalReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let domain = match req.domain.as_str() {
         "DSA" => crate::agents::learner::LearningDomain::DSA,
         "AIML" => crate::agents::learner::LearningDomain::AIML,
@@ -3688,14 +4250,17 @@ async fn learner_create_goal_handler(
         "Web3" => crate::agents::learner::LearningDomain::Web3,
         _ => crate::agents::learner::LearningDomain::General,
     };
-    let g = agent.create_goal(&req.title, domain).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let g = agent
+        .create_goal(&req.title, domain)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "goal": g })))
 }
 
 async fn learner_get_goal_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     if let Ok(Some(g)) = agent.get_goal(&id) {
         Ok(axum::Json(serde_json::json!({ "goal": g })))
     } else {
@@ -3704,80 +4269,230 @@ async fn learner_get_goal_handler(
 }
 
 async fn learner_assess_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    Ok(axum::Json(serde_json::json!({ "status": "assessed", "goal_id": id })))
+    Ok(axum::Json(
+        serde_json::json!({ "status": "assessed", "goal_id": id }),
+    ))
 }
 
 async fn learner_roadmap_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let rm = agent.create_roadmap(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rm = agent
+        .create_roadmap(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "roadmap": rm })))
 }
 
 async fn learner_week_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tasks = agent.generate_weekly_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tasks = agent
+        .generate_weekly_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "tasks": tasks })))
 }
 
 async fn learner_today_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tasks = agent.generate_daily_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tasks = agent
+        .generate_daily_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "tasks": tasks })))
 }
 
 async fn learner_practice_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let pt = agent.generate_practice_task(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let pt = agent
+        .generate_practice_task(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "practice_task": pt })))
 }
 
 async fn learner_revise_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let cp = agent.create_revision_checkpoint(&id, "General").map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let cp = agent
+        .create_revision_checkpoint(&id, "General")
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "checkpoint": cp })))
 }
 
 async fn learner_project_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let p = agent.create_project_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let p = agent
+        .create_project_plan(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "project_plan": p })))
 }
 
 async fn learner_exam_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let e = agent.generate_exam_prep(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let e = agent
+        .generate_exam_prep(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "exam_prep": e })))
 }
 
 async fn learner_progress_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let pe = agent.log_progress(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let pe = agent
+        .log_progress(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "progress": pe })))
 }
 
 async fn learner_report_handler(
-    axum::extract::Path(id): axum::extract::Path<String>
+    axum::extract::Path(id): axum::extract::Path<String>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::learner::LearnerAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let r = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let agent = crate::agents::learner::LearnerAgent::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent
+        .generate_report(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
 
+// Collaboration Endpoints
+async fn collaboration_status_handler() -> impl axum::response::IntoResponse {
+    axum::Json(serde_json::json!({ "status": "online" }))
+}
+
+async fn collaboration_list_sessions_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sessions = m
+        .list_sessions()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "sessions": sessions })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateCollaborationSessionReq {
+    title: String,
+    goal: String,
+    template: Option<String>,
+}
+
+async fn collaboration_create_session_handler(
+    axum::Json(req): axum::Json<CreateCollaborationSessionReq>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .create_session(&req.title, &req.goal, req.template.as_deref())
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_get_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .get_session(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(axum::http::StatusCode::NOT_FOUND)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_start_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .start_session(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_step_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .advance_step(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_pause_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .pause_session(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_resume_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .resume_session(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_cancel_session_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let session = m
+        .cancel_session(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "session": session })))
+}
+
+async fn collaboration_handoffs_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let handoffs = m
+        .list_handoffs(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "handoffs": handoffs })))
+}
+
+async fn collaboration_report_handler(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let m = crate::agent_collaboration::AgentCollaborationManager::new()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let report = m
+        .generate_report(&id)
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "report": report })))
+}

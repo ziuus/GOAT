@@ -1,9 +1,9 @@
+use crate::reports::ReportManager;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
-use crate::reports::ReportManager;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -128,7 +128,9 @@ impl SocializerAgent {
 
         let content = fs::read_to_string(&path)?;
         for line in content.lines() {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             if let Ok(campaign) = serde_json::from_str::<SocializerCampaign>(line) {
                 self.campaigns.insert(campaign.id.clone(), campaign);
             }
@@ -156,7 +158,13 @@ impl SocializerAgent {
         self.campaigns.get(id).cloned()
     }
 
-    pub fn add_campaign(&mut self, title: String, target_audience: String, value_proposition: String, project_or_idea_ref: Option<String>) -> Result<SocializerCampaign> {
+    pub fn add_campaign(
+        &mut self,
+        title: String,
+        target_audience: String,
+        value_proposition: String,
+        project_or_idea_ref: Option<String>,
+    ) -> Result<SocializerCampaign> {
         let id = Uuid::new_v4().to_string();
         let campaign = SocializerCampaign {
             id: id.clone(),
@@ -185,7 +193,10 @@ impl SocializerAgent {
         Ok(SocializerAudience {
             segments: vec!["Founders".to_string(), "Developers".to_string()],
             pain_points: vec!["Too much boilerplate".to_string()],
-            gathering_places: vec!["Reddit/r/Entrepreneur".to_string(), "Hacker News".to_string()],
+            gathering_places: vec![
+                "Reddit/r/Entrepreneur".to_string(),
+                "Hacker News".to_string(),
+            ],
             objections: vec!["Too expensive".to_string()],
             trust_signals: vec!["Open source".to_string()],
         })
@@ -216,21 +227,19 @@ impl SocializerAgent {
                 content_type: "Build in public update".to_string(),
                 risks: vec!["Can sound cringe if over-hyped".to_string()],
                 etiquette: vec!["Be authentic".to_string()],
-            }
+            },
         ])
     }
 
     pub fn generate_content_angles(&self, _id: &str) -> Result<Vec<SocializerContentAngle>> {
-        Ok(vec![
-            SocializerContentAngle {
-                angle_type: "Lesson Learned".to_string(),
-                target_platform: "X".to_string(),
-                hook: "I spent 3 weeks building X, here is why it failed.".to_string(),
-                main_point: "Validation is more important than code.".to_string(),
-                cta: "Follow for more updates.".to_string(),
-                spam_risk: "Low".to_string(),
-            }
-        ])
+        Ok(vec![SocializerContentAngle {
+            angle_type: "Lesson Learned".to_string(),
+            target_platform: "X".to_string(),
+            hook: "I spent 3 weeks building X, here is why it failed.".to_string(),
+            main_point: "Validation is more important than code.".to_string(),
+            cta: "Follow for more updates.".to_string(),
+            spam_risk: "Low".to_string(),
+        }])
     }
 
     pub fn generate_draft(&mut self, id: &str, platform: &str) -> Result<SocializerContentDraft> {
@@ -244,7 +253,10 @@ impl SocializerAgent {
 
         Ok(SocializerContentDraft {
             platform: platform.to_string(),
-            title_options: vec!["How we built X".to_string(), "The story behind X".to_string()],
+            title_options: vec![
+                "How we built X".to_string(),
+                "The story behind X".to_string(),
+            ],
             body: format!("Here is the draft for {}.", platform),
             non_promotional_version: "Just wanted to share our learnings...".to_string(),
             warnings: vec!["Do not post this in self-promotion free zones.".to_string()],
@@ -261,16 +273,32 @@ impl SocializerAgent {
         }
 
         Ok(SocializerLaunchPlan {
-            pre_launch_checklist: vec!["Warm up audience".to_string(), "Prepare assets".to_string()],
-            launch_day_plan: vec!["Post on Product Hunt".to_string(), "Send Newsletter".to_string()],
+            pre_launch_checklist: vec![
+                "Warm up audience".to_string(),
+                "Prepare assets".to_string(),
+            ],
+            launch_day_plan: vec![
+                "Post on Product Hunt".to_string(),
+                "Send Newsletter".to_string(),
+            ],
             metrics_to_track: vec!["Signups".to_string(), "Visitors".to_string()],
         })
     }
 
     pub fn generate_calendar(&self, _id: &str) -> Result<Vec<SocializerCalendarItem>> {
         Ok(vec![
-            SocializerCalendarItem { day: 1, platform: "X".to_string(), theme: "Teaser".to_string(), status: "Draft".to_string() },
-            SocializerCalendarItem { day: 2, platform: "LinkedIn".to_string(), theme: "Story".to_string(), status: "Idea".to_string() },
+            SocializerCalendarItem {
+                day: 1,
+                platform: "X".to_string(),
+                theme: "Teaser".to_string(),
+                status: "Draft".to_string(),
+            },
+            SocializerCalendarItem {
+                day: 2,
+                platform: "LinkedIn".to_string(),
+                theme: "Story".to_string(),
+                status: "Idea".to_string(),
+            },
         ])
     }
 
@@ -298,14 +326,13 @@ impl SocializerAgent {
         let template = crate::reports::ReportTemplate {
             kind: crate::reports::ReportKind::General,
             title: format!("Socializer Distribution Report {}", id),
-            sections: vec![
-                crate::reports::ReportSection {
-                    heading: "Campaign Summary".to_string(),
-                    body: format!("Report for campaign {}", id),
-                }
-            ],
+            sections: vec![crate::reports::ReportSection {
+                heading: "Campaign Summary".to_string(),
+                body: format!("Report for campaign {}", id),
+            }],
         };
-        let output = report_manager.generate_report(template)
+        let output = report_manager
+            .generate_report(template)
             .map_err(|e| anyhow::anyhow!("Report Error: {}", e))?;
         Ok(format!("Report {} generated.", output.id))
     }

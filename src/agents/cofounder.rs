@@ -1,10 +1,10 @@
+use crate::error::GoatError;
+use crate::reports::ReportManager;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
-use crate::error::GoatError;
-use crate::reports::ReportManager;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -151,7 +151,12 @@ impl CofounderManager {
         self.ideas.get(id).cloned()
     }
 
-    pub fn add_idea(&mut self, title: String, description: String, target_audience: String) -> Result<CofounderIdea> {
+    pub fn add_idea(
+        &mut self,
+        title: String,
+        description: String,
+        target_audience: String,
+    ) -> Result<CofounderIdea> {
         let id = Uuid::new_v4().to_string();
         let idea = CofounderIdea {
             id: id.clone(),
@@ -173,7 +178,7 @@ impl CofounderManager {
         } else {
             return Err(anyhow::anyhow!("Idea {} not found", id));
         }
-        
+
         Ok(CofounderValidationPlan {
             idea_id: id.to_string(),
             steps: vec![
@@ -200,15 +205,13 @@ impl CofounderManager {
     }
 
     pub fn generate_competitors(&self, id: &str) -> Result<Vec<CofounderCompetitorRef>> {
-        Ok(vec![
-            CofounderCompetitorRef {
-                idea_id: id.to_string(),
-                name: "Example Corp".to_string(),
-                url: "https://example.com".to_string(),
-                strengths: vec!["Big brand".to_string()],
-                weaknesses: vec!["Slow".to_string()],
-            }
-        ])
+        Ok(vec![CofounderCompetitorRef {
+            idea_id: id.to_string(),
+            name: "Example Corp".to_string(),
+            url: "https://example.com".to_string(),
+            strengths: vec!["Big brand".to_string()],
+            weaknesses: vec!["Slow".to_string()],
+        }])
     }
 
     pub fn generate_landing_page_brief(&self, id: &str) -> Result<String> {
@@ -261,14 +264,13 @@ impl CofounderManager {
         let template = crate::reports::ReportTemplate {
             kind: crate::reports::ReportKind::General,
             title: format!("Cofounder Idea {}", id),
-            sections: vec![
-                crate::reports::ReportSection {
-                    heading: "Executive Summary".to_string(),
-                    body: format!("Summary for idea {}", id),
-                }
-            ],
+            sections: vec![crate::reports::ReportSection {
+                heading: "Executive Summary".to_string(),
+                body: format!("Summary for idea {}", id),
+            }],
         };
-        let report_output = report_manager.generate_report(template)
+        let report_output = report_manager
+            .generate_report(template)
             .map_err(|e| anyhow::anyhow!("Report error: {}", e))?;
 
         Ok(CofounderReport {

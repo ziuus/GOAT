@@ -2083,7 +2083,10 @@ async fn handle_slash_command(
                     }
                     "mvp" => {
                         if let Ok(mvp) = manager.generate_mvp_scope(target) {
-                            println!("[COFOUNDER] MVP Scope: {} features", mvp.core_features.len());
+                            println!(
+                                "[COFOUNDER] MVP Scope: {} features",
+                                mvp.core_features.len()
+                            );
                         }
                     }
                     "competitors" => {

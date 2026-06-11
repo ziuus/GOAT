@@ -325,9 +325,12 @@ impl BrainIndexManager {
         format!("{:x}", hasher.finish())
     }
 
-
     fn ingest_promptforge(&self, docs: &mut Vec<BrainDocument>) {
-        let pf_history_file = self.paths.data_dir.join("promptforge").join("history.jsonl");
+        let pf_history_file = self
+            .paths
+            .data_dir
+            .join("promptforge")
+            .join("history.jsonl");
         if pf_history_file.exists() {
             if let Ok(content) = std::fs::read_to_string(&pf_history_file) {
                 if !self.contains_secrets(&content) {
@@ -348,10 +351,13 @@ impl BrainIndexManager {
                 }
             }
         }
-        
+
         let pf_templates = crate::promptforge::PromptForgeTemplateLibrary::new();
         for tpl in pf_templates.templates {
-            let body = format!("Template: {}\nKind: {:?}\nDescription: {}\nStructure:\n{}", tpl.name, tpl.kind, tpl.description, tpl.structure);
+            let body = format!(
+                "Template: {}\nKind: {:?}\nDescription: {}\nStructure:\n{}",
+                tpl.name, tpl.kind, tpl.description, tpl.structure
+            );
             if !self.contains_secrets(&body) {
                 docs.push(BrainDocument {
                     id: format!("pf_template_{}", tpl.id),
@@ -359,7 +365,11 @@ impl BrainIndexManager {
                     title: format!("PromptForge Template: {}", tpl.name),
                     summary: tpl.description.clone(),
                     body: self.truncate(&body),
-                    tags: vec!["promptforge".to_string(), "template".to_string(), format!("{:?}", tpl.kind)],
+                    tags: vec![
+                        "promptforge".to_string(),
+                        "template".to_string(),
+                        format!("{:?}", tpl.kind),
+                    ],
                     source_path: None,
                     project_id: None,
                     created_at: chrono::Utc::now().to_rfc3339(),

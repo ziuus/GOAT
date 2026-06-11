@@ -15,6 +15,7 @@ const navItems = [
   { name: 'Researcher', href: '/researcher', icon: Search },
   { name: 'Operator', href: '/operator', icon: TerminalSquare },
   { name: 'Learner', href: '/learner', icon: BookOpen },
+  { name: 'AgentFlow', href: '/agentflow', icon: Activity },
   { name: 'PromptForge', href: '/promptforge', icon: Sparkles },
   { name: 'Commands', href: '/commands', icon: Command },
   { name: 'Chat', href: '/chat', icon: MessageSquare },

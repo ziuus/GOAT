@@ -25,7 +25,9 @@ pub struct PromptForgeAgentMapping {
     pub target: String,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptForgeRules {
@@ -47,7 +49,9 @@ pub struct PromptForgeRules {
     pub send_timeline_context: bool,
 }
 
-fn default_max_prompt_chars() -> usize { 12000 }
+fn default_max_prompt_chars() -> usize {
+    12000
+}
 
 impl Default for PromptForgeRules {
     fn default() -> Self {
@@ -91,7 +95,7 @@ pub struct PromptForgeConfig {
 
     #[serde(default)]
     pub rules: PromptForgeRules,
-    
+
     #[serde(default)]
     pub agents: HashMap<String, PromptForgeAgentMapping>,
 }
@@ -99,13 +103,55 @@ pub struct PromptForgeConfig {
 impl Default for PromptForgeConfig {
     fn default() -> Self {
         let mut agents = HashMap::new();
-        agents.insert("builder".to_string(), PromptForgeAgentMapping { enabled: true, target: "coding".to_string() });
-        agents.insert("cofounder".to_string(), PromptForgeAgentMapping { enabled: true, target: "product".to_string() });
-        agents.insert("researcher".to_string(), PromptForgeAgentMapping { enabled: true, target: "research".to_string() });
-        agents.insert("designer".to_string(), PromptForgeAgentMapping { enabled: true, target: "design".to_string() });
-        agents.insert("socializer".to_string(), PromptForgeAgentMapping { enabled: true, target: "social".to_string() });
-        agents.insert("operator".to_string(), PromptForgeAgentMapping { enabled: true, target: "operations".to_string() });
-        agents.insert("learner".to_string(), PromptForgeAgentMapping { enabled: true, target: "learning".to_string() });
+        agents.insert(
+            "builder".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "coding".to_string(),
+            },
+        );
+        agents.insert(
+            "cofounder".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "product".to_string(),
+            },
+        );
+        agents.insert(
+            "researcher".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "research".to_string(),
+            },
+        );
+        agents.insert(
+            "designer".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "design".to_string(),
+            },
+        );
+        agents.insert(
+            "socializer".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "social".to_string(),
+            },
+        );
+        agents.insert(
+            "operator".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "operations".to_string(),
+            },
+        );
+        agents.insert(
+            "learner".to_string(),
+            PromptForgeAgentMapping {
+                enabled: true,
+                target: "learning".to_string(),
+            },
+        );
 
         Self {
             enabled: false,
@@ -184,7 +230,6 @@ impl std::fmt::Display for PromptForgeError {
 
 impl std::error::Error for PromptForgeError {}
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PromptForgeTemplateKind {
@@ -221,7 +266,8 @@ impl PromptForgeTemplateLibrary {
                     id: "coding_feature".to_string(),
                     kind: PromptForgeTemplateKind::CodingFeature,
                     name: "Coding Feature Refinement".to_string(),
-                    description: "Structures a rough coding request into a clear feature spec".to_string(),
+                    description: "Structures a rough coding request into a clear feature spec"
+                        .to_string(),
                     structure: "### Goal
 [...]
 ### Repo Inspection Steps
@@ -229,7 +275,8 @@ impl PromptForgeTemplateLibrary {
 ### Constraints
 [...]
 ### Tests/Checks
-[...]".to_string(),
+[...]"
+                        .to_string(),
                 },
                 PromptForgeTemplate {
                     id: "product_validation".to_string(),
@@ -241,13 +288,14 @@ impl PromptForgeTemplateLibrary {
 ### Assumptions
 [...]
 ### Validation Questions
-[...]".to_string(),
+[...]"
+                        .to_string(),
                 },
                 // Add more stubs if necessary
-            ]
+            ],
         }
     }
-    
+
     pub fn get(&self, id: &str) -> Option<PromptForgeTemplate> {
         self.templates.iter().find(|t| t.id == id).cloned()
     }
@@ -303,11 +351,16 @@ impl PromptForgeClient {
         let _ = fs::create_dir_all(&base_dir);
         let _ = fs::create_dir_all(base_dir.join("sessions"));
         let _ = fs::create_dir_all(base_dir.join("logs"));
-        
+
         Self { config, base_dir }
     }
 
-    pub fn should_refine(&self, task: &str, agent: &str, is_user_override: Option<bool>) -> PromptForgeDecision {
+    pub fn should_refine(
+        &self,
+        task: &str,
+        agent: &str,
+        is_user_override: Option<bool>,
+    ) -> PromptForgeDecision {
         let mut decision = PromptForgeDecision {
             should_refine: false,
             reason: "Refinement not required".to_string(),
@@ -333,7 +386,12 @@ impl PromptForgeClient {
             decision.complexity = "complex".to_string();
         } else {
             let lower = task.to_lowercase();
-            if lower.contains("build") || lower.contains("architect") || lower.contains("research") || lower.contains("plan") || lower.contains("design") {
+            if lower.contains("build")
+                || lower.contains("architect")
+                || lower.contains("research")
+                || lower.contains("plan")
+                || lower.contains("design")
+            {
                 decision.complexity = "medium".to_string();
             }
         }
@@ -351,13 +409,18 @@ impl PromptForgeClient {
 
         if let Some(user_ov) = is_user_override {
             decision.should_refine = user_ov;
-            decision.reason = if user_ov { "User explicitly requested refinement.".to_string() } else { "User explicitly bypassed refinement.".to_string() };
+            decision.reason = if user_ov {
+                "User explicitly requested refinement.".to_string()
+            } else {
+                "User explicitly bypassed refinement.".to_string()
+            };
             return decision;
         }
 
         if self.config.auto_refine {
             decision.should_refine = true;
-            decision.reason = "Auto-refine is enabled and task meets complexity threshold.".to_string();
+            decision.reason =
+                "Auto-refine is enabled and task meets complexity threshold.".to_string();
         } else {
             decision.reason = "Auto-refine is disabled, waiting for manual request.".to_string();
         }
@@ -365,9 +428,12 @@ impl PromptForgeClient {
         decision
     }
 
-    pub async fn refine(&self, req: PromptForgeRefineRequest) -> Result<PromptForgeRefineResponse, PromptForgeError> {
+    pub async fn refine(
+        &self,
+        req: PromptForgeRefineRequest,
+    ) -> Result<PromptForgeRefineResponse, PromptForgeError> {
         let start = chrono::Utc::now().timestamp();
-        
+
         let res = match req.mode {
             PromptForgeMode::Mock => {
                 let refined = format!("REFINED: {}", req.original_prompt);
@@ -378,7 +444,10 @@ impl PromptForgeClient {
                     refined_score: Some(95),
                     target_agent: req.target_agent.clone(),
                     target: req.target_format.clone(),
-                    improvements: vec!["Added structure".to_string(), "Clarified goals".to_string()],
+                    improvements: vec![
+                        "Added structure".to_string(),
+                        "Clarified goals".to_string(),
+                    ],
                     warnings: vec![],
                     provider_used: "mock_local".to_string(),
                     mode_used: PromptForgeMode::Mock,
@@ -387,7 +456,10 @@ impl PromptForgeClient {
             PromptForgeMode::Model => {
                 // Uses internal provider in real implementation.
                 // For now, doing a safe deterministic fallback.
-                let mut refined = format!("{}\n\n### Constraints & Context\n- Target: {}\n- Domain: {}", req.original_prompt, req.target_format, req.domain);
+                let mut refined = format!(
+                    "{}\n\n### Constraints & Context\n- Target: {}\n- Domain: {}",
+                    req.original_prompt, req.target_format, req.domain
+                );
                 Ok(PromptForgeRefineResponse {
                     original_prompt: req.original_prompt.clone(),
                     refined_prompt: refined.clone(),
@@ -411,12 +483,20 @@ impl PromptForgeClient {
                         target_agent: req.target_agent.clone(),
                         target: req.target_format.clone(),
                         improvements: vec![],
-                        warnings: vec![format!("Mode {:?} not available, returning original prompt (fail-open)", req.mode)],
+                        warnings: vec![format!(
+                            "Mode {:?} not available, returning original prompt (fail-open)",
+                            req.mode
+                        )],
                         provider_used: "none".to_string(),
                         mode_used: req.mode.clone(),
                     })
                 } else {
-                    Err(PromptForgeError { message: format!("Mode {:?} not supported and strict mode enabled.", req.mode) })
+                    Err(PromptForgeError {
+                        message: format!(
+                            "Mode {:?} not supported and strict mode enabled.",
+                            req.mode
+                        ),
+                    })
                 }
             }
         };
@@ -448,7 +528,7 @@ impl PromptForgeClient {
             }
         } else if let Err(ref err) = res {
             if self.config.store_history {
-                 let entry = PromptForgeHistoryEntry {
+                let entry = PromptForgeHistoryEntry {
                     id: uuid::Uuid::new_v4().to_string(),
                     timestamp: start,
                     agent: req.target_agent.clone(),
@@ -480,7 +560,10 @@ impl PromptForgeClient {
         let history_file = self.base_dir.join("history.jsonl");
         let line = serde_json::to_string(&entry)? + "\n";
         use std::io::Write;
-        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&history_file)?;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&history_file)?;
         file.write_all(line.as_bytes())?;
         Ok(())
     }
@@ -498,13 +581,27 @@ impl PromptForgeClient {
             acceptance_criteria: 40,
             safety: 90,
             agent_fit: 70,
-            weak_areas: if total < 50 { vec!["Too short".to_string(), "Missing constraints".to_string()] } else { vec![] },
-            suggestions: if total < 50 { vec!["Add more details".to_string()] } else { vec![] },
+            weak_areas: if total < 50 {
+                vec!["Too short".to_string(), "Missing constraints".to_string()]
+            } else {
+                vec![]
+            },
+            suggestions: if total < 50 {
+                vec!["Add more details".to_string()]
+            } else {
+                vec![]
+            },
             refinement_recommended: total < 75,
         }
     }
 
-    pub async fn maybe_refine_for_agent(&self, agent: &str, task: &str, context: &str, is_user_override: Option<bool>) -> String {
+    pub async fn maybe_refine_for_agent(
+        &self,
+        agent: &str,
+        task: &str,
+        context: &str,
+        is_user_override: Option<bool>,
+    ) -> String {
         let decision = self.should_refine(task, agent, is_user_override);
         if !decision.should_refine {
             return task.to_string();

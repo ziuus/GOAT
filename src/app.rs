@@ -3835,65 +3835,83 @@ impl App {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");
                 let target = parts.get(1).copied().unwrap_or("").trim();
-                let mut manager = crate::agents::cofounder::CofounderManager::new().expect("Failed to initialize CofounderManager");
+                let mut manager = crate::agents::cofounder::CofounderManager::new()
+                    .expect("Failed to initialize CofounderManager");
 
                 match subcmd {
                     "list" => {
                         let ideas = manager.list_ideas();
                         self.push_log(format!("[COFOUNDER] {} ideas found.", ideas.len()));
                         for i in ideas {
-                            self.push_log(format!("  [{}] {} (State: {:?})", i.id, i.title, i.state));
+                            self.push_log(format!(
+                                "  [{}] {} (State: {:?})",
+                                i.id, i.title, i.state
+                            ));
                         }
                     }
                     "new-idea" => {
                         // Very simple for testing
-                        match manager.add_idea(target.to_string(), "Mock Description".to_string(), "Mock Audience".to_string()) {
-                            Ok(idea) => self.push_log(format!("[COFOUNDER] Idea created: {}", idea.id)),
+                        match manager.add_idea(
+                            target.to_string(),
+                            "Mock Description".to_string(),
+                            "Mock Audience".to_string(),
+                        ) {
+                            Ok(idea) => {
+                                self.push_log(format!("[COFOUNDER] Idea created: {}", idea.id))
+                            }
                             Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                         }
                     }
-                    "validate" => {
-                        match manager.generate_validation_plan(target) {
-                            Ok(plan) => self.push_log(format!("[COFOUNDER] Validation Plan for {}: {} steps", plan.idea_id, plan.steps.len())),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    "validate" => match manager.generate_validation_plan(target) {
+                        Ok(plan) => self.push_log(format!(
+                            "[COFOUNDER] Validation Plan for {}: {} steps",
+                            plan.idea_id,
+                            plan.steps.len()
+                        )),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "score" => match manager.generate_scorecard(target) {
+                        Ok(score) => self.push_log(format!(
+                            "[COFOUNDER] Scorecard for {}: {}/50",
+                            score.idea_id, score.total_score
+                        )),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "mvp" => match manager.generate_mvp_scope(target) {
+                        Ok(mvp) => self.push_log(format!(
+                            "[COFOUNDER] MVP Scope for {}: {} core features",
+                            mvp.idea_id,
+                            mvp.core_features.len()
+                        )),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "competitors" => match manager.generate_competitors(target) {
+                        Ok(comps) => self.push_log(format!(
+                            "[COFOUNDER] {} competitors found for {}",
+                            comps.len(),
+                            target
+                        )),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "landing" => match manager.generate_landing_page_brief(target) {
+                        Ok(brief) => {
+                            self.push_log(format!("[COFOUNDER] Landing Page Brief: {}", brief))
                         }
-                    }
-                    "score" => {
-                        match manager.generate_scorecard(target) {
-                            Ok(score) => self.push_log(format!("[COFOUNDER] Scorecard for {}: {}/50", score.idea_id, score.total_score)),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "outreach" => match manager.generate_outreach_plan(target) {
+                        Ok(plan) => self.push_log(format!(
+                            "[COFOUNDER] Outreach Plan: {} channels",
+                            plan.channels.len()
+                        )),
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
+                    "report" => match manager.generate_report(target) {
+                        Ok(report) => {
+                            self.push_log(format!("[COFOUNDER] Report: {}", report.summary))
                         }
-                    }
-                    "mvp" => {
-                        match manager.generate_mvp_scope(target) {
-                            Ok(mvp) => self.push_log(format!("[COFOUNDER] MVP Scope for {}: {} core features", mvp.idea_id, mvp.core_features.len())),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                        }
-                    }
-                    "competitors" => {
-                        match manager.generate_competitors(target) {
-                            Ok(comps) => self.push_log(format!("[COFOUNDER] {} competitors found for {}", comps.len(), target)),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                        }
-                    }
-                    "landing" => {
-                        match manager.generate_landing_page_brief(target) {
-                            Ok(brief) => self.push_log(format!("[COFOUNDER] Landing Page Brief: {}", brief)),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                        }
-                    }
-                    "outreach" => {
-                        match manager.generate_outreach_plan(target) {
-                            Ok(plan) => self.push_log(format!("[COFOUNDER] Outreach Plan: {} channels", plan.channels.len())),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                        }
-                    }
-                    "report" => {
-                        match manager.generate_report(target) {
-                            Ok(report) => self.push_log(format!("[COFOUNDER] Report: {}", report.summary)),
-                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                        }
-                    }
+                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                    },
                     "show" => {
                         if let Some(idea) = manager.get_idea(target) {
                             self.push_log(format!("[COFOUNDER] ID: {}", idea.id));
@@ -3912,13 +3930,23 @@ impl App {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("status");
                 let target = parts.get(1).copied().unwrap_or("").trim();
-                let pf_client = crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
+                let pf_client =
+                    crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
 
                 match subcmd {
                     "status" => {
-                        self.push_log(format!("[PROMPTFORGE] Enabled: {}", self.config.promptforge.enabled));
-                        self.push_log(format!("[PROMPTFORGE] Mode: {:?}", self.config.promptforge.mode));
-                        self.push_log(format!("[PROMPTFORGE] Auto-refine: {}", self.config.promptforge.auto_refine));
+                        self.push_log(format!(
+                            "[PROMPTFORGE] Enabled: {}",
+                            self.config.promptforge.enabled
+                        ));
+                        self.push_log(format!(
+                            "[PROMPTFORGE] Mode: {:?}",
+                            self.config.promptforge.mode
+                        ));
+                        self.push_log(format!(
+                            "[PROMPTFORGE] Auto-refine: {}",
+                            self.config.promptforge.auto_refine
+                        ));
                         if !self.config.promptforge.enabled {
                             self.push_log("PromptForge is currently disabled. Use '/promptforge enable' to enable it.".to_string());
                         }
@@ -3928,25 +3956,42 @@ impl App {
                         self.config.promptforge.enabled = true;
                     }
                     "disable" => {
-                        self.push_log("[PROMPTFORGE] Disabled PromptForge for this session (ephemeral).".to_string());
+                        self.push_log(
+                            "[PROMPTFORGE] Disabled PromptForge for this session (ephemeral)."
+                                .to_string(),
+                        );
                         self.config.promptforge.enabled = false;
                     }
                     "doctor" => {
                         self.push_log("[PROMPTFORGE] Doctor check:".to_string());
                         self.push_log(format!("  Enabled: {}", self.config.promptforge.enabled));
                         self.push_log(format!("  Mode: {:?}", self.config.promptforge.mode));
-                        self.push_log(format!("  Fail Open: {}", self.config.promptforge.fail_open));
-                        self.push_log(format!("  Auto-refine: {}", self.config.promptforge.auto_refine));
-                        self.push_log(format!("  Browser Chat: {}", self.config.promptforge.allow_browser_chat));
+                        self.push_log(format!(
+                            "  Fail Open: {}",
+                            self.config.promptforge.fail_open
+                        ));
+                        self.push_log(format!(
+                            "  Auto-refine: {}",
+                            self.config.promptforge.auto_refine
+                        ));
+                        self.push_log(format!(
+                            "  Browser Chat: {}",
+                            self.config.promptforge.allow_browser_chat
+                        ));
                         if self.config.promptforge.allow_browser_chat {
                             self.push_log("  WARNING: Browser web-chat integration is not implemented/recommended now.".to_string());
                         }
                     }
                     "refine" => {
                         if !self.config.promptforge.enabled {
-                            self.push_log("[PROMPTFORGE] Disabled. Enable it first to refine prompts.".to_string());
+                            self.push_log(
+                                "[PROMPTFORGE] Disabled. Enable it first to refine prompts."
+                                    .to_string(),
+                            );
                         } else if target.is_empty() {
-                            self.push_log("[PROMPTFORGE] Please provide a prompt to refine.".to_string());
+                            self.push_log(
+                                "[PROMPTFORGE] Please provide a prompt to refine.".to_string(),
+                            );
                         } else {
                             self.push_log(format!("[PROMPTFORGE] Refinining: '{}'", target));
                             let req = crate::promptforge::PromptForgeRefineRequest {
@@ -3962,9 +4007,15 @@ impl App {
                             let rt = tokio::runtime::Runtime::new().unwrap();
                             match rt.block_on(pf_client.refine(req)) {
                                 Ok(resp) => {
-                                    self.push_log(format!("[PROMPTFORGE] Refined: '{}'", resp.refined_prompt));
+                                    self.push_log(format!(
+                                        "[PROMPTFORGE] Refined: '{}'",
+                                        resp.refined_prompt
+                                    ));
                                     if !resp.improvements.is_empty() {
-                                        self.push_log(format!("[PROMPTFORGE] Improvements: {:?}", resp.improvements));
+                                        self.push_log(format!(
+                                            "[PROMPTFORGE] Improvements: {:?}",
+                                            resp.improvements
+                                        ));
                                     }
                                 }
                                 Err(e) => self.push_log(format!("[PROMPTFORGE] Error: {}", e)),
@@ -3975,7 +4026,10 @@ impl App {
                         let hist = pf_client.get_history();
                         self.push_log(format!("[PROMPTFORGE] History: {} entries", hist.len()));
                         for entry in hist.iter().take(5) {
-                            self.push_log(format!("  [{}] {} -> {}", entry.timestamp, entry.original_prompt, entry.refined_prompt));
+                            self.push_log(format!(
+                                "  [{}] {} -> {}",
+                                entry.timestamp, entry.original_prompt, entry.refined_prompt
+                            ));
                         }
                     }
                     _ => self.push_log(format!("[PROMPTFORGE] Unknown subcmd: {}", subcmd)),
@@ -4000,7 +4054,10 @@ impl App {
                         if let Ok(revs) = agent.list_reviews() {
                             self.push_log(format!("[DESIGNER] {} reviews found.", revs.len()));
                             for r in revs {
-                                self.push_log(format!("  [{}] {} (State: {:?})", r.id, r.title, r.state));
+                                self.push_log(format!(
+                                    "  [{}] {} (State: {:?})",
+                                    r.id, r.title, r.state
+                                ));
                             }
                         }
                     }
@@ -4014,46 +4071,49 @@ impl App {
                             _ => crate::agents::designer::DesignerTargetType::GeneralUI,
                         };
                         match agent.create_review(kind, target, None) {
-                            Ok(rev) => self.push_log(format!("[DESIGNER] Review created: {}", rev.id)),
+                            Ok(rev) => {
+                                self.push_log(format!("[DESIGNER] Review created: {}", rev.id))
+                            }
                             Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
                         }
                     }
-                    "accessibility" => {
-                        match agent.run_accessibility_check(target) {
-                            Ok(_) => self.push_log(format!("[DESIGNER] Accessibility check complete for {}", target)),
-                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
-                        }
-                    }
-                    "responsive" => {
-                        match agent.run_responsive_check(target) {
-                            Ok(_) => self.push_log(format!("[DESIGNER] Responsive check complete for {}", target)),
-                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
-                        }
-                    }
-                    "plan" => {
-                        match agent.create_improvement_plan(target) {
-                            Ok(_) => self.push_log(format!("[DESIGNER] Improvement plan created for {}", target)),
-                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
-                        }
-                    }
-                    "handoff" => {
-                        match agent.create_handoff_brief(target) {
-                            Ok(_) => self.push_log(format!("[DESIGNER] Builder handoff created for {}", target)),
-                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
-                        }
-                    }
-                    "report" => {
-                        match agent.generate_report(target) {
-                            Ok(id) => self.push_log(format!("[DESIGNER] Report generated: {}", id)),
-                            Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
-                        }
-                    }
+                    "accessibility" => match agent.run_accessibility_check(target) {
+                        Ok(_) => self.push_log(format!(
+                            "[DESIGNER] Accessibility check complete for {}",
+                            target
+                        )),
+                        Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                    },
+                    "responsive" => match agent.run_responsive_check(target) {
+                        Ok(_) => self.push_log(format!(
+                            "[DESIGNER] Responsive check complete for {}",
+                            target
+                        )),
+                        Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                    },
+                    "plan" => match agent.create_improvement_plan(target) {
+                        Ok(_) => self.push_log(format!(
+                            "[DESIGNER] Improvement plan created for {}",
+                            target
+                        )),
+                        Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                    },
+                    "handoff" => match agent.create_handoff_brief(target) {
+                        Ok(_) => self
+                            .push_log(format!("[DESIGNER] Builder handoff created for {}", target)),
+                        Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                    },
+                    "report" => match agent.generate_report(target) {
+                        Ok(id) => self.push_log(format!("[DESIGNER] Report generated: {}", id)),
+                        Err(e) => self.push_log(format!("[DESIGNER] Error: {}", e)),
+                    },
                     _ => self.push_log(format!("[DESIGNER] Unknown subcmd: {}", subcmd)),
                 }
                 true
             }
 
-            "/researcher" | "@researcher" | "@research" | "@sources" | "@competitors" | "@compare" => {
+            "/researcher" | "@researcher" | "@research" | "@sources" | "@competitors"
+            | "@compare" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = if cmd.starts_with("@") {
                     cmd.trim_start_matches('@')
@@ -4074,12 +4134,23 @@ impl App {
                         if let Ok(topics) = agent.list_topics() {
                             self.push_log(format!("[RESEARCHER] {} topics found.", topics.len()));
                             for t in topics {
-                                self.push_log(format!("  [{}] {} (State: {:?})", t.id, t.title, t.status));
+                                self.push_log(format!(
+                                    "  [{}] {} (State: {:?})",
+                                    t.id, t.title, t.status
+                                ));
                             }
                         }
                     }
                     "new-topic" => {
-                        match agent.create_topic(if target.is_empty() { "Untitled" } else { target }, "Main Question", "General") {
+                        match agent.create_topic(
+                            if target.is_empty() {
+                                "Untitled"
+                            } else {
+                                target
+                            },
+                            "Main Question",
+                            "General",
+                        ) {
                             Ok(t) => self.push_log(format!("[RESEARCHER] Topic created: {}", t.id)),
                             Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
                         }
@@ -4088,7 +4159,10 @@ impl App {
                         // Check if we need to create a topic first if it's an alias
                         let topic_id = if subcmd == "research" && !target.is_empty() {
                             if let Ok(t) = agent.create_topic(target, target, "General") {
-                                self.push_log(format!("[RESEARCHER] Created topic for research: {}", t.id));
+                                self.push_log(format!(
+                                    "[RESEARCHER] Created topic for research: {}",
+                                    t.id
+                                ));
                                 t.id
                             } else {
                                 target.to_string()
@@ -4097,58 +4171,152 @@ impl App {
                             target.to_string()
                         };
                         match agent.create_plan(&topic_id) {
-                            Ok(_) => self.push_log(format!("[RESEARCHER] Plan created for {}", topic_id)),
+                            Ok(_) => {
+                                self.push_log(format!("[RESEARCHER] Plan created for {}", topic_id))
+                            }
                             Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
                         }
                     }
-                    "sources" => {
-                        match agent.list_sources(target) {
-                            Ok(s) => self.push_log(format!("[RESEARCHER] Found {} sources.", s.len())),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "notes" => {
-                        match agent.list_notes(target) {
-                            Ok(n) => self.push_log(format!("[RESEARCHER] Found {} notes.", n.len())),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "competitors" => {
-                        match agent.generate_competitors(target) {
-                            Ok(c) => self.push_log(format!("[RESEARCHER] Generated {} competitor scans.", c.len())),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "compare" => {
-                        match agent.generate_compare(target) {
-                            Ok(c) => self.push_log(format!("[RESEARCHER] Generated comparison for {}", c.options.join(" vs "))),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "market" => {
-                        match agent.generate_market(target) {
-                            Ok(_) => self.push_log(format!("[RESEARCHER] Generated market brief.")),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "brief" => {
-                        match agent.generate_brief(target) {
-                            Ok(_) => self.push_log(format!("[RESEARCHER] Brief generated.")),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
-                    "report" => {
-                        match agent.generate_report(target) {
-                            Ok(r) => self.push_log(format!("[RESEARCHER] Report generated: {}", r.id)),
-                            Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
-                        }
-                    }
+                    "sources" => match agent.list_sources(target) {
+                        Ok(s) => self.push_log(format!("[RESEARCHER] Found {} sources.", s.len())),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "notes" => match agent.list_notes(target) {
+                        Ok(n) => self.push_log(format!("[RESEARCHER] Found {} notes.", n.len())),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "competitors" => match agent.generate_competitors(target) {
+                        Ok(c) => self.push_log(format!(
+                            "[RESEARCHER] Generated {} competitor scans.",
+                            c.len()
+                        )),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "compare" => match agent.generate_compare(target) {
+                        Ok(c) => self.push_log(format!(
+                            "[RESEARCHER] Generated comparison for {}",
+                            c.options.join(" vs ")
+                        )),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "market" => match agent.generate_market(target) {
+                        Ok(_) => self.push_log(format!("[RESEARCHER] Generated market brief.")),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "brief" => match agent.generate_brief(target) {
+                        Ok(_) => self.push_log(format!("[RESEARCHER] Brief generated.")),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
+                    "report" => match agent.generate_report(target) {
+                        Ok(r) => self.push_log(format!("[RESEARCHER] Report generated: {}", r.id)),
+                        Err(e) => self.push_log(format!("[RESEARCHER] Error: {}", e)),
+                    },
                     _ => self.push_log(format!("[RESEARCHER] Unknown subcmd: {}", subcmd)),
                 }
                 true
             }
-
-            "/operator" | "@operator" | "@ops" | "@health" | "@logs" | "@incident" | "@deploy" | "@rollback" => {
+            "/collab" | "@collab" | "@team" | "@handoff" | "@workflow" | "@agentflow" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = parts.get(0).copied().unwrap_or("list");
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let manager = match crate::agent_collaboration::AgentCollaborationManager::new() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        self.push_log(format!("[COLLAB] Failed to initialize: {}", e));
+                        return true;
+                    }
+                };
+                match subcmd {
+                    "list" => match manager.list_sessions() {
+                        Ok(sessions) => {
+                            self.push_log(format!("[COLLAB] {} sessions found.", sessions.len()));
+                            for s in sessions {
+                                self.push_log(format!(
+                                    "  [{}] {} ({:?}) - {} steps",
+                                    s.id,
+                                    s.title,
+                                    s.status,
+                                    s.steps.len()
+                                ));
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "new" | "plan" => {
+                        let title = if target.is_empty() {
+                            "New Collaboration"
+                        } else {
+                            target
+                        };
+                        match manager.create_session(title, title, Some("startup-validation-flow"))
+                        {
+                            Ok(session) => {
+                                self.push_log(format!("[COLLAB] Session created: {}", session.id))
+                            }
+                            Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                        }
+                    }
+                    "show" => match manager.get_session(target) {
+                        Ok(Some(s)) => {
+                            self.push_log(format!(
+                                "[COLLAB] Session: {} ({:?})",
+                                s.title, s.status
+                            ));
+                            for step in s.steps {
+                                self.push_log(format!(
+                                    "  - {} ({}): {:?}",
+                                    step.agent, step.action, step.status
+                                ));
+                            }
+                        }
+                        Ok(None) => self.push_log(format!("[COLLAB] Session not found.")),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "start" => match manager.start_session(target) {
+                        Ok(s) => self.push_log(format!("[COLLAB] Session started: {}", s.id)),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "step" => match manager.advance_step(target) {
+                        Ok(s) => self.push_log(format!(
+                            "[COLLAB] Step advanced. Current status: {:?}",
+                            s.status
+                        )),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "pause" => match manager.pause_session(target) {
+                        Ok(s) => self.push_log(format!("[COLLAB] Session paused: {}", s.id)),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "resume" => match manager.resume_session(target) {
+                        Ok(s) => self.push_log(format!("[COLLAB] Session resumed: {}", s.id)),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "cancel" => match manager.cancel_session(target) {
+                        Ok(s) => self.push_log(format!("[COLLAB] Session cancelled: {}", s.id)),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "handoffs" => match manager.list_handoffs(target) {
+                        Ok(handoffs) => {
+                            self.push_log(format!("[COLLAB] {} handoffs found.", handoffs.len()));
+                            for h in handoffs {
+                                self.push_log(format!(
+                                    "  [{}] {} -> {}: {}",
+                                    h.id, h.from_agent, h.to_agent, h.title
+                                ));
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    "report" => match manager.generate_report(target) {
+                        Ok(r) => self.push_log(format!("[COLLAB] Report generated: {}", r.id)),
+                        Err(e) => self.push_log(format!("[COLLAB] Error: {}", e)),
+                    },
+                    _ => self.push_log(format!("[COLLAB] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+            "/operator" | "@operator" | "@ops" | "@health" | "@logs" | "@incident" | "@deploy"
+            | "@rollback" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = if cmd.starts_with("@") {
                     cmd.trim_start_matches('@')
@@ -4169,27 +4337,42 @@ impl App {
                         if let Ok(systems) = agent.list_systems() {
                             self.push_log(format!("[OPERATOR] {} systems found.", systems.len()));
                             for s in systems {
-                                self.push_log(format!("  [{}] {} (Status: {})", s.id, s.name, s.status));
+                                self.push_log(format!(
+                                    "  [{}] {} (Status: {})",
+                                    s.id, s.name, s.status
+                                ));
                             }
                         }
                     }
                     "system" | "show" => {
                         if target.is_empty() {
                             match agent.create_system("New System", "Web App", "Production") {
-                                Ok(s) => self.push_log(format!("[OPERATOR] System created: {}", s.id)),
+                                Ok(s) => {
+                                    self.push_log(format!("[OPERATOR] System created: {}", s.id))
+                                }
                                 Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                             }
                         } else {
                             if let Ok(Some(s)) = agent.get_system(target) {
-                                self.push_log(format!("[OPERATOR] System: {} ({})", s.name, s.status));
+                                self.push_log(format!(
+                                    "[OPERATOR] System: {} ({})",
+                                    s.name, s.status
+                                ));
                             } else {
                                 self.push_log(format!("[OPERATOR] System not found."));
                             }
                         }
                     }
                     "health" => {
-                        match agent.create_health_check(if target.is_empty() { "default" } else { target }) {
-                            Ok(hc) => self.push_log(format!("[OPERATOR] Health check generated: {} risk findings.", hc.risk_findings.len())),
+                        match agent.create_health_check(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(hc) => self.push_log(format!(
+                                "[OPERATOR] Health check generated: {} risk findings.",
+                                hc.risk_findings.len()
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
@@ -4200,31 +4383,63 @@ impl App {
                         }
                     }
                     "incident" => {
-                        match agent.create_incident(if target.is_empty() { "default" } else { target }) {
-                            Ok(inc) => self.push_log(format!("[OPERATOR] Incident analysis generated. Severity: {:?}", inc.severity)),
+                        match agent.create_incident(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(inc) => self.push_log(format!(
+                                "[OPERATOR] Incident analysis generated. Severity: {:?}",
+                                inc.severity
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
                     "deploy-plan" | "deploy" => {
-                        match agent.create_deployment_plan(if target.is_empty() { "default" } else { target }) {
-                            Ok(plan) => self.push_log(format!("[OPERATOR] Deployment plan ready. Requires approval: {}", plan.approval_requirements.join(", "))),
+                        match agent.create_deployment_plan(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(plan) => self.push_log(format!(
+                                "[OPERATOR] Deployment plan ready. Requires approval: {}",
+                                plan.approval_requirements.join(", ")
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
                     "ci" => {
-                        match agent.create_ci_review(if target.is_empty() { "default" } else { target }) {
-                            Ok(ci) => self.push_log(format!("[OPERATOR] CI/CD Review complete. Missing checks: {}", ci.missing_checks.len())),
+                        match agent.create_ci_review(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(ci) => self.push_log(format!(
+                                "[OPERATOR] CI/CD Review complete. Missing checks: {}",
+                                ci.missing_checks.len()
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
                     "rollback" => {
-                        match agent.create_rollback_plan(if target.is_empty() { "default" } else { target }) {
-                            Ok(rp) => self.push_log(format!("[OPERATOR] Rollback plan generated to version {}.", rp.version_tag_to_return_to)),
+                        match agent.create_rollback_plan(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(rp) => self.push_log(format!(
+                                "[OPERATOR] Rollback plan generated to version {}.",
+                                rp.version_tag_to_return_to
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
                     "runbook" => {
-                        match agent.create_runbook(if target.is_empty() { "default" } else { target }) {
+                        match agent.create_runbook(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
                             Ok(_) => self.push_log(format!("[OPERATOR] Runbook generated.")),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
@@ -4233,8 +4448,13 @@ impl App {
                         self.push_log(format!("[OPERATOR] Reliability check initiated."));
                     }
                     "report" => {
-                        match agent.create_report(if target.is_empty() { "default" } else { target }, "operator_health_report") {
-                            Ok(r) => self.push_log(format!("[OPERATOR] Report generated: {}", r.id)),
+                        match agent.create_report(
+                            if target.is_empty() { "default" } else { target },
+                            "operator_health_report",
+                        ) {
+                            Ok(r) => {
+                                self.push_log(format!("[OPERATOR] Report generated: {}", r.id))
+                            }
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
@@ -4243,7 +4463,8 @@ impl App {
                 true
             }
 
-            "/learner" | "@learner" | "@learn" | "@study" | "@dsa" | "@ml" | "@rust" | "@web3" | "@today" | "@revise" => {
+            "/learner" | "@learner" | "@learn" | "@study" | "@dsa" | "@ml" | "@rust" | "@web3"
+            | "@today" | "@revise" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = if cmd.starts_with("@") {
                     cmd.trim_start_matches('@')
@@ -4272,14 +4493,24 @@ impl App {
                         if let Ok(goals) = agent.list_goals() {
                             self.push_log(format!("[LEARNER] {} goals found.", goals.len()));
                             for g in goals {
-                                self.push_log(format!("  [{}] {} (Domain: {:?})", g.id, g.title, g.domain));
+                                self.push_log(format!(
+                                    "  [{}] {} (Domain: {:?})",
+                                    g.id, g.title, g.domain
+                                ));
                             }
                         }
                     }
                     "new-goal" | "learn" | "study" | "dsa" | "ml" | "rust" | "web3" => {
-                        let title = if target.is_empty() { "New Learning Goal" } else { target };
+                        let title = if target.is_empty() {
+                            "New Learning Goal"
+                        } else {
+                            target
+                        };
                         match agent.create_goal(title, domain) {
-                            Ok(g) => self.push_log(format!("[LEARNER] Goal created: {} (Level: {:?})", g.id, g.current_level)),
+                            Ok(g) => self.push_log(format!(
+                                "[LEARNER] Goal created: {} (Level: {:?})",
+                                g.id, g.current_level
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
@@ -4287,57 +4518,110 @@ impl App {
                         self.push_log(format!("[LEARNER] Level assessed for goal {}.", target));
                     }
                     "roadmap" => {
-                        match agent.create_roadmap(if target.is_empty() { "default" } else { target }) {
-                            Ok(rm) => self.push_log(format!("[LEARNER] Roadmap created with {} phases.", rm.phases.len())),
+                        match agent.create_roadmap(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(rm) => self.push_log(format!(
+                                "[LEARNER] Roadmap created with {} phases.",
+                                rm.phases.len()
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "week" => {
-                        match agent.generate_weekly_plan(if target.is_empty() { "default" } else { target }) {
-                            Ok(tasks) => self.push_log(format!("[LEARNER] Weekly plan created: {} tasks.", tasks.len())),
+                        match agent.generate_weekly_plan(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(tasks) => self.push_log(format!(
+                                "[LEARNER] Weekly plan created: {} tasks.",
+                                tasks.len()
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "today" => {
-                        match agent.generate_daily_plan(if target.is_empty() { "default" } else { target }) {
-                            Ok(tasks) => self.push_log(format!("[LEARNER] Today's plan: {} tasks.", tasks.len())),
+                        match agent.generate_daily_plan(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(tasks) => self.push_log(format!(
+                                "[LEARNER] Today's plan: {} tasks.",
+                                tasks.len()
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "practice" => {
-                        match agent.generate_practice_task(if target.is_empty() { "default" } else { target }) {
+                        match agent.generate_practice_task(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
                             Ok(pt) => self.push_log(format!("[LEARNER] Practice task generated.")),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "revise" => {
-                        let topic = if target.is_empty() { "General Revision" } else { target };
+                        let topic = if target.is_empty() {
+                            "General Revision"
+                        } else {
+                            target
+                        };
                         match agent.create_revision_checkpoint("default", topic) {
-                            Ok(cp) => self.push_log(format!("[LEARNER] Revision checkpoint generated for {}.", cp.topic)),
+                            Ok(cp) => self.push_log(format!(
+                                "[LEARNER] Revision checkpoint generated for {}.",
+                                cp.topic
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "project" => {
-                        match agent.create_project_plan(if target.is_empty() { "default" } else { target }) {
-                            Ok(plan) => self.push_log(format!("[LEARNER] Project plan generated:\n{}", plan)),
+                        match agent.create_project_plan(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(plan) => self
+                                .push_log(format!("[LEARNER] Project plan generated:\n{}", plan)),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "exam" => {
-                        match agent.generate_exam_prep(if target.is_empty() { "default" } else { target }) {
-                            Ok(plan) => self.push_log(format!("[LEARNER] Exam prep strategy generated:\n{}", plan)),
+                        match agent.generate_exam_prep(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(plan) => self.push_log(format!(
+                                "[LEARNER] Exam prep strategy generated:\n{}",
+                                plan
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "progress" => {
-                        match agent.log_progress(if target.is_empty() { "default" } else { target }) {
-                            Ok(pe) => self.push_log(format!("[LEARNER] Progress updated: {} mins spent.", pe.time_spent_minutes)),
+                        match agent.log_progress(if target.is_empty() { "default" } else { target })
+                        {
+                            Ok(pe) => self.push_log(format!(
+                                "[LEARNER] Progress updated: {} mins spent.",
+                                pe.time_spent_minutes
+                            )),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
                     "report" => {
-                        match agent.generate_report(if target.is_empty() { "default" } else { target }) {
-                            Ok(r) => self.push_log(format!("[LEARNER] Learning report generated: {}", r.id)),
+                        match agent.generate_report(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
+                            Ok(r) => self
+                                .push_log(format!("[LEARNER] Learning report generated: {}", r.id)),
                             Err(e) => self.push_log(format!("[LEARNER] Error: {}", e)),
                         }
                     }
@@ -4367,84 +4651,101 @@ impl App {
                         let campaigns = manager.list_campaigns();
                         self.push_log(format!("[SOCIALIZER] {} campaigns found.", campaigns.len()));
                         for c in campaigns {
-                            self.push_log(format!("  [{}] {} (State: {:?})", c.id, c.title, c.state));
+                            self.push_log(format!(
+                                "  [{}] {} (State: {:?})",
+                                c.id, c.title, c.state
+                            ));
                         }
                     }
                     "new-campaign" => {
-                        match manager.add_campaign("Mock Title".to_string(), "Mock Audience".to_string(), "Mock Value Prop".to_string(), None) {
-                            Ok(c) => self.push_log(format!("[SOCIALIZER] Campaign created: {}", c.id)),
+                        match manager.add_campaign(
+                            "Mock Title".to_string(),
+                            "Mock Audience".to_string(),
+                            "Mock Value Prop".to_string(),
+                            None,
+                        ) {
+                            Ok(c) => {
+                                self.push_log(format!("[SOCIALIZER] Campaign created: {}", c.id))
+                            }
                             Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
                         }
                     }
-                    "audience" => {
-                        match manager.generate_audience_map(target) {
-                            Ok(a) => self.push_log(format!("[SOCIALIZER] Audience mapped: {} segments", a.segments.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "channels" => {
-                        match manager.generate_channel_strategy(target) {
-                            Ok(c) => self.push_log(format!("[SOCIALIZER] Channel strategy: {} channels", c.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "angles" => {
-                        match manager.generate_content_angles(target) {
-                            Ok(a) => self.push_log(format!("[SOCIALIZER] Content angles: {} generated", a.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "reddit" => {
-                        match manager.generate_draft(target, "Reddit") {
-                            Ok(d) => self.push_log(format!("[SOCIALIZER] Reddit Draft generated: {} warnings", d.warnings.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "linkedin" => {
-                        match manager.generate_draft(target, "LinkedIn") {
-                            Ok(d) => self.push_log(format!("[SOCIALIZER] LinkedIn Draft generated")),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "x" => {
-                        match manager.generate_draft(target, "X") {
-                            Ok(d) => self.push_log(format!("[SOCIALIZER] X Draft generated")),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "launch" => {
-                        match manager.generate_launch_plan(target) {
-                            Ok(lp) => self.push_log(format!("[SOCIALIZER] Launch Plan generated: {} checklist items", lp.pre_launch_checklist.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "calendar" => {
-                        match manager.generate_calendar(target) {
-                            Ok(c) => self.push_log(format!("[SOCIALIZER] Calendar: {} items", c.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "outreach" => {
-                        match manager.generate_outreach(target) {
-                            Ok(d) => self.push_log(format!("[SOCIALIZER] Outreach draft: {} warnings", d.warnings.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "feedback" => {
-                        match manager.track_feedback(target) {
-                            Ok(fb) => self.push_log(format!("[SOCIALIZER] Feedback: {} positive signals", fb.positive_signals.len())),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "report" => {
-                        match manager.generate_report(target) {
-                            Ok(r) => self.push_log(format!("[SOCIALIZER] Report: {}", r)),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
+                    "audience" => match manager.generate_audience_map(target) {
+                        Ok(a) => self.push_log(format!(
+                            "[SOCIALIZER] Audience mapped: {} segments",
+                            a.segments.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "channels" => match manager.generate_channel_strategy(target) {
+                        Ok(c) => self.push_log(format!(
+                            "[SOCIALIZER] Channel strategy: {} channels",
+                            c.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "angles" => match manager.generate_content_angles(target) {
+                        Ok(a) => self.push_log(format!(
+                            "[SOCIALIZER] Content angles: {} generated",
+                            a.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "reddit" => match manager.generate_draft(target, "Reddit") {
+                        Ok(d) => self.push_log(format!(
+                            "[SOCIALIZER] Reddit Draft generated: {} warnings",
+                            d.warnings.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "linkedin" => match manager.generate_draft(target, "LinkedIn") {
+                        Ok(d) => self.push_log(format!("[SOCIALIZER] LinkedIn Draft generated")),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "x" => match manager.generate_draft(target, "X") {
+                        Ok(d) => self.push_log(format!("[SOCIALIZER] X Draft generated")),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "launch" => match manager.generate_launch_plan(target) {
+                        Ok(lp) => self.push_log(format!(
+                            "[SOCIALIZER] Launch Plan generated: {} checklist items",
+                            lp.pre_launch_checklist.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "calendar" => match manager.generate_calendar(target) {
+                        Ok(c) => self.push_log(format!("[SOCIALIZER] Calendar: {} items", c.len())),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "outreach" => match manager.generate_outreach(target) {
+                        Ok(d) => self.push_log(format!(
+                            "[SOCIALIZER] Outreach draft: {} warnings",
+                            d.warnings.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "feedback" => match manager.track_feedback(target) {
+                        Ok(fb) => self.push_log(format!(
+                            "[SOCIALIZER] Feedback: {} positive signals",
+                            fb.positive_signals.len()
+                        )),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
+                    "report" => match manager.generate_report(target) {
+                        Ok(r) => self.push_log(format!("[SOCIALIZER] Report: {}", r)),
+                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
+                    },
                     "from-idea" => {
-                        match manager.add_campaign("Idea Title".to_string(), "Idea Audience".to_string(), "Idea Prop".to_string(), Some(target.to_string())) {
-                            Ok(c) => self.push_log(format!("[SOCIALIZER] Campaign created from idea: {}", c.id)),
+                        match manager.add_campaign(
+                            "Idea Title".to_string(),
+                            "Idea Audience".to_string(),
+                            "Idea Prop".to_string(),
+                            Some(target.to_string()),
+                        ) {
+                            Ok(c) => self.push_log(format!(
+                                "[SOCIALIZER] Campaign created from idea: {}",
+                                c.id
+                            )),
                             Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
                         }
                     }
@@ -4650,8 +4951,8 @@ impl App {
         for log in hook_logs {
             self.push_log(log);
         }
-let is_first = self.history.iter().all(|m| m.role != "user");
-        
+        let is_first = self.history.iter().all(|m| m.role != "user");
+
         // --- PHASE 5.20 PROMPTFORGE DEEP AGENT WIRING ---
         let mut user_override = None;
         let mut final_msg = msg.clone();
@@ -4665,70 +4966,78 @@ let is_first = self.history.iter().all(|m| m.role != "user");
 
         let route = self.swarm_router.route(&final_msg);
         let agent_id = route.profile.name.to_lowercase().replace(" ", "_");
-        
+
         let pf_client = crate::promptforge::PromptForgeClient::new(self.config.promptforge.clone());
-        let refined_msg = pf_client.maybe_refine_for_agent(&agent_id, &final_msg, "context_placeholder", user_override).await;
-        
+        let refined_msg = pf_client
+            .maybe_refine_for_agent(&agent_id, &final_msg, "context_placeholder", user_override)
+            .await;
+
         if refined_msg != final_msg {
-            self.push_log(format!("[PROMPTFORGE] Refined prompt for {}: \n{}", agent_id, refined_msg));
+            self.push_log(format!(
+                "[PROMPTFORGE] Refined prompt for {}: \n{}",
+                agent_id, refined_msg
+            ));
             final_msg = refined_msg.clone();
-            
+
             // Timeline Integration
-            let _ = self.timeline_manager.record_event(crate::timeline::TimelineEvent {
-                id: uuid::Uuid::new_v4().to_string(),
-                timestamp: chrono::Utc::now().timestamp(),
-                project_path: None,
-                session_id: Some(self.session_id.clone()),
-                source: crate::timeline::TimelineSource::System,
-                kind: crate::timeline::TimelineEventKind::PromptForgeRefined,
-                title: "PromptForge Refined".to_string(),
-                summary: format!("Prompt refined for agent {}", agent_id),
-                actor: "promptforge".to_string(),
-                related_ids: vec![],
-                file_refs: vec![],
-                git_refs: vec![],
-                checkpoint_refs: vec![],
-                job_refs: vec![],
-                approval_refs: vec![],
-                skill_refs: vec![],
-                recipe_refs: vec![],
-                memory_refs: vec![],
-                risk_level: crate::timeline::TimelineRiskLevel::Low,
-                privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
-                redaction_status: "none".to_string(),
-            });
+            let _ = self
+                .timeline_manager
+                .record_event(crate::timeline::TimelineEvent {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    timestamp: chrono::Utc::now().timestamp(),
+                    project_path: None,
+                    session_id: Some(self.session_id.clone()),
+                    source: crate::timeline::TimelineSource::System,
+                    kind: crate::timeline::TimelineEventKind::PromptForgeRefined,
+                    title: "PromptForge Refined".to_string(),
+                    summary: format!("Prompt refined for agent {}", agent_id),
+                    actor: "promptforge".to_string(),
+                    related_ids: vec![],
+                    file_refs: vec![],
+                    git_refs: vec![],
+                    checkpoint_refs: vec![],
+                    job_refs: vec![],
+                    approval_refs: vec![],
+                    skill_refs: vec![],
+                    recipe_refs: vec![],
+                    memory_refs: vec![],
+                    risk_level: crate::timeline::TimelineRiskLevel::Low,
+                    privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
+                    redaction_status: "none".to_string(),
+                });
         } else if self.config.promptforge.enabled {
-             // Just record bypass or fail
-             let _ = self.timeline_manager.record_event(crate::timeline::TimelineEvent {
-                id: uuid::Uuid::new_v4().to_string(),
-                timestamp: chrono::Utc::now().timestamp(),
-                project_path: None,
-                session_id: Some(self.session_id.clone()),
-                source: crate::timeline::TimelineSource::System,
-                kind: crate::timeline::TimelineEventKind::PromptForgeBypassed,
-                title: "PromptForge Bypassed".to_string(),
-                summary: "Prompt refinement bypassed or disabled".to_string(),
-                actor: "promptforge".to_string(),
-                related_ids: vec![],
-                file_refs: vec![],
-                git_refs: vec![],
-                checkpoint_refs: vec![],
-                job_refs: vec![],
-                approval_refs: vec![],
-                skill_refs: vec![],
-                recipe_refs: vec![],
-                memory_refs: vec![],
-                risk_level: crate::timeline::TimelineRiskLevel::None,
-                privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
-                redaction_status: "none".to_string(),
-            });
+            // Just record bypass or fail
+            let _ = self
+                .timeline_manager
+                .record_event(crate::timeline::TimelineEvent {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    timestamp: chrono::Utc::now().timestamp(),
+                    project_path: None,
+                    session_id: Some(self.session_id.clone()),
+                    source: crate::timeline::TimelineSource::System,
+                    kind: crate::timeline::TimelineEventKind::PromptForgeBypassed,
+                    title: "PromptForge Bypassed".to_string(),
+                    summary: "Prompt refinement bypassed or disabled".to_string(),
+                    actor: "promptforge".to_string(),
+                    related_ids: vec![],
+                    file_refs: vec![],
+                    git_refs: vec![],
+                    checkpoint_refs: vec![],
+                    job_refs: vec![],
+                    approval_refs: vec![],
+                    skill_refs: vec![],
+                    recipe_refs: vec![],
+                    memory_refs: vec![],
+                    risk_level: crate::timeline::TimelineRiskLevel::None,
+                    privacy_level: crate::timeline::TimelinePrivacyLevel::Standard,
+                    redaction_status: "none".to_string(),
+                });
         }
-        
+
         msg = final_msg;
         // -------------------------------------------------
 
         if is_first {
-
             if let Some(ref brain) = self.brain {
                 let title = crate::app::generate_session_title(&msg);
                 let _ = brain.update_session_title(&self.session_id, &title);
