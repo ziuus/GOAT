@@ -2,75 +2,116 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Clock, TerminalSquare, Calendar, ScrollText, Settings, ShieldCheck, MessageSquare, FolderTree, GitBranch, Command, FileText, Sparkles, Wand2, Library, Workflow, BrainCircuit, Radio, Users, Search, BookOpen } from 'lucide-react';
+import { 
+  Activity, Clock, TerminalSquare, Calendar, ScrollText, 
+  Settings, ShieldCheck, MessageSquare, FolderTree, GitBranch, 
+  Command, FileText, Sparkles, Wand2, Library, Workflow, 
+  BrainCircuit, Radio, Users, Search, BookOpen, Layers
+} from 'lucide-react';
 
 import pkg from '../../package.json';
 
-const navItems = [
-  { name: 'Overview', href: '/', icon: Activity },
-  { name: 'Agents', href: '/agents', icon: Users },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Cofounder', href: '/cofounder', icon: Sparkles },
-  { name: 'Socializer', href: '/socializer', icon: Users },
-  { name: 'Researcher', href: '/researcher', icon: Search },
-  { name: 'Operator', href: '/operator', icon: TerminalSquare },
-  { name: 'Learner', href: '/learner', icon: BookOpen },
-  { name: 'AgentFlow', href: '/agentflow', icon: Activity },
-  { name: 'PromptForge', href: '/promptforge', icon: Sparkles },
-  { name: 'Commands', href: '/commands', icon: Command },
-  { name: 'Chat', href: '/chat', icon: MessageSquare },
-  { name: 'Skill Directory', href: '/skills', icon: Library },
-  { name: 'AI Studio', href: '/studio', icon: Wand2 },
-  { name: 'Recipes', href: '/recipes', icon: Workflow },
-  { name: 'Onboarding', href: '/onboarding', icon: Activity },
-  { name: 'Project Profile', href: '/project', icon: FolderTree },
-  { name: 'Repo Explorer', href: '/repo', icon: FolderTree },
-  { name: 'Diffs', href: '/diffs', icon: GitBranch },
-  { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
-  { name: 'Memory Galaxy', href: '/memory', icon: Sparkles },
-  { name: 'Brain Search', href: '/brain', icon: BrainCircuit },
-  { name: 'Timeline', href: '/timeline', icon: Calendar },
-  { name: 'Audit Log', href: '/audit', icon: FileText },
-  { name: 'Jobs', href: '/jobs', icon: TerminalSquare },
-  { name: 'Schedule', href: '/schedule', icon: Calendar },
-  { name: 'Hooks', href: '/hooks', icon: Clock },
-  { name: 'GitHub Workflow', href: '/github', icon: GitBranch },
-  { name: 'Browser QA', href: '/browser', icon: Activity },
-  { name: 'Transports & Voice', href: '/transports', icon: Radio },
-  { name: 'MCP & Tools', href: '/mcp', icon: TerminalSquare },
-  { name: 'Logs', href: '/logs', icon: ScrollText },
-  { name: 'Settings', href: '/settings', icon: Settings },
+const navGroups = [
+  {
+    label: "Core",
+    items: [
+      { name: 'Dashboard', href: '/', icon: Activity },
+      { name: 'Chat', href: '/chat', icon: MessageSquare },
+      { name: 'Command Palette', href: '/commands', icon: Command },
+    ]
+  },
+  {
+    label: "Agents",
+    items: [
+      { name: 'Prime Agents', href: '/agents', icon: Layers },
+      { name: 'Cofounder', href: '/cofounder', icon: Sparkles },
+      { name: 'Socializer', href: '/socializer', icon: Users },
+      { name: 'Designer', href: '/designer', icon: Sparkles },
+      { name: 'Researcher', href: '/researcher', icon: Search },
+      { name: 'Operator', href: '/operator', icon: TerminalSquare },
+      { name: 'Learner', href: '/learner', icon: BookOpen },
+    ]
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { name: 'PromptForge', href: '/promptforge', icon: Wand2 },
+      { name: 'Brain Search', href: '/brain', icon: BrainCircuit },
+      { name: 'Memory Galaxy', href: '/memory', icon: Sparkles },
+      { name: 'AI Studio', href: '/studio', icon: Wand2 },
+    ]
+  },
+  {
+    label: "Workflows",
+    items: [
+      { name: 'AgentFlow', href: '/agentflow', icon: Workflow },
+      { name: 'Recipes', href: '/recipes', icon: Workflow },
+      { name: 'Timeline', href: '/timeline', icon: Calendar },
+      { name: 'Reports', href: '/reports', icon: FileText },
+    ]
+  },
+  {
+    label: "System",
+    items: [
+      { name: 'Approvals', href: '/approvals', icon: ShieldCheck },
+      { name: 'Settings', href: '/settings', icon: Settings },
+      { name: 'Logs', href: '/logs', icon: ScrollText },
+    ]
+  }
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col">
-      <div className="p-6 border-b border-border">
-        <h1 className="text-lg font-bold tracking-tight">GOAT Dashboard <span className="text-xs font-normal text-muted-foreground ml-1">v{pkg.version}</span></h1>
-        <p className="text-xs text-muted-foreground mt-1">General Omniscient Agentic Tool</p>
+    <aside className="w-64 border-r border-white/5 bg-[#050505] flex flex-col text-slate-300">
+      <div className="p-6 border-b border-white/5 shrink-0">
+        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <Layers className="w-5 h-5 text-indigo-500" />
+          GOAT <span className="text-[10px] uppercase font-semibold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded ml-1">OS Alpha</span>
+        </h1>
+        <p className="text-xs text-slate-500 mt-2">Local-first AI Agent System</p>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {item.name}
-            </Link>
-          );
-        })}
+
+      <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-none">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2 px-2">
+              {group.label}
+            </h3>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-indigo-500/10 text-indigo-400'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
+
+      <div className="p-4 border-t border-white/5 shrink-0 bg-[#0A0A0A]">
+        <div className="flex items-start gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3">
+          <ShieldCheck className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-emerald-400">ApprovalGate Active</p>
+            <p className="text-[10px] text-emerald-500/70 mt-0.5">System is protected</p>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }

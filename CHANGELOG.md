@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **UI/UX Overhaul (Phase 5.26)**: Completely overhauled the dashboard layout, introducing a unified design system (`PageShell`, `FeatureCard`, `EmptyState`) to enforce a calm, modern, dark-first UI.
+- **Prime Agents Command Center**: Redesigned `/agents` to serve as a command center instead of a simple feature list.
+- **Sidebar Organization**: Reorganized navigation into OS-like groupings (Core, Agents, Intelligence, Workflows, System) with active connection and safety states.
+- **Public Positioning**: Rewrote `README.md` to position GOAT as a general AI Agent OS (for builders, students, founders, creators, researchers, and operators), not just a coding assistant. Updated `docs/GITHUB_REPO_SETUP.md` with new GitHub description and topics.
+
 ## [0.1.0-alpha.1] — Phase 5.15: Public Repo Polish & Release Packaging (2026-06-11)
 
 ### Added

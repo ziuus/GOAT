@@ -1,28 +1,35 @@
-# GOAT Dashboard UX Audit
+# GOAT Dashboard UX Audit (Phase 5.26 Update)
 
 **Date:** June 2026
 
-## Overview
-The Web Dashboard (Next.js 15, React 19, Tailwind) acts as the visual companion to the GOAT Daemon. It was recently overhauled in Phase 4.6 to include a robust design system and dynamic theming.
+## Goal
+Audit the existing dashboard routes and propose improvements for a modern, clean, premium "Agent OS" feel that serves builders, students, founders, creators, researchers, and operators.
 
-## Layout Analysis
-- **Navigation (Sidebar):** Clean, distinct, and accurately maps to all core feature areas.
-- **Top Bar / Connection Status:** The token authentication flow is secure. The Settings page clearly dictates the connection state and warns against non-local bindings.
-- **Theme Switching:** Functional across three modes (GOAT Dark, Minimal Dark, High Contrast). Transition is seamless.
-- **Command Palette:** The `Ctrl+K` modal provides an excellent power-user navigation flow.
+## 1. Navigation Problems
+* **Flat Sidebar Hierarchy**: The sidebar has over 30 items without proper grouping. `navItems` in `Sidebar.tsx` mixes home, agents, system, and logs all in one flat list.
+* **Missing "OS" Context**: The sidebar lacks a clear active connection state indicating the daemon's heartbeat or "ApprovalGate Protected" trust signals.
 
-## Specific Views
-- **Chat:** The chat interface correctly parses markdown and diffs. The `Ctrl+Enter` flow is intuitive. The mode selector (Chat/Plan/Act) is highly visible.
-- **Repo & Diffs:** Uses a custom graceful viewer since `@monaco-editor/react` is partially blocked by offline constraints. The viewer handles line numbers and color-coded git diffs perfectly.
-- **Approvals:** Excellent risk-level filtering (Low/Medium/High/Critical) with clear accept/deny actions.
-- **Audit/Jobs:** Standard data grids. Could use better pagination if logs grow extremely large.
+## 2. Home Page (`/`)
+* **Weak Landing**: Currently an overview of metrics but lacks a clear "Agent OS" feeling. It does not instantly answer "What is GOAT?" or provide immediate quick actions for builders, founders, or learners.
+* **Missing Workflows**: No clear paths like "Validate an Idea", "Plan Learning", or "Refine Prompt".
 
-## Discovered Issues (Small/Medium)
-1. **Empty States:** While `EmptyState` components exist, some pages (like Hooks/Jobs) still use raw text placeholders when empty.
-2. **Mobile Behavior:** The sidebar correctly collapses, but padding on the chat input box feels cramped on very narrow viewports.
-3. **Loading States:** The skeleton UI occasionally flashes briefly even on fast local connections, which can be visually jarring.
+## 3. Prime Agents Pages (`/agents`, `/cofounder`, etc.)
+* **Visual Clutter**: The agents page displays agents but looks like a generic feature list rather than a "Command Center".
+* **Inconsistent Layouts**: Each agent page has a slightly different header or structure. The empty/loading/error states are missing or basic.
+* **Developer Jargon**: Too many labels describe the technical backend implementation rather than the user intent.
 
-## Verdict
-**Is it polished?** Yes, the Phase 4.6 overhaul elevated the dashboard to a premium feel.
-**Are error states clear?** Connection failures correctly guide the user to the `Settings` page.
-**Is it ready for Desktop wrap?** Yes. The UI relies strictly on local API calls and is fully responsive, making it an ideal candidate for a Tauri webview.
+## 4. PromptForge (`/promptforge`)
+* **No Compiler Feel**: It lacks the robust feel of an "intelligent compiler." Needs better diff/comparison views, explicit warnings that it doesn't execute tasks, and a prominent mode selector.
+
+## 5. UI Components & Style
+* **Inconsistent Cards & Spacing**: Cards vary in padding and border styles.
+* **Glassy Overload vs. Flat Design**: Needs a balanced "restrained glassmorphism" dark-first theme. Currently, some areas feel cramped.
+* **Missing Design System**: No centralized components like `PageShell`, `EmptyState`, or `FeatureCard` in a shared location for all views.
+
+## 6. Learner OS Integration
+* **Preservation Needed**: The Learner OS has good UX patterns from Phase 5.25. These should be preserved and elevated into global reusable components.
+
+## Proposed Design System Approach
+1. Create `components/ui/` with primitives (`PageShell`, `SectionHeader`, `FeatureCard`, `StatusBadge`, `EmptyState`, `LoadingState`, `ErrorState`, `SafetyNotice`).
+2. Restructure `Sidebar.tsx` into categorized groups (`Intelligence`, `Workflows`, `System`).
+3. Refactor the `page.tsx` routes to use `PageShell`.

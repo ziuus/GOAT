@@ -83,6 +83,11 @@ Status legend:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
+| TUI (Terminal UI) | 🟢 Works | Main navigation, chat, modal systems robust. |
+| Daemon / API | 🟢 Works | Headless mode fully implemented. |
+| Web Dashboard | 🟢 Works | Overhauled in Phase 5.26 with unified Design System, grouped sidebar, and command center. Next.js 15 app. |
+| Tauri Desktop App | 🟡 Partial | Native window spawns dashboard webview. Menu bar missing. |
+| Agent Collaboration | 🟢 Works | Implemented via `AgentCollaborationManager` (sessions, handoffs, workflows). |
 | ReAct loop (plan → act → observe) | `working` | Up to 10 iterations |
 | Configurable max iterations | `planned` | Currently hardcoded to 10 |
 | Tool calling dispatch | `working` | Native + MCP tools |
