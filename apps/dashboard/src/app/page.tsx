@@ -84,7 +84,10 @@ export default function Home() {
             </div>
 
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-1">Quick Actions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <Link href="/agentflow">
+                <FeatureCard title="Start AgentFlow" description="Collaborate across multiple agents in a workflow." icon={<Layers className="w-5 h-5 text-indigo-400" />} className="h-full border-indigo-500/20 bg-indigo-500/5" />
+              </Link>
               <Link href="/cofounder">
                 <FeatureCard title="Validate an idea" description="Use Cofounder to plan MVPs and features." icon={<Sparkles className="w-5 h-5" />} className="h-full" />
               </Link>
@@ -98,9 +101,14 @@ export default function Home() {
                 <FeatureCard title="Research a topic" description="Gather source-grounded insights and competitor scans." icon={<Search className="w-5 h-5" />} className="h-full" />
               </Link>
             </div>
-          </section>
+            
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-1">Active Collaborations</h2>
+            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 flex flex-col items-center justify-center min-h-[150px] text-slate-500 mb-6">
+              <Activity className="w-8 h-8 mb-3 opacity-50" />
+              <p>No active AgentFlow sessions.</p>
+              <Link href="/agentflow" className="text-indigo-400 mt-2 text-sm hover:underline">View AgentFlow</Link>
+            </div>
 
-          <section>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4 px-1">Recent Activity</h2>
             <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px] text-slate-500">
               <Activity className="w-8 h-8 mb-3 opacity-50" />

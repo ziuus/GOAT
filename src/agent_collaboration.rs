@@ -43,6 +43,8 @@ pub struct AgentCollaborationSession {
     pub timeline_refs: Vec<String>,
     pub report_refs: Vec<String>,
     pub brain_refs: Vec<String>,
+    pub runtime_job_refs: Vec<String>,
+    pub approval_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +60,7 @@ pub struct AgentCollaborationStep {
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
     pub artifacts_produced: Vec<String>,
+    pub runtime_job_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,6 +209,8 @@ impl AgentCollaborationManager {
             timeline_refs: vec![],
             report_refs: vec![],
             brain_refs: vec![],
+            runtime_job_refs: vec![],
+            approval_refs: vec![],
         };
         Self::append_jsonl(&self.sessions_file(), &session)?;
         Ok(session)
@@ -240,6 +245,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -253,6 +259,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -266,6 +273,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -279,6 +287,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -292,6 +301,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                 ];
             }
@@ -315,6 +325,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -328,6 +339,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -341,6 +353,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -354,6 +367,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                 ];
             }
@@ -376,6 +390,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -389,6 +404,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -402,6 +418,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                 ];
             }
@@ -425,6 +442,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -438,6 +456,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -451,6 +470,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -464,6 +484,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                 ];
             }
@@ -486,6 +507,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -499,6 +521,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -512,6 +535,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                     AgentCollaborationStep {
                         id: Uuid::new_v4().to_string(),
@@ -525,6 +549,7 @@ impl AgentCollaborationManager {
                         started_at: None,
                         completed_at: None,
                         artifacts_produced: vec![],
+                        runtime_job_id: None,
                     },
                 ];
             }
@@ -542,6 +567,7 @@ impl AgentCollaborationManager {
                     started_at: None,
                     completed_at: None,
                     artifacts_produced: vec![],
+                    runtime_job_id: None,
                 }];
             }
         }

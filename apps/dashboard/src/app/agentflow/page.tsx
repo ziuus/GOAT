@@ -177,11 +177,21 @@ export default function AgentFlowPage() {
                                 <AlertTriangle className="w-3.5 h-3.5" /> Requires Approval
                               </div>
                             )}
+                            {step.runtime_job_id && (
+                              <div className="mt-2 text-xs text-slate-500 truncate">
+                                Job Ref: {step.runtime_job_id}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
+                </div>
+                
+                <div className="mt-6 pt-4 border-t border-white/10 flex items-center gap-2 text-xs text-slate-400">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  <p><strong>Safety notice:</strong> Collaboration is visible, cancellable, and runtime-backed.</p>
                 </div>
               </div>
             ) : (

@@ -113,6 +113,7 @@ pub struct GoatRuntime {
     pub transport_manager: crate::transports::TransportManager,
     pub voice_manager: crate::voice::VoiceManager,
     pub agent_runtime: crate::agent_runtime::AgentRuntime,
+    pub collaboration_manager: crate::agent_collaboration::AgentCollaborationManager,
 }
 
 impl GoatRuntime {
@@ -315,6 +316,8 @@ impl GoatRuntime {
                 paths.runtime_dir.clone(),
             )
             .expect("Failed to initialize Agent Runtime"),
+            collaboration_manager: crate::agent_collaboration::AgentCollaborationManager::new()
+                .expect("Failed to initialize AgentCollaborationManager"),
         };
 
         (runtime, boot_log)
