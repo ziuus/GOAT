@@ -1,0 +1,62 @@
+name: Alpha Feedback
+description: Provide feedback, report a bug, or suggest an improvement for the GOAT Alpha.
+title: "[Alpha Feedback]: "
+labels: ["alpha", "feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing the GOAT Alpha! Please use this form to report your experience. Ensure you've read `docs/GOAT_KNOWN_LIMITATIONS.md` first.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to do?
+      description: Explain the goal or workflow you were attempting.
+    validations:
+      required: true
+  - type: textarea
+    id: worked
+    attributes:
+      label: What worked?
+      description: Did any part of the process succeed as expected?
+    validations:
+      required: false
+  - type: textarea
+    id: confusing
+    attributes:
+      label: What was confusing?
+      description: Describe any UX/UI friction, unclear instructions, or unexpected behavior.
+    validations:
+      required: false
+  - type: textarea
+    id: broke
+    attributes:
+      label: What broke?
+      description: If you encountered an error, paste it here.
+    validations:
+      required: false
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Which interface were you using?
+      options:
+        - Dashboard (Next.js)
+        - TUI (Terminal UI)
+        - Daemon (Headless API)
+        - Desktop (Tauri)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: e.g. macOS Sonoma, Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Screenshots
+      description: Paste any relevant logs from `logs/goat.log.*` or drag-and-drop screenshots here.
+    validations:
+      required: false

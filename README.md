@@ -101,7 +101,7 @@ GOAT provides multiple unified ways to access your agents:
 ## 🚀 Current Status
 
 > **Status:** Active Alpha Development
-> Many systems are implemented, but some integrations are still experimental or partial. Expect rapid changes.
+> **WARNING:** GOAT is in active alpha. Some systems are experimental or partially wired. Use with care and review actions before approval. Expect rapid changes.
 
 See [docs/GOAT_FEATURE_MATRIX.md](docs/GOAT_FEATURE_MATRIX.md) for an honest, up-to-date status of what works.
 
@@ -159,14 +159,17 @@ npm run dev
 
 ## 📸 Screenshots
 
-*(Screenshots are being collected for the first alpha release. Placeholders below)*
+*(Screenshots are being collected for the first alpha release. Once captured, they will appear below)*
 
-* `[Dashboard UI Placeholder]`
-* `[Prime Agents View Placeholder]`
-* `[Learner OS Roadmap Placeholder]`
-* `[Cofounder Validation Report Placeholder]`
-* `[PromptForge Refinement Placeholder]`
-* `[Memory Galaxy Search Placeholder]`
+* `![Home Dashboard](docs/assets/screenshots/01-home-dashboard.png)`
+* `![Agent Command Center](docs/assets/screenshots/02-agent-command-center.png)`
+* `![Learner OS](docs/assets/screenshots/03-learner-os.png)`
+* `![Cofounder](docs/assets/screenshots/04-cofounder.png)`
+* `![PromptForge](docs/assets/screenshots/05-promptforge.png)`
+* `![Reports](docs/assets/screenshots/06-reports.png)`
+* `![Timeline](docs/assets/screenshots/07-timeline.png)`
+* `![Brain Search](docs/assets/screenshots/08-brain-search.png)`
+* `![Sidebar Safety](docs/assets/screenshots/09-sidebar-safety.png)`
 
 ## 📚 Documentation Index
 

@@ -17,3 +17,18 @@ Thank you for your interest in contributing to GOAT! We are in early alpha and w
 - **Modular Design:** Keep the core agent logic decoupled from specific UI implementations.
 
 See [docs/README.md](docs/README.md) for more architectural resources.
+
+## Good First Contributions
+
+If you're looking to help out, here are great places to start:
+* Docs cleanup and typo fixes
+* Screenshots for the README
+* UI polish in the Next.js dashboard
+* Dashboard empty states improvements
+* Agent workflow examples and recipes
+* Bug reports
+* Small provider integrations
+* Writing tests
+
+**⚠️ Important Warning:**
+For large features or major architectural changes, please open an issue first to discuss it before writing code. This prevents wasted effort!

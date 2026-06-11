@@ -1,16 +1,16 @@
 # GOAT Alpha Release Checklist
 
-Before tagging and releasing `0.1.0-alpha.1` (or any subsequent alpha), ensure the following checklist is completed:
+Before tagging and releasing `0.14.0-alpha.1` (or any subsequent alpha), ensure the following strict checklist is completed:
 
-- [ ] **README Polished:** Positioning is clear ("Not just for developers"), badges are accurate, and quick start commands are correct.
-- [ ] **Repo Settings:** GitHub description and topics are set manually according to `docs/GITHUB_REPO_SETUP.md`.
-- [ ] **Screenshots Collected:** All required screenshots in `docs/assets/screenshots/README.md` are captured and linked.
-- [ ] **Install Works:** `git clone` and `cargo build` run cleanly.
-- [ ] **Doctor Works:** `cargo run --release -- doctor` executes without crashing.
-- [ ] **Dashboard Builds:** `cd apps/dashboard && npm run build` completes with 0 errors.
-- [ ] **Core Workflows Tested:** Ran through all 5 workflows in `docs/GOAT_DOGFOODING_GUIDE.md`.
-- [ ] **No Obvious Dead Buttons:** "Coming soon" features are explicitly disabled or labeled in the UI. No silent failures.
+- [ ] **README Polished:** Positioning is clear, warnings are present, badges are accurate, and quick start commands are verified.
+- [ ] **Screenshots Ready:** All required screenshots in `docs/assets/screenshots/README.md` are captured and named correctly.
+- [ ] **Smoke Test Completed:** Ran through all steps in `docs/GOAT_ALPHA_SMOKE_TEST.md`.
 - [ ] **Feature Matrix Honest:** `docs/GOAT_FEATURE_MATRIX.md` strictly labels what is Working vs. Experimental.
-- [ ] **Known Limitations Listed:** Clearly stated in the README and Matrix.
-- [ ] **No Secrets:** Ran `git grep` to ensure no hardcoded API keys or tokens are in the codebase.
-- [ ] **Release Notes Drafted:** `CHANGELOG.md` is updated with the unreleased section moved to a versioned tag.
+- [ ] **Known Limitations:** `docs/GOAT_KNOWN_LIMITATIONS.md` exists and is up-to-date.
+- [ ] **Issue Templates:** `alpha-feedback.yml` template exists.
+- [ ] **Docs Links:** All links in the documentation index are working.
+- [ ] **No Fake Claims:** The system does exactly what it says it does.
+- [ ] **No Secrets:** Verified no hardcoded API keys, tokens, or personal paths are in the codebase.
+- [ ] **Dashboard Build Passes:** `npm run build` succeeds locally.
+- [ ] **Cargo Tests Pass:** `cargo test` executes successfully.
+- [ ] **Release Notes:** `docs/releases/GOAT_0.14.0_ALPHA_1.md` is drafted and accurate.
