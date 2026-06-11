@@ -46,7 +46,21 @@ All data is stored in `~/.local/share/goat/agents/prime/learner/`:
 - **Privacy**: Does not store unnecessary sensitive personal details in the progress logs.
 - **Handoffs**: Learner can prepare "Builder Handoffs" for project-based tasks, but will not automatically execute code generation.
 
+## Dashboard UX & Journey OS (Phase 5.25)
+The Learner UI in the GOAT Dashboard operates as an AI Learning OS. It replaces static forms with a **Journey-style Visual Roadmap**:
+- **Overview**: Goal summary and target tracking.
+- **Roadmap Tree**: Vertical timeline rendering of phases and modules.
+- **Daily Focus**: Bite-sized, manageable daily tasks to prevent burnout.
+- **Practice & Revision**: Dedicated panels for problem sets and active recall with confidence logging.
+- **Progress & Reports**: Visual tracking of minutes spent and weak area identification.
+- **Safety Notice**: Permanently visible reminder that realistic scheduling is active.
+- **WebSocket Readiness**: The `LearnerAgentStatus` component is built to accept future WebSocket/SSE streams for real-time live generation feedback.
+
+## Roadmap Templates
+Groundwork is laid for Template Roadmaps. A "DSA Masterclass" placeholder exists in the UI to rapidly spawn predefined `DSA` goals. In the future, this will link to curated syllabus files.
+
 ## Future Phases
 
 - Integration with PromptForge for highly customized, external API-driven syllabus generation.
 - Deep Brain Search integration to retrieve specific past code mistakes to turn into revision exercises.
+- Live WebSocket event streaming for real-time agent typing/status.

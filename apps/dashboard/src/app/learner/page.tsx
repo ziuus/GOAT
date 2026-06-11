@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { learnerApi } from '@/lib/goat-api';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BookOpen, Target, Brain, FileText, Calendar, CheckCircle2, ListTodo, Activity, Compass, Code, Database, Clock
-} from 'lucide-react';
+import { BookOpen, Target, Clock, Plus, Compass } from 'lucide-react';
+import { LearnerShell } from '@/components/learner/LearnerShell';
 
 export default function LearnerPage() {
   const [goals, setGoals] = useState<any[]>([]);
@@ -13,6 +11,7 @@ export default function LearnerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDomain, setNewDomain] = useState('DSA');
 
@@ -41,6 +40,7 @@ export default function LearnerPage() {
       if (res.goal) {
         setGoals([...goals, res.goal]);
         setSelectedGoal(res.goal);
+        setIsCreating(false);
         setNewTitle('');
       }
     } catch (err: any) {
@@ -48,44 +48,26 @@ export default function LearnerPage() {
     }
   };
 
-  const handleAction = async (id: string, action: string) => {
-    try {
-      let res: any;
-      if (action === 'roadmap') res = await learnerApi.roadmap(id);
-      else if (action === 'week') res = await learnerApi.week(id);
-      else if (action === 'today') res = await learnerApi.today(id);
-      else if (action === 'practice') res = await learnerApi.practice(id);
-      else if (action === 'revise') res = await learnerApi.revise(id);
-      else if (action === 'project') res = await learnerApi.project(id);
-      else if (action === 'exam') res = await learnerApi.exam(id);
-      else if (action === 'progress') res = await learnerApi.progress(id);
-      else if (action === 'report') res = await learnerApi.report(id);
-
-      if (res) alert(`Action ${action} completed successfully.`);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-slate-300 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         
         <header className="flex justify-between items-end border-b border-white/10 pb-6">
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <BookOpen className="w-8 h-8 text-blue-400" />
-              Learner Prime
+              Learner OS
             </h1>
             <p className="text-sm text-slate-400 mt-2">
-              Structured Learning Plans, Roadmaps, Practice Tasks, and Revision Checkpoints.
+              Structured Journey, Roadmap Tracks, and Realistic AI Scheduling.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-medium border border-blue-500/20">
-              <Activity className="w-3.5 h-3.5" /> Realistic Schedules Active
-            </span>
-          </div>
+          <button 
+            onClick={() => setIsCreating(!isCreating)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 rounded-lg text-sm font-medium border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Track
+          </button>
         </header>
 
         {error && (
@@ -96,120 +78,98 @@ export default function LearnerPage() {
 
         <div className="grid grid-cols-12 gap-8">
           
-          <div className="col-span-4 space-y-4">
-            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <Target className="w-4 h-4" /> New Learning Goal
-              </h2>
-              <div className="space-y-3">
-                <input 
-                  type="text" 
-                  placeholder="e.g. Master Rust Concurrency" 
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                />
-                <select 
-                  value={newDomain}
-                  onChange={e => setNewDomain(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                >
-                  <option value="DSA">Data Structures & Algorithms</option>
-                  <option value="AIML">AI / Machine Learning</option>
-                  <option value="Rust">Rust Programming</option>
-                  <option value="Web3">Web3 & DApps</option>
-                  <option value="FullStack">Full-Stack Development</option>
-                  <option value="SystemDesign">System Design</option>
-                  <option value="ExamPrep">Exam Preparation</option>
-                  <option value="ProjectBased">Project-Based Learning</option>
-                  <option value="General">General Study</option>
-                </select>
-                <button 
-                  onClick={handleCreate}
-                  className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-medium text-sm py-2 rounded-lg transition-colors border border-blue-500/50"
-                >
-                  Create Goal
-                </button>
+          <div className="col-span-12 md:col-span-3 space-y-4">
+            {isCreating && (
+              <div className="bg-white/[0.02] border border-white/5 hover:border-blue-500/30 transition-colors rounded-2xl p-5 mb-4 shadow-lg shadow-blue-500/5">
+                <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-blue-400" /> Configure Track
+                </h2>
+                <div className="space-y-3">
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Master Rust Concurrency" 
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                  <select 
+                    value={newDomain}
+                    onChange={e => setNewDomain(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+                  >
+                    <option value="DSA">Data Structures & Algorithms</option>
+                    <option value="AIML">AI / Machine Learning</option>
+                    <option value="Rust">Rust Programming</option>
+                    <option value="Web3">Web3 & DApps</option>
+                    <option value="FullStack">Full-Stack Development</option>
+                    <option value="SystemDesign">System Design</option>
+                    <option value="ExamPrep">Exam Preparation</option>
+                    <option value="ProjectBased">Project-Based Learning</option>
+                    <option value="General">General Study</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsCreating(false)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-medium text-xs py-2 rounded-lg transition-colors border border-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleCreate}
+                      className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-medium text-xs py-2 rounded-lg transition-colors border border-blue-500/50"
+                    >
+                      Start Journey
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Active Goals</h3>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Active Tracks</h3>
+              {goals.length === 0 && !isCreating && !loading && (
+                <p className="text-sm text-slate-500 px-2 italic">No active tracks. Create one to start learning.</p>
+              )}
               {goals.map(g => (
                 <button
                   key={g.id}
                   onClick={() => setSelectedGoal(g)}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
                     selectedGoal?.id === g.id 
-                      ? 'bg-blue-500/10 border-blue-500/50' 
+                      ? 'bg-blue-500/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
                       : 'bg-white/[0.02] border-white/5 hover:border-white/20'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-medium text-white truncate">{g.title}</h4>
-                    <span className="text-[10px] uppercase bg-black px-2 py-0.5 rounded text-slate-400 border border-white/10">{g.domain}</span>
+                    <h4 className="font-medium text-white truncate max-w-[70%]">{g.title}</h4>
+                    <span className="text-[9px] uppercase bg-black px-1.5 py-0.5 rounded text-slate-400 border border-white/10 shrink-0">{g.domain}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
                     <Clock className="w-3.5 h-3.5" />
-                    <span>Level: {g.current_level}</span>
+                    <span>Lvl: {g.current_level}</span>
                   </div>
                 </button>
               ))}
             </div>
+            
+            <div className="mt-8 pt-6 border-t border-white/10">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Templates</h3>
+              <button 
+                onClick={() => { setNewTitle('DSA Masterclass'); setNewDomain('DSA'); setIsCreating(true); }}
+                className="w-full text-left px-4 py-3 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 rounded-xl transition-colors text-sm text-slate-400"
+              >
+                DSA Masterclass <span className="text-xs bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded ml-2">Popular</span>
+              </button>
+            </div>
           </div>
 
-          <div className="col-span-8">
+          <div className="col-span-12 md:col-span-9">
             {selectedGoal ? (
-              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
-                <div className="mb-6 pb-6 border-b border-white/10">
-                  <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-                    {selectedGoal.title}
-                  </h2>
-                  <p className="text-slate-400 text-sm">Target: {selectedGoal.target_level}</p>
-                </div>
-
-                <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl mb-6 flex gap-3 text-blue-200 text-sm">
-                  <BookOpen className="w-5 h-5 shrink-0 text-blue-400" />
-                  <p><strong>Note:</strong> Learner generates realistic study plans. We do not over-promise mastery in unrealistic timeframes. Be honest with your time budget!</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => handleAction(selectedGoal.id, 'roadmap')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <Compass className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Generate Roadmap</h3>
-                    <p className="text-xs text-slate-500 mt-1">Structured learning phases and modules.</p>
-                  </button>
-                  <button onClick={() => handleAction(selectedGoal.id, 'today')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <ListTodo className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Today's Plan</h3>
-                    <p className="text-xs text-slate-500 mt-1">Get 1-2 hour concentrated daily tasks.</p>
-                  </button>
-                  <button onClick={() => handleAction(selectedGoal.id, 'practice')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <Code className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Practice Set</h3>
-                    <p className="text-xs text-slate-500 mt-1">Generate practical problems to solve.</p>
-                  </button>
-                  <button onClick={() => handleAction(selectedGoal.id, 'revise')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <Brain className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Revision Checkpoint</h3>
-                    <p className="text-xs text-slate-500 mt-1">Check confidence and catch mistakes.</p>
-                  </button>
-                  <button onClick={() => handleAction(selectedGoal.id, 'progress')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <CheckCircle2 className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Log Progress</h3>
-                    <p className="text-xs text-slate-500 mt-1">Track what you learned today.</p>
-                  </button>
-                  <button onClick={() => handleAction(selectedGoal.id, 'report')} className="p-4 border border-white/10 hover:border-blue-500/50 rounded-xl bg-black/40 text-left group transition-all">
-                    <FileText className="w-5 h-5 text-blue-400 mb-2" />
-                    <h3 className="font-medium text-white text-sm">Learning Report</h3>
-                    <p className="text-xs text-slate-500 mt-1">Generate a summary of weak/strong areas.</p>
-                  </button>
-                </div>
-              </div>
+              <LearnerShell goal={selectedGoal} onUpdate={loadGoals} />
             ) : (
-              <div className="h-full min-h-[400px] border border-white/5 border-dashed rounded-2xl flex items-center justify-center text-slate-500 flex-col gap-4">
-                <BookOpen className="w-12 h-12 opacity-20" />
-                <p>Select a goal or create a new one.</p>
+              <div className="h-full min-h-[600px] border border-white/5 border-dashed rounded-2xl flex items-center justify-center text-slate-500 flex-col gap-4 bg-black/20">
+                <Compass className="w-16 h-16 opacity-20 text-blue-400" />
+                <p className="text-lg text-slate-400">Select a learning track to open the OS.</p>
               </div>
             )}
           </div>
