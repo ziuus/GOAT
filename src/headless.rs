@@ -21,11 +21,14 @@
 use crate::approval::{ApprovalDecision, ApprovalRequest};
 use crate::command_registry::{CommandRegistry, CommandStatus};
 use crate::llm::{FunctionDeclaration, Message, Tool};
+use crate::paths::GoatPaths;
 use crate::runtime::GoatRuntime;
 use crate::tools::NativeTools;
 use anyhow::Result;
 use serde_json::Value;
+use std::fs;
 use std::io::{self, BufRead, Write};
+use std::path::PathBuf;
 use tracing::info;
 
 const MAX_HISTORY_MESSAGES: usize = 80;
@@ -984,8 +987,45 @@ async fn handle_slash_command(
                     }
                     Err(e) => println!("Error: {}", e),
                 },
+                "execute-plan" => {
+                    println!("[BUILDER] execute-plan not fully implemented headless. Use UI/API.")
+                }
+                "preview" => {
+                    println!("[BUILDER] preview not fully implemented headless. Use UI/API.")
+                }
+                "apply" => {
+                    let id = parts.get(2).unwrap_or(&"");
+                    if id.is_empty() {
+                        println!("[BUILDER] Missing execution session ID.");
+                    } else {
+                        let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+                        let working_dir =
+                            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                        match mgr.apply_patch(id, &working_dir) {
+                            Ok(_) => println!("[BUILDER] Patch applied successfully."),
+                            Err(e) => println!("[BUILDER] Failed to apply patch: {}", e),
+                        }
+                    }
+                }
+                "rollback" => {
+                    let id = parts.get(2).unwrap_or(&"");
+                    if id.is_empty() {
+                        println!("[BUILDER] Missing execution session ID.");
+                    } else {
+                        let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+                        let cp_mgr = crate::checkpoint::CheckpointManager::new(&rt.paths.data_dir);
+                        let working_dir =
+                            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                        match mgr.rollback_session(id, &working_dir, &cp_mgr) {
+                            Ok(res) => {
+                                println!("[BUILDER] Rollback Result: success={}", res.success)
+                            }
+                            Err(e) => println!("[BUILDER] Failed to rollback: {}", e),
+                        }
+                    }
+                }
                 _ => println!(
-                    "Unknown builder action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan",
+                    "Unknown builder action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan, apply, rollback",
                     action
                 ),
             }

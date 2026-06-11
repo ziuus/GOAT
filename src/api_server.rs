@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use std::path::PathBuf;
 use tokio_stream::StreamExt;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -569,6 +570,40 @@ pub async fn start_server(
         )
         .route("/v1/builder/artifacts", get(builder_artifacts_handler))
         .route("/v1/builder/reports", get(builder_reports_handler))
+        // Code Execution APIs
+        .route("/v1/code-execution/status", get(ce_status_handler))
+        .route("/v1/code-execution/preview", post(ce_preview_handler))
+        .route("/v1/code-execution/create", post(ce_create_handler))
+        .route("/v1/code-execution/sessions", get(ce_list_sessions_handler))
+        .route(
+            "/v1/code-execution/sessions/:id",
+            get(ce_get_session_handler),
+        )
+        .route(
+            "/v1/code-execution/sessions/:id/request-approval",
+            post(ce_request_approval_handler),
+        )
+        .route(
+            "/v1/code-execution/sessions/:id/apply",
+            post(ce_apply_handler),
+        )
+        .route(
+            "/v1/code-execution/sessions/:id/validate",
+            post(ce_validate_handler),
+        )
+        .route(
+            "/v1/code-execution/sessions/:id/rollback",
+            post(ce_rollback_handler),
+        )
+        .route("/v1/code-execution/sessions/:id/diff", get(ce_diff_handler))
+        .route(
+            "/v1/code-execution/sessions/:id/artifacts",
+            get(ce_artifacts_handler),
+        )
+        .route(
+            "/v1/code-execution/sessions/:id/report",
+            get(ce_report_handler),
+        )
         .route("/v1/socializer/status", get(socializer_status_handler))
         .route(
             "/v1/socializer/campaigns",
@@ -648,6 +683,10 @@ pub async fn start_server(
             "/v1/extensions/:id/disable",
             post(extensions_disable_handler),
         )
+        .route(
+            "/v1/extensions/:id/disable",
+            post(extensions_disable_handler),
+        )
         .layer(cors)
         .with_state(state);
 
@@ -655,8 +694,164 @@ pub async fn start_server(
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     println!("[DAEMON] API server listening on http://{}", addr);
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service()).await?;
+
     Ok(())
+}
+
+// ── Code Execution Handlers ───────────────────────────────────────────────────
+
+async fn ce_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "online" })))
+}
+
+async fn ce_preview_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    // Placeholder for preview generation
+    Ok(Json(serde_json::json!({ "preview": "Not Implemented" })))
+}
+
+async fn ce_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "session": "Not Implemented" })))
+}
+
+async fn ce_list_sessions_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    let sessions = mgr.list_sessions().unwrap_or_default();
+    Ok(Json(serde_json::json!({ "sessions": sessions })))
+}
+
+async fn ce_get_session_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    if let Ok(Some(session)) = mgr.get_session(&id) {
+        Ok(Json(serde_json::json!({ "session": session })))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Not Found" })),
+        ))
+    }
+}
+
+async fn ce_request_approval_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "Approval requested" })))
+}
+
+async fn ce_apply_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    match mgr.apply_patch(&id, &working_dir) {
+        Ok(_) => Ok(Json(
+            serde_json::json!({ "status": "Applied successfully" }),
+        )),
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn ce_validate_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(payload): Json<crate::code_execution::ValidationCommand>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    match mgr.execute_validation(&id, payload, &working_dir) {
+        Ok(run) => Ok(Json(serde_json::json!({ "run": run }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn ce_rollback_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    let checkpoint_mgr = crate::checkpoint::CheckpointManager::new(&rt.paths.data_dir);
+    let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    match mgr.rollback_session(&id, &working_dir, &checkpoint_mgr) {
+        Ok(result) => Ok(Json(serde_json::json!({ "result": result }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )),
+    }
+}
+
+async fn ce_diff_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "diff": "Not Implemented" })))
+}
+
+async fn ce_artifacts_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "artifacts": [] })))
+}
+
+async fn ce_report_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "report": "Not Implemented" })))
 }
 
 fn check_auth(
