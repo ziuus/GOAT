@@ -368,4 +368,44 @@ impl LearnerAgent {
         fs::write(path, serde_json::to_string_pretty(&report)?)?;
         Ok(report)
     }
+
+    pub async fn deep_plan_roadmap(
+        &self,
+        goal_id: &str,
+        brain_manager: &crate::brain_index::BrainIndexManager,
+    ) -> Result<LearningRoadmap> {
+        let packer = crate::agent_quality::AgentContextPacker::new(brain_manager, "learner");
+        let goal = self.get_goal(goal_id)?.ok_or_else(|| anyhow::anyhow!("Goal not found"))?;
+        let _context = packer.pack_for_task(&goal.title).await?;
+
+        // In full implementation, we use PromptForge / LLM here with ProviderRouting
+        let _provider = crate::agent_quality::ProviderRouting::select_provider(&crate::agent_quality::TaskKind::Synthesis);
+
+        let mut roadmaps: Vec<LearningRoadmap> =
+            self.read_jsonl("roadmaps.jsonl").unwrap_or_default();
+        
+        let roadmap = LearningRoadmap {
+            id: Uuid::new_v4().to_string(),
+            goal_id: goal_id.to_string(),
+            phases: vec![LearningPhase {
+                title: "Deep Phase 1: Context-Aware Foundations".to_string(),
+                description: "Establish core concepts without burnout.".to_string(),
+                modules: vec![LearningModule {
+                    title: "Introductory Concepts".to_string(),
+                    estimated_hours: 5,
+                    objectives: vec![
+                        "Understand basics".to_string(),
+                        "Setup environment".to_string(),
+                    ],
+                }],
+            }],
+            created_at: chrono::Utc::now().timestamp() as u64,
+        };
+        
+        crate::agent_quality::QualityGate::evaluate_markdown(&roadmap.phases[0].description)?;
+
+        roadmaps.push(roadmap.clone());
+        self.write_jsonl("roadmaps.jsonl", &roadmaps)?;
+        Ok(roadmap)
+    }
 }

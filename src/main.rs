@@ -1,5 +1,6 @@
 pub mod agent_collaboration;
 pub mod agent_profiles;
+pub mod agent_quality;
 pub mod agent_runtime;
 pub mod agents;
 pub mod api_server;

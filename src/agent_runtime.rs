@@ -435,6 +435,35 @@ impl AgentRuntime {
                     error: None,
                 });
             }
+            AgentJobKind::BuilderPlan => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Analyze Context".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Design Architecture".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Draft Implementation Plan".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Medium,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             _ => {
                 steps.push(AgentJobStep {
                     id: Uuid::new_v4().to_string(),

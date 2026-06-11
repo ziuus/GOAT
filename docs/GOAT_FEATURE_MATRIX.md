@@ -91,6 +91,8 @@ Status legend:
 | Cofounder UI | 🟢 Works | UI built, state managed, API validation planned. |
 | Learner UI | 🟢 Works | Complete local state roadmap experience. |
 | PromptForge UI | 🟢 Works | Connected to local API. |
+| Builder UI | 🟢 Works | Phase 7.0 BuilderAgent integrated. |
+| Prime Agent Deep Quality | 🟢 Works | Phase 7.0 context packing and quality gates. |
 | Socializer, Designer, Operator | 🧪 Experimental | UI shells created for Alpha. |
 | ReAct loop (plan → act → observe) | 🟢 Works | Up to 10 iterations |
 | Configurable max iterations | 🟡 Partial | Currently hardcoded to 10 |

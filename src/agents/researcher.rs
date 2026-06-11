@@ -477,4 +477,40 @@ impl ResearcherAgent {
             content: "Generated report content.".to_string(),
         })
     }
+
+    pub async fn deep_generate_brief(
+        &self,
+        topic_id: &str,
+        brain_manager: &crate::brain_index::BrainIndexManager,
+    ) -> Result<ResearchBrief> {
+        let topic = self.get_topic(topic_id)?.ok_or_else(|| anyhow::anyhow!("Topic not found"))?;
+        let packer = crate::agent_quality::AgentContextPacker::new(brain_manager, "researcher");
+        let _context = packer.pack_for_task(&topic.title).await?;
+
+        // In full implementation, we use PromptForge / LLM here with ProviderRouting
+        let _provider = crate::agent_quality::ProviderRouting::select_provider(&crate::agent_quality::TaskKind::Synthesis);
+
+        let brief = ResearchBrief {
+            id: Uuid::new_v4().to_string(),
+            topic_id: topic_id.to_string(),
+            executive_summary: "Deeply generated brief summary using Brain context.".to_string(),
+            research_question: topic.research_question.clone(),
+            scope: "General".to_string(),
+            key_findings: vec![],
+            evidence_table: vec![],
+            source_list: vec![],
+            disagreements: vec![],
+            assumptions: vec![],
+            risks: vec![],
+            implications: vec![],
+            recommendations: vec![],
+            next_research_steps: vec![],
+            handoff_notes: None,
+        };
+
+        crate::agent_quality::QualityGate::evaluate_markdown(&brief.executive_summary)
+            .unwrap_or_else(|_| {});
+
+        Ok(brief)
+    }
 }

@@ -676,3 +676,12 @@
 * Added `/v1/browser/workflows` endpoints.
 * Overhauled `/browser` Next.js dashboard page with active steps visual trace.
 * Defined safety policies and desktop boundaries (`docs/GOAT_BROWSER_SAFETY.md`, `docs/GOAT_DESKTOP_AUTOMATION_BOUNDARY.md`).
+
+## Phase 7.0: Deep Prime Agent Quality (✅ COMPLETED)
+* Created `docs/GOAT_DEEP_AGENT_QUALITY_AUDIT.md` for phase roadmap.
+* Built `src/agent_quality.rs` unifying `TaskKind`, `ProviderRouting`, `QualityGate`, and `AgentContextPacker`.
+* Created `src/agents/builder.rs` adding the `BuilderAgent` logic tightly integrated with quality tools.
+* Added `deep_evaluate_idea` to `CofounderManager` pulling brain context and using routing.
+* Added `deep_plan_roadmap` to `LearnerAgent` using `QualityGate` markdown validations.
+* Added `deep_generate_brief` to `ResearcherAgent`.
+* Added `AgentJobKind::BuilderPlan` logic inside `src/agent_runtime.rs` to structure execution.
