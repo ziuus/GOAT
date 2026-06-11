@@ -556,6 +556,19 @@ pub async fn start_server(
             "/v1/cofounder/ideas/:id/report",
             post(cofounder_idea_report_handler),
         )
+        // ── Phase 7.1: Builder ───────────────────────────────────────────────
+        .route("/v1/builder/status", get(builder_status_handler))
+        .route("/v1/builder/inspect", post(builder_inspect_handler))
+        .route("/v1/builder/plan", post(builder_plan_handler))
+        .route("/v1/builder/diff-review", post(builder_diff_review_handler))
+        .route("/v1/builder/test-plan", post(builder_test_plan_handler))
+        .route("/v1/builder/validate", post(builder_validate_handler))
+        .route(
+            "/v1/builder/rollback-plan",
+            post(builder_rollback_plan_handler),
+        )
+        .route("/v1/builder/artifacts", get(builder_artifacts_handler))
+        .route("/v1/builder/reports", get(builder_reports_handler))
         .route("/v1/socializer/status", get(socializer_status_handler))
         .route(
             "/v1/socializer/campaigns",
@@ -3365,6 +3378,234 @@ async fn reports_list_handler(
     let mgr = crate::reports::ReportManager::new();
     let reports = mgr.list_reports().unwrap_or_default();
     Ok(Json(serde_json::json!({ "reports": reports })))
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderInspectReq {
+    scope: Option<crate::agents::builder::BuilderInspectionScope>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderPlanReq {
+    goal: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderDiffReviewReq {
+    plan_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderTestPlanReq {
+    goal: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderValidateReq {
+    plan_id: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct BuilderRollbackPlanReq {
+    plan_id: String,
+}
+
+async fn builder_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "online" })))
+}
+
+async fn builder_inspect_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderInspectReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let scope = payload
+        .scope
+        .unwrap_or(crate::agents::builder::BuilderInspectionScope {
+            max_depth: 3,
+            include_tests: true,
+        });
+    let result = agent.inspect_repo(scope).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderPlanReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let rt = state.runtime.lock().await;
+    let brain_mgr = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    let result = agent
+        .plan_patch(&payload.goal, &brain_mgr)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_diff_review_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderDiffReviewReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let result = agent.diff_review(&payload.plan_id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_test_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderTestPlanReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let result = agent.test_plan(&payload.goal).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_validate_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderValidateReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let result = agent.validate(&payload.plan_id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_rollback_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<BuilderRollbackPlanReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let result = agent.rollback_plan(&payload.plan_id).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::to_value(&result).unwrap_or_default()))
+}
+
+async fn builder_artifacts_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    // List all plan json files under builder base_dir
+    let agent = crate::agents::builder::BuilderAgent::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let mut plans = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&agent.base_dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_file() {
+                if let Some(ext) = entry.path().extension() {
+                    if ext == "json" {
+                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                                plans.push(val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(Json(serde_json::json!({ "artifacts": plans })))
+}
+
+async fn builder_reports_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::reports::ReportManager::new();
+    let reports = mgr.list_reports().unwrap_or_default();
+    let builder_reports: Vec<_> = reports
+        .into_iter()
+        .filter(|r| {
+            r.title.to_lowercase().contains("builder")
+                || r.markdown.to_lowercase().contains("builder")
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "reports": builder_reports })))
 }
 
 async fn cofounder_status_handler(

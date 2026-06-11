@@ -1861,6 +1861,147 @@ impl App {
                 }
                 true
             }
+            cmd if cmd.starts_with("/builder")
+                || cmd.starts_with("@builder")
+                || cmd.starts_with("@code")
+                || cmd.starts_with("@plan")
+                || cmd.starts_with("@review")
+                || cmd.starts_with("@diff")
+                || cmd.starts_with("@tests")
+                || cmd.starts_with("@patch") =>
+            {
+                let rt = tokio::runtime::Handle::current();
+                let action = parts.get(1).copied().unwrap_or("inspect");
+
+                let agent = match crate::agents::builder::BuilderAgent::new() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        self.push_log(format!("[BUILDER] Failed to create agent: {}", e));
+                        return true;
+                    }
+                };
+
+                match action {
+                    "inspect" => {
+                        self.push_log("[BUILDER] Starting repository inspection...".to_string());
+                        match agent.inspect_repo(crate::agents::builder::BuilderInspectionScope {
+                            max_depth: 3,
+                            include_tests: true,
+                        }) {
+                            Ok(res) => {
+                                self.push_log(format!(
+                                    "[BUILDER] Repo: {} | Language: {} | Build System: {}",
+                                    res.snapshot.root_path,
+                                    res.snapshot.tech_stack.main_language,
+                                    res.snapshot.tech_stack.build_system
+                                ));
+                                self.push_log(format!(
+                                    "[BUILDER] Total files: {} | Risk files: {}",
+                                    res.snapshot.file_count,
+                                    res.snapshot.risk_areas.len()
+                                ));
+                            }
+                            Err(e) => self.push_log(format!("[BUILDER] Inspection failed: {}", e)),
+                        }
+                    }
+                    "plan" => {
+                        let goal = parts[2..].join(" ");
+                        if goal.is_empty() {
+                            self.push_log("[BUILDER] Please provide a plan goal.".to_string());
+                        } else {
+                            let brain_mgr = crate::brain_index::BrainIndexManager::new(
+                                self.paths.clone(),
+                                self.config.brain_index.clone(),
+                                &self.config.embeddings,
+                            );
+                            match rt.block_on(agent.plan_patch(&goal, &brain_mgr)) {
+                                Ok(plan) => {
+                                    self.push_log(format!(
+                                        "[BUILDER] Plan {} created with risk: {}",
+                                        plan.id, plan.risk_level
+                                    ));
+                                    self.push_log(format!(
+                                        "[BUILDER] Affected files: {}",
+                                        plan.affected_files
+                                            .iter()
+                                            .map(|f| f.path.as_str())
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    ));
+                                }
+                                Err(e) => {
+                                    self.push_log(format!("[BUILDER] Planning failed: {}", e))
+                                }
+                            }
+                        }
+                    }
+                    "diff-review" => {
+                        self.push_log("[BUILDER] Reviewing working tree diffs...".to_string());
+                        match agent.diff_review("active_plan") {
+                            Ok(review) => {
+                                self.push_log(format!(
+                                    "[BUILDER] Diff Review Complete. Overall Severity: {:?}",
+                                    review.overall_severity
+                                ));
+                                for finding in review.findings {
+                                    self.push_log(format!(
+                                        "  - [{}]: {}",
+                                        finding.file_path, finding.issue_description
+                                    ));
+                                }
+                            }
+                            Err(e) => self.push_log(format!("[BUILDER] Diff review failed: {}", e)),
+                        }
+                    }
+                    "test-plan" => {
+                        let goal = parts[2..].join(" ");
+                        self.push_log(format!("[BUILDER] Generating test commands for: {}", goal));
+                        match agent.test_plan(&goal) {
+                            Ok(plan) => {
+                                self.push_log(format!("[BUILDER] Recommended validation:"));
+                                for cmd in plan.commands {
+                                    self.push_log(format!("  Command: {}", cmd.command));
+                                }
+                            }
+                            Err(e) => {
+                                self.push_log(format!("[BUILDER] Test planning failed: {}", e))
+                            }
+                        }
+                    }
+                    "validate" => {
+                        self.push_log("[BUILDER] Executing test plan validation...".to_string());
+                        match agent.validate("active_plan") {
+                            Ok(res) => {
+                                self.push_log(format!(
+                                    "[BUILDER] Validation success: {} (Passed {}/{})",
+                                    res.is_valid, res.tests_passed, res.tests_run
+                                ));
+                                self.push_log(format!("[BUILDER] Output:\n{}", res.test_logs));
+                            }
+                            Err(e) => self.push_log(format!("[BUILDER] Validation failed: {}", e)),
+                        }
+                    }
+                    "rollback-plan" => {
+                        self.push_log("[BUILDER] Identifying rollback plan...".to_string());
+                        match agent.rollback_plan("active_plan") {
+                            Ok(plan) => {
+                                self.push_log(format!(
+                                    "[BUILDER] Rollback fallback command: {}",
+                                    plan.command_fallback
+                                ));
+                                for step in plan.steps {
+                                    self.push_log(format!("  Step: {}", step));
+                                }
+                            }
+                            Err(e) => {
+                                self.push_log(format!("[BUILDER] Rollback plan failed: {}", e))
+                            }
+                        }
+                    }
+                    _ => self.push_log(format!("[BUILDER] Unknown action: {}", action)),
+                }
+                true
+            }
             cmd if cmd.starts_with("/transports") || cmd.starts_with("/transport") => {
                 let rt = tokio::runtime::Handle::current();
                 let action = parts.get(1).copied().unwrap_or("status");

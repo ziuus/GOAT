@@ -893,6 +893,105 @@ async fn handle_slash_command(
             true
         }
 
+        cmd if cmd.starts_with("/builder")
+            || cmd.starts_with("@builder")
+            || cmd.starts_with("@code")
+            || cmd.starts_with("@plan")
+            || cmd.starts_with("@review")
+            || cmd.starts_with("@diff")
+            || cmd.starts_with("@tests")
+            || cmd.starts_with("@patch") =>
+        {
+            let action = parts.get(1).copied().unwrap_or("inspect");
+            let agent = match crate::agents::builder::BuilderAgent::new() {
+                Ok(a) => a,
+                Err(e) => {
+                    println!("[BUILDER] Failed to create agent: {}", e);
+                    return true;
+                }
+            };
+            let handle = tokio::runtime::Handle::current();
+
+            match action {
+                "inspect" => {
+                    println!("[BUILDER] Inspecting repository...");
+                    match agent.inspect_repo(crate::agents::builder::BuilderInspectionScope {
+                        max_depth: 3,
+                        include_tests: true,
+                    }) {
+                        Ok(res) => {
+                            println!("Root: {}", res.snapshot.root_path);
+                            println!("Main Language: {}", res.snapshot.tech_stack.main_language);
+                            println!("Files: {}", res.snapshot.file_count);
+                        }
+                        Err(e) => println!("Error: {}", e),
+                    }
+                }
+                "plan" => {
+                    let goal = parts.get(2..).unwrap_or(&[""]).join(" ");
+                    if goal.is_empty() {
+                        println!("[BUILDER] Goal missing.");
+                    } else {
+                        let brain_mgr = crate::brain_index::BrainIndexManager::new(
+                            rt.paths.clone(),
+                            rt.config.brain_index.clone(),
+                            &rt.config.embeddings,
+                        );
+                        match handle.block_on(agent.plan_patch(&goal, &brain_mgr)) {
+                            Ok(plan) => {
+                                println!("Plan ID: {}", plan.id);
+                                println!("Goal: {}", plan.goal);
+                                println!("Risk: {}", plan.risk_level);
+                            }
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    }
+                }
+                "diff-review" => {
+                    println!("[BUILDER] Running diff review...");
+                    match agent.diff_review("active_plan") {
+                        Ok(rev) => {
+                            println!("Severity: {:?}", rev.overall_severity);
+                            for f in rev.findings {
+                                println!("- [{}]: {}", f.file_path, f.issue_description);
+                            }
+                        }
+                        Err(e) => println!("Error: {}", e),
+                    }
+                }
+                "test-plan" => {
+                    let goal = parts.get(2..).unwrap_or(&[""]).join(" ");
+                    match agent.test_plan(&goal) {
+                        Ok(p) => {
+                            println!("Validation plan generated.");
+                            for c in p.commands {
+                                println!("Command: {}", c.command);
+                            }
+                        }
+                        Err(e) => println!("Error: {}", e),
+                    }
+                }
+                "validate" => match agent.validate("active_plan") {
+                    Ok(res) => {
+                        println!("Validation Finished. Valid: {}", res.is_valid);
+                        println!("Logs:\n{}", res.test_logs);
+                    }
+                    Err(e) => println!("Error: {}", e),
+                },
+                "rollback-plan" => match agent.rollback_plan("active_plan") {
+                    Ok(p) => {
+                        println!("Fallback Command: {}", p.command_fallback);
+                    }
+                    Err(e) => println!("Error: {}", e),
+                },
+                _ => println!(
+                    "Unknown builder action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan",
+                    action
+                ),
+            }
+            true
+        }
+
         cmd if cmd.starts_with("/transports") || cmd.starts_with("/transport") => {
             let action = parts.get(1).copied().unwrap_or("status");
             match action {

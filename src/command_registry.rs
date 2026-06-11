@@ -600,6 +600,37 @@ fn all_commands() -> Vec<CommandMetadata> {
             status: CommandStatus::Working,
             related: None,
         },
+        // ── Builder / Coding ───────────────────────────────────────────────────
+        CommandMetadata {
+            name: "/builder",
+            aliases: &[
+                "\\builder",
+                "@builder",
+                "@code",
+                "@plan",
+                "@review",
+                "@diff",
+                "@tests",
+                "@patch",
+            ],
+            category: CommandCategory::System,
+            description: "Interact with the builder agent, inspect repos, plan patches, and review diffs",
+            usage: "/builder <action> [goal/id]",
+            examples: &[
+                "/builder inspect",
+                "/builder plan Create a helper module",
+                "/builder diff-review",
+                "/builder test-plan Create a helper module",
+                "/builder validate",
+                "/builder rollback-plan",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            risk: CommandRisk::None,
+            status: CommandStatus::Working,
+            related: None,
+        },
         // ── Transports ─────────────────────────────────────────────────────────
         CommandMetadata {
             name: "/transports",

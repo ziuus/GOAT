@@ -10,6 +10,15 @@ import Link from 'next/link';
 export default function AgentsOverview() {
   const agents = [
     {
+      name: 'Builder',
+      href: '/builder',
+      icon: <TerminalSquare className="w-6 h-6" />,
+      description: 'Workspace analysis, patch planning, diff reviews, and test generation.',
+      status: 'Online',
+      bestFor: 'Writing and validating code changes',
+      specialists: ['Software Engineer', 'QA Tester']
+    },
+    {
       name: 'Cofounder',
       href: '/cofounder',
       icon: <Sparkles className="w-6 h-6" />,

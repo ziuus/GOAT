@@ -173,6 +173,16 @@ pub enum Command {
         args: Vec<String>,
     },
 
+    /// Builder agent workspace operations (Phase 7.1)
+    #[command(name = "builder")]
+    Builder {
+        /// Subcommand: inspect, plan, diff-review, test-plan, validate, rollback-plan
+        action: String,
+        /// Goal or argument depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Manage tools, permissions, and tool registry.
     #[command(name = "tools")]
     Tools {
@@ -715,6 +725,10 @@ pub async fn handle_subcommand(
         }
         Command::Browser { action, args } => {
             handle_browser_command(paths, config, &action, &args)?;
+            Ok(true)
+        }
+        Command::Builder { action, args } => {
+            handle_builder_command(paths, config, &action, &args)?;
             Ok(true)
         }
 
@@ -2596,6 +2610,90 @@ fn handle_browser_command(
         }
         _ => {
             println!("Unknown action: {}", action);
+        }
+    }
+    Ok(())
+}
+
+fn handle_builder_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    use crate::agents::builder::{BuilderAgent, BuilderInspectionScope};
+    use crate::brain_index::BrainIndexManager;
+
+    let agent = BuilderAgent::new()?;
+    let brain_mgr = BrainIndexManager::new(
+        paths.clone(),
+        config.brain_index.clone(),
+        &config.embeddings,
+    );
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    match action {
+        "inspect" => {
+            let result = agent.inspect_repo(BuilderInspectionScope {
+                max_depth: 3,
+                include_tests: true,
+            })?;
+            println!("[BUILDER] Inspection complete. Snapshot generated.");
+            println!("Root: {}", result.snapshot.root_path);
+            println!(
+                "Main Language: {}",
+                result.snapshot.tech_stack.main_language
+            );
+            println!("Files scanned: {}", result.snapshot.file_count);
+        }
+        "plan" => {
+            let goal = args.join(" ");
+            if goal.is_empty() {
+                println!("[BUILDER] Please provide a goal.");
+                return Ok(());
+            }
+            let plan = rt.block_on(agent.plan_patch(&goal, &brain_mgr))?;
+            println!("[BUILDER] Patch Plan Generated (ID: {})", plan.id);
+            println!("Goal: {}", plan.goal);
+            println!("Risk Level: {}", plan.risk_level);
+        }
+        "diff-review" => {
+            let plan_id = args.first().map(|s| s.as_str()).unwrap_or("active_plan");
+            let review = agent.diff_review(plan_id)?;
+            println!("[BUILDER] Diff Review Complete.");
+            println!("Overall Severity: {:?}", review.overall_severity);
+            for finding in review.findings {
+                println!("- [{}]: {}", finding.file_path, finding.issue_description);
+            }
+        }
+        "test-plan" => {
+            let goal = args.join(" ");
+            let plan = agent.test_plan(&goal)?;
+            println!("[BUILDER] Test Plan Created (ID: {})", plan.plan_id);
+            for cmd in plan.commands {
+                println!("Command: {}", cmd.command);
+            }
+        }
+        "validate" => {
+            let plan_id = args.first().map(|s| s.as_str()).unwrap_or("active_plan");
+            let result = agent.validate(plan_id)?;
+            println!("[BUILDER] Validation Finished. Valid: {}", result.is_valid);
+            println!("Logs:\n{}", result.test_logs);
+        }
+        "rollback-plan" => {
+            let plan_id = args.first().map(|s| s.as_str()).unwrap_or("active_plan");
+            let rollback = agent.rollback_plan(plan_id)?;
+            println!("[BUILDER] Rollback Plan generated.");
+            println!("Fallback command: {}", rollback.command_fallback);
+        }
+        _ => {
+            println!(
+                "Unknown action: {}. Use inspect, plan, diff-review, test-plan, validate, rollback-plan",
+                action
+            );
         }
     }
     Ok(())

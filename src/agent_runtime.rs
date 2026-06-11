@@ -68,6 +68,12 @@ pub enum AgentJobKind {
     DesignerReview,
     OperatorHealthCheck,
     BuilderPlan,
+    BuilderRepoInspection,
+    BuilderDiffReview,
+    BuilderTestPlan,
+    BuilderApplyPatchPendingApproval,
+    BuilderValidationRun,
+    BuilderRollbackPlan,
     ReportGeneration,
     GenericAgentTask,
 }
@@ -459,6 +465,108 @@ impl AgentRuntime {
                     name: "Draft Implementation Plan".into(),
                     status: AgentJobStepStatus::Pending,
                     risk_level: AgentJobRiskLevel::Medium,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderRepoInspection => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Scan Repository Directory".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate Snapshot Summary".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderDiffReview => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Analyze File Changes".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Scrutinize Logic And Safety".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Medium,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderTestPlan => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Determine Target Tech Stack".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Draft Validation Command List".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderApplyPatchPendingApproval => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Request User Approval Gate".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::High,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Write Project Changes".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::High,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderValidationRun => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Run Automated Test Commands".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Medium,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
+            AgentJobKind::BuilderRollbackPlan => {
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Identify Restoration Plan".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
                     started_at: None,
                     completed_at: None,
                     error: None,
