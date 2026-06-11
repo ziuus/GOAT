@@ -1077,6 +1077,28 @@ async fn handle_slash_command(
             true
         }
 
+        cmd if cmd.starts_with("/researcher") => {
+            let args = parts.get(1).copied().unwrap_or("").trim();
+            let mut args_iter = args.split_whitespace();
+            let action = args_iter.next().unwrap_or("status");
+            let arg_rest = args_iter.collect::<Vec<_>>().join(" ");
+
+            match action {
+                "projects" => println!("[RESEARCHER] Projects list:"),
+                "new" => println!("[RESEARCHER] Creating project: {}", arg_rest),
+                "add-source" => println!("[RESEARCHER] Adding source to project"),
+                "ingest-browser" => println!("[RESEARCHER] Ingesting browser artifact"),
+                "brief" => println!("[RESEARCHER] Generating brief for project"),
+                "competitors" => println!("[RESEARCHER] Scanning competitors"),
+                "compare-tech" => println!("[RESEARCHER] Comparing technology options"),
+                "report" => println!("[RESEARCHER] Generating report"),
+                _ => println!(
+                    "[RESEARCHER] Unknown action. Use projects, new, add-source, ingest-browser, brief, competitors, compare-tech, report"
+                ),
+            }
+            true
+        }
+
         cmd if cmd.starts_with("/transports") || cmd.starts_with("/transport") => {
             let action = parts.get(1).copied().unwrap_or("status");
             match action {

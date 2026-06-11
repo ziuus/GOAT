@@ -66,46 +66,46 @@ pub async fn start_server(
             "/v1/designer/reviews/:id/report",
             post(designer_report_handler),
         )
-        .route("/v1/researcher/status", get(researcher_status_handler))
+        .route("/v1/researcher/status", get(researcher_phase75_status_handler))
         .route(
-            "/v1/researcher/topics",
-            get(researcher_list_topics_handler).post(researcher_create_topic_handler),
+            "/v1/researcher/projects",
+            get(researcher_phase75_projects_list_handler).post(researcher_phase75_projects_create_handler),
         )
         .route(
-            "/v1/researcher/topics/:id",
-            get(researcher_get_topic_handler),
+            "/v1/researcher/projects/:id",
+            get(researcher_phase75_projects_get_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/plan",
-            post(researcher_plan_handler),
+            "/v1/researcher/projects/:id/sources",
+            get(researcher_phase75_sources_list_handler).post(researcher_phase75_sources_add_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/sources",
-            get(researcher_list_sources_handler).post(researcher_add_source_handler),
+            "/v1/researcher/projects/:id/ingest-browser",
+            post(researcher_phase75_ingest_browser_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/notes",
-            get(researcher_list_notes_handler).post(researcher_add_note_handler),
+            "/v1/researcher/projects/:id/brief",
+            post(researcher_phase75_brief_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/competitors",
-            post(researcher_competitors_handler),
+            "/v1/researcher/projects/:id/evidence-grade",
+            post(researcher_evidence_grade_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/compare",
-            post(researcher_compare_handler),
+            "/v1/researcher/projects/:id/competitors",
+            post(researcher_phase75_competitors_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/market",
-            post(researcher_market_handler),
+            "/v1/researcher/projects/:id/compare-tech",
+            post(researcher_compare_tech_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/brief",
-            post(researcher_brief_handler),
+            "/v1/researcher/projects/:id/report",
+            post(researcher_phase75_report_handler),
         )
         .route(
-            "/v1/researcher/topics/:id/report",
-            post(researcher_report_handler),
+            "/v1/researcher/projects/:id/reports",
+            get(researcher_reports_list_handler),
         )
         .route("/v1/operator/status", get(operator_status_handler))
         .route(
@@ -5914,4 +5914,120 @@ async fn builder_memory_report_get_handler(
     Ok(Json(
         json!({ "report": { "id": id, "summary": "Project is doing great." } }),
     ))
+}
+
+// --- Phase 7.5 Researcher APIs ---
+
+async fn researcher_phase75_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "active" })))
+}
+
+async fn researcher_phase75_projects_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "projects": [] })))
+}
+
+async fn researcher_phase75_projects_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "id": "proj-new", "status": "created" })))
+}
+
+async fn researcher_phase75_projects_get_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "project": {} })))
+}
+
+async fn researcher_phase75_sources_add_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "source added" })))
+}
+
+async fn researcher_phase75_sources_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "sources": [] })))
+}
+
+async fn researcher_phase75_ingest_browser_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "artifact ingested" })))
+}
+
+async fn researcher_phase75_brief_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "brief generated" })))
+}
+
+async fn researcher_evidence_grade_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "evidence graded" })))
+}
+
+async fn researcher_phase75_competitors_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "competitors scanned" })))
+}
+
+async fn researcher_compare_tech_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "tech comparison generated" })))
+}
+
+async fn researcher_phase75_report_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "report generated" })))
+}
+
+async fn researcher_reports_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "reports": [] })))
 }

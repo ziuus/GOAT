@@ -46,6 +46,7 @@ pub mod quick_access;
 pub mod recipe_marketplace;
 pub mod repo_map;
 pub mod reports;
+pub mod research_sources;
 pub mod runtime;
 pub mod scheduler;
 pub mod skill_marketplace;

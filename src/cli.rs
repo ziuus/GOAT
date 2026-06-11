@@ -183,6 +183,16 @@ pub enum Command {
         args: Vec<String>,
     },
 
+    /// Researcher agent operations (Phase 7.5)
+    #[command(name = "researcher")]
+    Researcher {
+        /// Subcommand: projects, new, add-source, ingest-browser, brief, competitors, compare-tech, report
+        action: String,
+        /// Goal or argument depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Manage tools, permissions, and tool registry.
     #[command(name = "tools")]
     Tools {
@@ -729,6 +739,10 @@ pub async fn handle_subcommand(
         }
         Command::Builder { action, args } => {
             handle_builder_command(paths, config, &action, &args)?;
+            Ok(true)
+        }
+        Command::Researcher { action, args } => {
+            handle_researcher_command(paths, config, &action, &args)?;
             Ok(true)
         }
 
@@ -2695,6 +2709,31 @@ fn handle_builder_command(
                 action
             );
         }
+    }
+    Ok(())
+}
+
+fn handle_researcher_command(
+    _paths: &crate::paths::GoatPaths,
+    _config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    match action {
+        "projects" => println!("[RESEARCHER] Projects list:"),
+        "new" => {
+            let q = args.join(" ");
+            println!("[RESEARCHER] Creating project: {}", q);
+        }
+        "add-source" => println!("[RESEARCHER] Adding source to project"),
+        "ingest-browser" => println!("[RESEARCHER] Ingesting browser artifact"),
+        "brief" => println!("[RESEARCHER] Generating brief for project"),
+        "competitors" => println!("[RESEARCHER] Scanning competitors"),
+        "compare-tech" => println!("[RESEARCHER] Comparing technology options"),
+        "report" => println!("[RESEARCHER] Generating report"),
+        _ => println!(
+            "[RESEARCHER] Unknown action. Use projects, new, add-source, ingest-browser, brief, competitors, compare-tech, report"
+        ),
     }
     Ok(())
 }

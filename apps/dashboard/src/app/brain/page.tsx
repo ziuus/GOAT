@@ -105,6 +105,16 @@ export default function BrainSearchPage() {
       case "builder_recurring_mistake":
       case "builder_project_learning":
         return <BrainCircuit className="w-5 h-5 text-amber-400" />;
+      case "researcher_project":
+      case "researcher_source":
+      case "researcher_citation":
+      case "researcher_claim":
+      case "researcher_finding":
+      case "researcher_brief":
+      case "researcher_competitor_profile":
+      case "researcher_competitor_report":
+      case "researcher_technology_comparison":
+        return <BookOpen className="w-5 h-5 text-sky-400" />;
       default: return <Database className="w-5 h-5 text-slate-400" />;
     }
   };
