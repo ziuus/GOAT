@@ -156,3 +156,30 @@ export const cofounderApi = {
   handoffToBuilder: (id: string) => 
     daemonFetch(`/v1/cofounder/ideas/${id}/handoff`, { method: 'POST' }).then(res => res.json()),
 };
+
+export interface SocializerCampaign {
+  id: string;
+  title: string;
+  project_or_idea_ref: string | null;
+  target_audience: string;
+  value_proposition: string;
+  state: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export const socializerApi = {
+  getStatus: () => fetchGoat<any>('/v1/socializer/status'),
+  listCampaigns: () => fetchGoat<any>('/v1/socializer/campaigns'),
+  createCampaign: (data: any) => daemonFetch('/v1/socializer/campaigns', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
+  getCampaign: (id: string) => fetchGoat<any>(`/v1/socializer/campaigns/${id}`),
+  generateAudience: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/audience`, { method: 'POST' }).then(r => r.json()),
+  generateChannels: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/channels`, { method: 'POST' }).then(r => r.json()),
+  generateAngles: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/angles`, { method: 'POST' }).then(r => r.json()),
+  generateDraft: (id: string, platform: string) => daemonFetch(`/v1/socializer/campaigns/${id}/${platform.toLowerCase()}`, { method: 'POST' }).then(r => r.json()),
+  generateLaunch: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/launch`, { method: 'POST' }).then(r => r.json()),
+  generateCalendar: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/calendar`, { method: 'POST' }).then(r => r.json()),
+  generateOutreach: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/outreach`, { method: 'POST' }).then(r => r.json()),
+  generateFeedback: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/feedback`, { method: 'POST' }).then(r => r.json()),
+  generateReport: (id: string) => daemonFetch(`/v1/socializer/campaigns/${id}/report`, { method: 'POST' }).then(r => r.json()),
+};

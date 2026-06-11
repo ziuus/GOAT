@@ -449,6 +449,25 @@ fn all_commands() -> Vec<CommandMetadata> {
             risk: CommandRisk::Low,
             related: None,
         },
+        CommandMetadata {
+            name: "/socializer",
+            aliases: &["\\socializer", "@socializer"],
+            category: CommandCategory::System,
+            description: "Socializer Prime Agent commands",
+            usage: "/socializer [list | new-campaign | audience <id> | channels <id> | angles <id> | reddit <id> | linkedin <id> | x <id> | launch <id> | calendar <id> | outreach <id> | feedback <id> | report <id> | show <id> | from-idea <idea_id>]",
+            examples: &[
+                "/socializer list",
+                "/socializer new-campaign",
+                "/socializer audience <id>",
+                "@socializer launch <id>",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            status: CommandStatus::Working,
+            risk: CommandRisk::Low,
+            related: None,
+        },
         // ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
         CommandMetadata {
             name: "/mode",

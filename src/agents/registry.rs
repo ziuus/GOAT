@@ -81,7 +81,7 @@ impl AgentRegistry {
             name: "Socializer".to_string(),
             description: "Community and social media expert".to_string(),
             tier: AgentTier::Prime,
-            status: AgentStatus::Planned,
+            status: AgentStatus::Experimental,
             prime_affinity: None,
             traits: vec!["Extroverted".to_string(), "Persuasive".to_string()],
             capabilities: vec!["Marketing".to_string(), "Social Media".to_string()],

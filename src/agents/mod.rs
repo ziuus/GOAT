@@ -1,7 +1,9 @@
 pub mod manifest;
 pub mod registry;
 pub mod cofounder;
+pub mod socializer;
 
 pub use manifest::*;
 pub use registry::*;
 pub use cofounder::*;
+pub use socializer::*;
