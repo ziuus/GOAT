@@ -63,6 +63,15 @@ const MOCK_AGENTS = [
     description: "Deep source-grounded research, technology comparisons, and competitor analysis.",
     domainResponsibilities: ["Research", "Comparisons", "Brief Generation"],
     parentPrime: null
+  },
+  {
+    id: "agent-7",
+    name: "Operator Prime",
+    tier: "Prime",
+    status: "active",
+    description: "System Health, Logs, Safe Deployments, Rollbacks, and Incident Analysis.",
+    domainResponsibilities: ["Deployments", "Rollbacks", "Health Checks"],
+    parentPrime: null
   }
 ];
 

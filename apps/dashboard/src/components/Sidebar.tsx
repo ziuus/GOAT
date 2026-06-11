@@ -13,6 +13,7 @@ const navItems = [
   { name: 'Cofounder', href: '/cofounder', icon: Sparkles },
   { name: 'Socializer', href: '/socializer', icon: Users },
   { name: 'Researcher', href: '/researcher', icon: Search },
+  { name: 'Operator', href: '/operator', icon: TerminalSquare },
   { name: 'PromptForge', href: '/promptforge', icon: Sparkles },
   { name: 'Commands', href: '/commands', icon: Command },
   { name: 'Chat', href: '/chat', icon: MessageSquare },

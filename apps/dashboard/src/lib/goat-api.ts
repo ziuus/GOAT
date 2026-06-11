@@ -239,3 +239,19 @@ export const researcherApi = {
   generateBrief: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/brief`, { method: "POST" }).then(r => r.json()),
   generateReport: (id: string) => daemonFetch(`/v1/researcher/topics/${id}/report`, { method: "POST" }).then(r => r.json()),
 };
+
+export const operatorApi = {
+  getStatus: () => daemonFetch("/v1/operator/status").then(r => r.json()),
+  listSystems: () => daemonFetch("/v1/operator/systems").then(r => r.json()),
+  createSystem: (data: any) => daemonFetch("/v1/operator/systems", { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  getSystem: (id: string) => daemonFetch(`/v1/operator/systems/${id}`).then(r => r.json()),
+  healthCheck: (id: string) => daemonFetch(`/v1/operator/systems/${id}/health`, { method: "POST" }).then(r => r.json()),
+  logsCheck: (id: string) => daemonFetch(`/v1/operator/systems/${id}/logs`, { method: "POST" }).then(r => r.json()),
+  incidentCheck: (id: string) => daemonFetch(`/v1/operator/systems/${id}/incident`, { method: "POST" }).then(r => r.json()),
+  deployPlan: (id: string) => daemonFetch(`/v1/operator/systems/${id}/deploy-plan`, { method: "POST" }).then(r => r.json()),
+  ciReview: (id: string) => daemonFetch(`/v1/operator/systems/${id}/ci`, { method: "POST" }).then(r => r.json()),
+  rollbackPlan: (id: string) => daemonFetch(`/v1/operator/systems/${id}/rollback`, { method: "POST" }).then(r => r.json()),
+  runbook: (id: string) => daemonFetch(`/v1/operator/systems/${id}/runbook`, { method: "POST" }).then(r => r.json()),
+  reliability: (id: string) => daemonFetch(`/v1/operator/systems/${id}/reliability`, { method: "POST" }).then(r => r.json()),
+  report: (id: string) => daemonFetch(`/v1/operator/systems/${id}/report`, { method: "POST" }).then(r => r.json()),
+};

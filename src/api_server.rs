@@ -58,6 +58,18 @@ pub async fn start_server(
         .route("/v1/researcher/topics/:id/market", post(researcher_market_handler))
         .route("/v1/researcher/topics/:id/brief", post(researcher_brief_handler))
         .route("/v1/researcher/topics/:id/report", post(researcher_report_handler))
+        .route("/v1/operator/status", get(operator_status_handler))
+        .route("/v1/operator/systems", get(operator_list_systems_handler).post(operator_create_system_handler))
+        .route("/v1/operator/systems/:id", get(operator_get_system_handler))
+        .route("/v1/operator/systems/:id/health", post(operator_health_handler))
+        .route("/v1/operator/systems/:id/logs", post(operator_logs_handler))
+        .route("/v1/operator/systems/:id/incident", post(operator_incident_handler))
+        .route("/v1/operator/systems/:id/deploy-plan", post(operator_deploy_plan_handler))
+        .route("/v1/operator/systems/:id/ci", post(operator_ci_handler))
+        .route("/v1/operator/systems/:id/rollback", post(operator_rollback_handler))
+        .route("/v1/operator/systems/:id/runbook", post(operator_runbook_handler))
+        .route("/v1/operator/systems/:id/reliability", post(operator_reliability_handler))
+        .route("/v1/operator/systems/:id/report", post(operator_report_handler))
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -3508,6 +3520,122 @@ async fn researcher_report_handler(
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     let agent = crate::agents::researcher::ResearcherAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let r = agent.generate_report(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "report": r })))
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Operator Endpoints
+// -----------------------------------------------------------------------------
+
+async fn operator_status_handler() -> impl axum::response::IntoResponse {
+    let mut status = serde_json::Map::new();
+    status.insert("enabled".to_string(), serde_json::Value::Bool(true));
+    status.insert("version".to_string(), serde_json::Value::String("1.0".to_string()));
+    axum::Json(status)
+}
+
+async fn operator_list_systems_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let systems = agent.list_systems().unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({ "systems": systems })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateOperatorSystemReq {
+    name: String,
+    system_type: String,
+    environment: String,
+}
+
+async fn operator_create_system_handler(
+    axum::Json(req): axum::Json<CreateOperatorSystemReq>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sys = agent.create_system(&req.name, &req.system_type, &req.environment).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "system": sys })))
+}
+
+async fn operator_get_system_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Ok(Some(s)) = agent.get_system(&id) {
+        Ok(axum::Json(serde_json::json!({ "system": s })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn operator_health_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hc = agent.create_health_check(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "health_check": hc })))
+}
+
+async fn operator_logs_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let lf = agent.create_log_finding(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "log_finding": lf })))
+}
+
+async fn operator_incident_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let inc = agent.create_incident(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "incident": inc })))
+}
+
+async fn operator_deploy_plan_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let plan = agent.create_deployment_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "plan": plan })))
+}
+
+async fn operator_ci_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let ci = agent.create_ci_review(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "ci_review": ci })))
+}
+
+async fn operator_rollback_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rp = agent.create_rollback_plan(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "rollback_plan": rp })))
+}
+
+async fn operator_runbook_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rb = agent.create_runbook(&id).map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(axum::Json(serde_json::json!({ "runbook": rb })))
+}
+
+async fn operator_reliability_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    // Currently returns a basic response, future iterations will create full OperatorReliabilityCheck
+    Ok(axum::Json(serde_json::json!({ "status": "initiated", "system_id": id })))
+}
+
+async fn operator_report_handler(
+    axum::extract::Path(id): axum::extract::Path<String>
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let agent = crate::agents::operator::OperatorAgent::new().map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    let r = agent.create_report(&id, "operator_health_report").map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
 

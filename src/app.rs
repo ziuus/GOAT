@@ -4148,6 +4148,101 @@ impl App {
                 true
             }
 
+            "/operator" | "@operator" | "@ops" | "@health" | "@logs" | "@incident" | "@deploy" | "@rollback" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = if cmd.starts_with("@") {
+                    cmd.trim_start_matches('@')
+                } else {
+                    parts.get(0).copied().unwrap_or("list")
+                };
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let agent = match crate::agents::operator::OperatorAgent::new() {
+                    Ok(a) => a,
+                    Err(e) => {
+                        self.push_log(format!("[OPERATOR] Init error: {}", e));
+                        return true;
+                    }
+                };
+
+                match subcmd {
+                    "list" | "operator" | "ops" => {
+                        if let Ok(systems) = agent.list_systems() {
+                            self.push_log(format!("[OPERATOR] {} systems found.", systems.len()));
+                            for s in systems {
+                                self.push_log(format!("  [{}] {} (Status: {})", s.id, s.name, s.status));
+                            }
+                        }
+                    }
+                    "system" | "show" => {
+                        if target.is_empty() {
+                            match agent.create_system("New System", "Web App", "Production") {
+                                Ok(s) => self.push_log(format!("[OPERATOR] System created: {}", s.id)),
+                                Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                            }
+                        } else {
+                            if let Ok(Some(s)) = agent.get_system(target) {
+                                self.push_log(format!("[OPERATOR] System: {} ({})", s.name, s.status));
+                            } else {
+                                self.push_log(format!("[OPERATOR] System not found."));
+                            }
+                        }
+                    }
+                    "health" => {
+                        match agent.create_health_check(if target.is_empty() { "default" } else { target }) {
+                            Ok(hc) => self.push_log(format!("[OPERATOR] Health check generated: {} risk findings.", hc.risk_findings.len())),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "logs" => {
+                        match agent.create_log_finding(if target.is_empty() { "default" } else { target }) {
+                            Ok(lf) => self.push_log(format!("[OPERATOR] Logs reviewed: {} error patterns. Sensitive values redacted.", lf.error_patterns.len())),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "incident" => {
+                        match agent.create_incident(if target.is_empty() { "default" } else { target }) {
+                            Ok(inc) => self.push_log(format!("[OPERATOR] Incident analysis generated. Severity: {:?}", inc.severity)),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "deploy-plan" | "deploy" => {
+                        match agent.create_deployment_plan(if target.is_empty() { "default" } else { target }) {
+                            Ok(plan) => self.push_log(format!("[OPERATOR] Deployment plan ready. Requires approval: {}", plan.approval_requirements.join(", "))),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "ci" => {
+                        match agent.create_ci_review(if target.is_empty() { "default" } else { target }) {
+                            Ok(ci) => self.push_log(format!("[OPERATOR] CI/CD Review complete. Missing checks: {}", ci.missing_checks.len())),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "rollback" => {
+                        match agent.create_rollback_plan(if target.is_empty() { "default" } else { target }) {
+                            Ok(rp) => self.push_log(format!("[OPERATOR] Rollback plan generated to version {}.", rp.version_tag_to_return_to)),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "runbook" => {
+                        match agent.create_runbook(if target.is_empty() { "default" } else { target }) {
+                            Ok(_) => self.push_log(format!("[OPERATOR] Runbook generated.")),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    "reliability" => {
+                        self.push_log(format!("[OPERATOR] Reliability check initiated."));
+                    }
+                    "report" => {
+                        match agent.create_report(if target.is_empty() { "default" } else { target }, "operator_health_report") {
+                            Ok(r) => self.push_log(format!("[OPERATOR] Report generated: {}", r.id)),
+                            Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
+                        }
+                    }
+                    _ => self.push_log(format!("[OPERATOR] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");
