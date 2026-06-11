@@ -75,7 +75,10 @@ impl BuilderAgent {
                 context_pack.items.len(),
                 context_pack.estimated_size
             ),
-            implementation_steps: vec!["Step 1: Setup module".to_string(), "Step 2: Implement logic".to_string()],
+            implementation_steps: vec![
+                "Step 1: Setup module".to_string(),
+                "Step 2: Implement logic".to_string(),
+            ],
             test_plan: vec!["Write unit tests".to_string()],
             status: BuilderWorkflowState::PlanDrafted,
         };

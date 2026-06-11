@@ -1746,9 +1746,10 @@ impl App {
                             .browser_workflow_manager
                             .create_workflow("UI QA", url, "ui-qa");
                         let _ = self.browser_workflow_manager.save_workflow(&w);
-                        if let Ok(updated) =
-                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
-                        {
+                        if let Ok(updated) = rt.block_on(
+                            self.browser_workflow_manager
+                                .run_workflow(&w.id, &mut self.browser_manager),
+                        ) {
                             self.push_log(format!(
                                 "[BROWSER] QA Completed with status: {:?}",
                                 updated.status
@@ -1766,9 +1767,10 @@ impl App {
                             "landing-review",
                         );
                         let _ = self.browser_workflow_manager.save_workflow(&w);
-                        if let Ok(updated) =
-                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
-                        {
+                        if let Ok(updated) = rt.block_on(
+                            self.browser_workflow_manager
+                                .run_workflow(&w.id, &mut self.browser_manager),
+                        ) {
                             self.push_log(format!(
                                 "[BROWSER] Landing Review Completed: {:?}",
                                 updated.status
@@ -1785,9 +1787,10 @@ impl App {
                             "dashboard-qa",
                         );
                         let _ = self.browser_workflow_manager.save_workflow(&w);
-                        if let Ok(updated) =
-                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
-                        {
+                        if let Ok(updated) = rt.block_on(
+                            self.browser_workflow_manager
+                                .run_workflow(&w.id, &mut self.browser_manager),
+                        ) {
                             self.push_log(format!(
                                 "[BROWSER] Dashboard QA Completed: {:?}",
                                 updated.status
@@ -1805,9 +1808,10 @@ impl App {
                             "web-health-check",
                         );
                         let _ = self.browser_workflow_manager.save_workflow(&w);
-                        if let Ok(updated) =
-                            rt.block_on(self.browser_workflow_manager.run_workflow(&w.id, &mut self.browser_manager))
-                        {
+                        if let Ok(updated) = rt.block_on(
+                            self.browser_workflow_manager
+                                .run_workflow(&w.id, &mut self.browser_manager),
+                        ) {
                             self.push_log(format!(
                                 "[BROWSER] Web Health Check Completed: {:?}",
                                 updated.status

@@ -483,12 +483,16 @@ impl ResearcherAgent {
         topic_id: &str,
         brain_manager: &crate::brain_index::BrainIndexManager,
     ) -> Result<ResearchBrief> {
-        let topic = self.get_topic(topic_id)?.ok_or_else(|| anyhow::anyhow!("Topic not found"))?;
+        let topic = self
+            .get_topic(topic_id)?
+            .ok_or_else(|| anyhow::anyhow!("Topic not found"))?;
         let packer = crate::agent_quality::AgentContextPacker::new(brain_manager, "researcher");
         let _context = packer.pack_for_task(&topic.title).await?;
 
         // In full implementation, we use PromptForge / LLM here with ProviderRouting
-        let _provider = crate::agent_quality::ProviderRouting::select_provider(&crate::agent_quality::TaskKind::Synthesis);
+        let _provider = crate::agent_quality::ProviderRouting::select_provider(
+            &crate::agent_quality::TaskKind::Synthesis,
+        );
 
         let brief = ResearchBrief {
             id: Uuid::new_v4().to_string(),

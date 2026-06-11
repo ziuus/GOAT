@@ -284,14 +284,19 @@ impl CofounderManager {
         id: &str,
         brain_manager: &crate::brain_index::BrainIndexManager,
     ) -> Result<CofounderScorecard> {
-        let idea = self.ideas.get(id).ok_or_else(|| anyhow::anyhow!("Idea not found"))?;
-        
+        let idea = self
+            .ideas
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("Idea not found"))?;
+
         let packer = crate::agent_quality::AgentContextPacker::new(brain_manager, "cofounder");
         let _context = packer.pack_for_task(&idea.description).await?;
 
         // In full implementation, we use PromptForge / LLM here with ProviderRouting
-        let provider = crate::agent_quality::ProviderRouting::select_provider(&crate::agent_quality::TaskKind::Strategic);
-        
+        let provider = crate::agent_quality::ProviderRouting::select_provider(
+            &crate::agent_quality::TaskKind::Strategic,
+        );
+
         // Mocking the result of the LLM for now
         let score = CofounderScorecard {
             idea_id: id.to_string(),
@@ -309,7 +314,7 @@ impl CofounderManager {
         };
 
         crate::agent_quality::QualityGate::evaluate_scorecard(score.total_score)?;
-        
+
         if let Some(idea_mut) = self.ideas.get_mut(id) {
             idea_mut.state = CofounderWorkflowState::Scored;
             self.save_ideas()?;
