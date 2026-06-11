@@ -1,0 +1,55 @@
+You are executing Phase 6.3 of the GOAT project: Agent Execution Runtime v1.
+
+Your task is to implement the following end-to-end, then test, build, and ensure Git status is clean.
+
+# Requirements
+
+## 1. Execution runtime core
+Create `src/agent_runtime.rs`. Define `AgentRuntime`, `AgentJob`, `AgentJobId`, `AgentJobStatus`, `AgentJobKind`, `AgentJobStep`, `AgentJobStepStatus`, `AgentJobEvent`, `AgentJobEventKind`, `AgentJobInput`, `AgentJobOutput`, `AgentJobArtifact`, `AgentJobPolicy`, `AgentJobRiskLevel`, `AgentJobCheckpoint`, `AgentJobResumeState`, `AgentRuntimeConfig`.
+Job statuses: queued, waiting_for_approval, running, paused, completed, failed, cancelled.
+Step statuses: pending, waiting_for_approval, running, completed, skipped, failed, cancelled.
+Job kinds: cofounder_validation, learner_roadmap, promptforge_refinement, researcher_brief, designer_review, operator_health_check, builder_plan, report_generation, generic_agent_task.
+
+## 2. Runtime storage
+Save jobs, steps, events to `~/.local/share/goat/runtime/` as JSONL (`jobs.jsonl`, `steps.jsonl`, etc.).
+Jobs should store id, title, agent_id, status, artifacts, approval_refs, timeline_refs, report_refs, etc. Do not store secrets.
+
+## 3. Runtime commands & API
+Slash commands: `/jobs`, `/jobs list`, `/jobs show <id>`, `/jobs run <agent> <task>`, `/jobs pause <id>`, `/jobs resume <id>`, `/jobs cancel <id>`, `/jobs retry <id>`. Aliases: `@jobs`, `@run`, `@status`, etc.
+API endpoints: `GET /v1/runtime/status`, `GET /v1/runtime/jobs`, `GET /v1/runtime/jobs/:id`, `POST /v1/runtime/jobs`, and endpoints to start/pause/resume/cancel/retry/events/artifacts.
+
+## 4. Live progress events
+Expose runtime events (e.g. `job_queued`, `job_started`, `job_step_started`, `job_waiting_for_approval`, `job_completed`) for the dashboard via existing SSE endpoints.
+
+## 5. ApprovalGate & Deterministic Runners
+Jobs with medium/high/critical risk trigger ApprovalGate. Steps enter `waiting_for_approval`.
+Implement deterministic simple runners for: PromptForge refinement, Learner roadmap, Cofounder validation, Researcher brief, Operator health check.
+
+## 6. Integrations
+- Save structured artifacts.
+- Record `TimelineEventKind`s.
+- Index basic metadata via Brain Search.
+- Create `runtime_job_report` via ReportManager.
+
+## 7. Dashboard
+Add `/runtime` (or `/jobs`) Next.js page showing active jobs, logs, pause/resume/cancel. Add "Run as Job" actions to existing Agent pages (or prefill links).
+
+## 8. Docs
+Create `docs/GOAT_AGENT_RUNTIME.md`, `docs/GOAT_RUNTIME_JOBS.md`, `docs/GOAT_RUNTIME_SAFETY.md`. Update existing docs.
+
+## Constraints
+- Do NOT rewrite existing agents.
+- Do NOT bypass ApprovalGate.
+- Do NOT make risky actions automatic.
+- Do NOT add cloud dependencies.
+- Ensure TUI, Daemon, CLI, and Dashboard still build/run properly.
+
+## Instructions
+1. Implement the Rust backend logic first.
+2. Hook up the Axum API.
+3. Hook up the Command CLI.
+4. Update the Next.js Dashboard.
+5. Create Documentation.
+6. Run `cargo fmt`, `cargo check`, `cargo test`.
+7. Run `cd apps/dashboard && npm run build`.
+8. Once everything builds successfully, simply exit. DO NOT commit or push, I will handle that.

@@ -2,10 +2,10 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use uuid::Uuid;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::PathBuf;
+use uuid::Uuid;
 
 pub type AgentJobId = String;
 
@@ -189,13 +189,13 @@ impl AgentRuntime {
         if !runtime_dir.exists() {
             fs::create_dir_all(&runtime_dir)?;
         }
-        
+
         let mut runtime = Self {
             config,
             runtime_dir,
             jobs: HashMap::new(),
         };
-        
+
         let jobs_path = runtime.jobs_file();
         if jobs_path.exists() {
             let content = fs::read_to_string(&jobs_path)?;
@@ -205,7 +205,7 @@ impl AgentRuntime {
                 }
             }
         }
-        
+
         Ok(runtime)
     }
 
@@ -226,10 +226,7 @@ impl AgentRuntime {
     }
 
     fn append_jsonl<T: Serialize>(path: &PathBuf, item: &T) -> Result<()> {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().create(true).append(true).open(path)?;
         let json = serde_json::to_string(item)?;
         writeln!(file, "{}", json)?;
         Ok(())
@@ -261,44 +258,194 @@ impl AgentRuntime {
         Ok(())
     }
 
-    pub fn create_job(&mut self, title: String, agent_id: String, job_kind: AgentJobKind, task: String) -> Result<AgentJobId> {
+    pub fn create_job(
+        &mut self,
+        title: String,
+        agent_id: String,
+        job_kind: AgentJobKind,
+        task: String,
+    ) -> Result<AgentJobId> {
         let job_id = Uuid::new_v4().to_string();
         let mut steps = Vec::new();
-        
+
         // Setup deterministic steps based on job kind
         match job_kind {
             AgentJobKind::PromptforgeRefinement => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Collect Input".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Refine".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Score".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Store Artifact".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-            },
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Collect Input".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Refine".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Score".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Store Artifact".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             AgentJobKind::LearnerRoadmap => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Create Goal".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Generate Roadmap".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Generate Today Plan".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Store Artifact".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-            },
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Create Goal".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate Roadmap".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate Today Plan".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Store Artifact".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             AgentJobKind::CofounderValidation => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Create Idea".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Generate Checklist".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Generate MVP Scope".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Store Artifact".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-            },
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Create Idea".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate Checklist".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate MVP Scope".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Store Artifact".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             AgentJobKind::ResearcherBrief => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Create Topic".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Create Research Plan".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Generate Brief Skeleton".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-            },
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Create Topic".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Create Research Plan".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Generate Brief Skeleton".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             AgentJobKind::OperatorHealthCheck => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Create Checklist".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Store Artifact".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
-            },
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Create Checklist".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Store Artifact".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
+            }
             _ => {
-                steps.push(AgentJobStep { id: Uuid::new_v4().to_string(), name: "Execute Task".into(), status: AgentJobStepStatus::Pending, risk_level: AgentJobRiskLevel::Low, started_at: None, completed_at: None, error: None });
+                steps.push(AgentJobStep {
+                    id: Uuid::new_v4().to_string(),
+                    name: "Execute Task".into(),
+                    status: AgentJobStepStatus::Pending,
+                    risk_level: AgentJobRiskLevel::Low,
+                    started_at: None,
+                    completed_at: None,
+                    error: None,
+                });
             }
         }
-        
+
         let job = AgentJob {
             id: job_id.clone(),
             title,
@@ -319,11 +466,15 @@ impl AgentRuntime {
             completed_at: None,
             error: None,
         };
-        
+
         self.jobs.insert(job_id.clone(), job);
         self.save_jobs()?;
-        self.push_event(&job_id, AgentJobEventKind::JobCreated, "Job created successfully")?;
-        
+        self.push_event(
+            &job_id,
+            AgentJobEventKind::JobCreated,
+            "Job created successfully",
+        )?;
+
         Ok(job_id)
     }
 
@@ -383,7 +534,9 @@ impl AgentRuntime {
             job.status = AgentJobStatus::Queued;
             job.error = None;
             for step in &mut job.steps {
-                if step.status == AgentJobStepStatus::Failed || step.status == AgentJobStepStatus::Cancelled {
+                if step.status == AgentJobStepStatus::Failed
+                    || step.status == AgentJobStepStatus::Cancelled
+                {
                     step.status = AgentJobStepStatus::Pending;
                     step.error = None;
                 }

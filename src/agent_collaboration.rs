@@ -590,7 +590,7 @@ impl AgentCollaborationManager {
             let step = &mut session.steps[current_index];
             step.status = AgentCollaborationStatus::Completed;
             step.completed_at = Some(Utc::now());
-            
+
             // Create a handoff if there is a next step
             if let (Some(na), Some(nd)) = (next_agent, next_desc) {
                 let handoff = AgentHandoff {

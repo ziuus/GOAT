@@ -2237,7 +2237,12 @@ fn all_commands() -> Vec<CommandMetadata> {
             category: CommandCategory::System,
             description: "Manage Agent Execution Runtime jobs (run, list, pause, resume)",
             usage: "/jobs [run|list|show|pause|resume|cancel|retry] <args>",
-            examples: &["/jobs run learner 'Create roadmap'", "/jobs list", "@status", "@run cofounder 'Validate idea'"],
+            examples: &[
+                "/jobs run learner 'Create roadmap'",
+                "/jobs list",
+                "@status",
+                "@run cofounder 'Validate idea'",
+            ],
             shortcut: None,
             surface: CommandSurface::both(),
             requires_approval: false,

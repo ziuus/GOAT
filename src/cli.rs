@@ -1992,7 +1992,10 @@ fn handle_jobs_command(
                 println!("  No jobs found.");
             } else {
                 for job in jobs {
-                    println!("  - [{}] {} ({:?}) - {}", job.id, job.agent_id, job.status, job.input_summary);
+                    println!(
+                        "  - [{}] {} ({:?}) - {}",
+                        job.id, job.agent_id, job.status, job.input_summary
+                    );
                 }
             }
         }

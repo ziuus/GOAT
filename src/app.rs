@@ -2347,7 +2347,10 @@ impl App {
                             logs.push("[RUNTIME] No background jobs tracked.".to_string());
                         } else {
                             for s in statuses {
-                                logs.push(format!("[RUNTIME]   [{}] {} ({:?}) - {}", s.id, s.agent_id, s.status, s.input_summary));
+                                logs.push(format!(
+                                    "[RUNTIME]   [{}] {} ({:?}) - {}",
+                                    s.id, s.agent_id, s.status, s.input_summary
+                                ));
                             }
                         }
                         for log in logs {
@@ -2356,11 +2359,18 @@ impl App {
                     }
                     "run" => {
                         if parts.len() < 4 {
-                            self.push_log("[RUNTIME] Usage: /jobs run <agent_id> <task>".to_string());
+                            self.push_log(
+                                "[RUNTIME] Usage: /jobs run <agent_id> <task>".to_string(),
+                            );
                         } else {
                             let agent_id = parts[2].to_string();
                             let task = parts[3..].join(" ");
-                            match self.agent_runtime.create_job(format!("TUI Job: {}", task), agent_id, crate::agent_runtime::AgentJobKind::GenericAgentTask, task) {
+                            match self.agent_runtime.create_job(
+                                format!("TUI Job: {}", task),
+                                agent_id,
+                                crate::agent_runtime::AgentJobKind::GenericAgentTask,
+                                task,
+                            ) {
                                 Ok(job_id) => {
                                     self.push_log(format!("[RUNTIME] Created job: {}", job_id));
                                     let _ = self.agent_runtime.start_job(&job_id);

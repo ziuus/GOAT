@@ -446,6 +446,7 @@ mod tests {
             tool_catalog_file: base.join("tool.toml"),
             brain_index_dir: base.join("brain-index"),
             skill_packs_dir: base.join("skill-packs"),
+            runtime_dir: base.join("runtime"),
         }
     }
 
