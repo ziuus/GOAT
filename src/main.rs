@@ -15,6 +15,7 @@ pub mod browser_adapter;
 pub mod browser_workflows;
 pub mod checkpoint;
 mod cli;
+pub mod code_execution;
 pub mod command_registry;
 pub mod config;
 pub mod daemon;

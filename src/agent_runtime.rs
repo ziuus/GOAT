@@ -74,6 +74,12 @@ pub enum AgentJobKind {
     BuilderApplyPatchPendingApproval,
     BuilderValidationRun,
     BuilderRollbackPlan,
+    CodeExecutionPreview,
+    CodeExecutionCheckpoint,
+    CodeExecutionApplyPatch,
+    CodeExecutionValidation,
+    CodeExecutionRollback,
+    CodeExecutionReport,
     ReportGeneration,
     GenericAgentTask,
 }
