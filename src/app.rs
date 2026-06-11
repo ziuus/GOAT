@@ -3831,6 +3831,83 @@ impl App {
             }
 
             // ── Phase 5.16: Agents ──────────────────────────────────────────────
+            "/cofounder" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = parts.get(0).copied().unwrap_or("list");
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let mut manager = crate::agents::cofounder::CofounderManager::new().expect("Failed to initialize CofounderManager");
+
+                match subcmd {
+                    "list" => {
+                        let ideas = manager.list_ideas();
+                        self.push_log(format!("[COFOUNDER] {} ideas found.", ideas.len()));
+                        for i in ideas {
+                            self.push_log(format!("  [{}] {} (State: {:?})", i.id, i.title, i.state));
+                        }
+                    }
+                    "new-idea" => {
+                        // Very simple for testing
+                        match manager.add_idea(target.to_string(), "Mock Description".to_string(), "Mock Audience".to_string()) {
+                            Ok(idea) => self.push_log(format!("[COFOUNDER] Idea created: {}", idea.id)),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "validate" => {
+                        match manager.generate_validation_plan(target) {
+                            Ok(plan) => self.push_log(format!("[COFOUNDER] Validation Plan for {}: {} steps", plan.idea_id, plan.steps.len())),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "score" => {
+                        match manager.generate_scorecard(target) {
+                            Ok(score) => self.push_log(format!("[COFOUNDER] Scorecard for {}: {}/50", score.idea_id, score.total_score)),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "mvp" => {
+                        match manager.generate_mvp_scope(target) {
+                            Ok(mvp) => self.push_log(format!("[COFOUNDER] MVP Scope for {}: {} core features", mvp.idea_id, mvp.core_features.len())),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "competitors" => {
+                        match manager.generate_competitors(target) {
+                            Ok(comps) => self.push_log(format!("[COFOUNDER] {} competitors found for {}", comps.len(), target)),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "landing" => {
+                        match manager.generate_landing_page_brief(target) {
+                            Ok(brief) => self.push_log(format!("[COFOUNDER] Landing Page Brief: {}", brief)),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "outreach" => {
+                        match manager.generate_outreach_plan(target) {
+                            Ok(plan) => self.push_log(format!("[COFOUNDER] Outreach Plan: {} channels", plan.channels.len())),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "report" => {
+                        match manager.generate_report(target) {
+                            Ok(report) => self.push_log(format!("[COFOUNDER] Report: {}", report.summary)),
+                            Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
+                        }
+                    }
+                    "show" => {
+                        if let Some(idea) = manager.get_idea(target) {
+                            self.push_log(format!("[COFOUNDER] ID: {}", idea.id));
+                            self.push_log(format!("  Title: {}", idea.title));
+                            self.push_log(format!("  State: {:?}", idea.state));
+                        } else {
+                            self.push_log(format!("[COFOUNDER] Idea '{}' not found", target));
+                        }
+                    }
+                    _ => self.push_log(format!("[COFOUNDER] Unknown subcmd: {}", subcmd)),
+                }
+                true
+            }
+
             "/agents" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
                 let subcmd = parts.get(0).copied().unwrap_or("list");

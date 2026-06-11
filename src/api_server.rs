@@ -284,6 +284,16 @@ pub async fn start_server(
         )
         // ── Phase 5.16: Agents ──────────────────────────────────────────────
         .route("/v1/agents", get(agents_list_handler))
+        .route("/v1/cofounder/status", get(cofounder_status_handler))
+        .route("/v1/cofounder/ideas", get(cofounder_ideas_handler).post(cofounder_idea_create_handler))
+        .route("/v1/cofounder/ideas/:id", get(cofounder_idea_detail_handler))
+        .route("/v1/cofounder/ideas/:id/validate", post(cofounder_idea_validate_handler))
+        .route("/v1/cofounder/ideas/:id/score", post(cofounder_idea_score_handler))
+        .route("/v1/cofounder/ideas/:id/mvp", post(cofounder_idea_mvp_handler))
+        .route("/v1/cofounder/ideas/:id/competitors", post(cofounder_idea_competitors_handler))
+        .route("/v1/cofounder/ideas/:id/landing", post(cofounder_idea_landing_handler))
+        .route("/v1/cofounder/ideas/:id/outreach", post(cofounder_idea_outreach_handler))
+        .route("/v1/cofounder/ideas/:id/report", post(cofounder_idea_report_handler))
         .route("/v1/reports", get(reports_list_handler))
         .layer(cors)
         .with_state(state);
@@ -2783,3 +2793,131 @@ async fn reports_list_handler(
     let reports = mgr.list_reports().unwrap_or_default();
     Ok(Json(serde_json::json!({ "reports": reports })))
 }
+
+async fn cofounder_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "status": "online" })))
+}
+
+async fn cofounder_ideas_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let ideas = mgr.list_ideas();
+    Ok(Json(serde_json::json!({ "ideas": ideas })))
+}
+
+#[derive(serde::Deserialize)]
+struct CofounderIdeaCreatePayload {
+    title: String,
+    description: String,
+    target_audience: String,
+}
+
+async fn cofounder_idea_create_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<CofounderIdeaCreatePayload>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let idea = mgr.add_idea(payload.title, payload.description, payload.target_audience).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "idea": idea })))
+}
+
+async fn cofounder_idea_detail_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    if let Some(idea) = mgr.get_idea(&id) {
+        Ok(Json(serde_json::json!({ "idea": idea })))
+    } else {
+        Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "not found" }))))
+    }
+}
+
+async fn cofounder_idea_validate_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let plan = mgr.generate_validation_plan(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "plan": plan })))
+}
+
+async fn cofounder_idea_score_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let score = mgr.generate_scorecard(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "score": score })))
+}
+
+async fn cofounder_idea_mvp_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let mvp = mgr.generate_mvp_scope(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "mvp": mvp })))
+}
+
+async fn cofounder_idea_competitors_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let comps = mgr.generate_competitors(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "competitors": comps })))
+}
+
+async fn cofounder_idea_landing_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let brief = mgr.generate_landing_page_brief(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "brief": brief })))
+}
+
+async fn cofounder_idea_outreach_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let plan = mgr.generate_outreach_plan(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "plan": plan })))
+}
+
+async fn cofounder_idea_report_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    let report = mgr.generate_report(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+    Ok(Json(serde_json::json!({ "report": report })))
+}
+

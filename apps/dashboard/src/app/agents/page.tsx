@@ -45,6 +45,15 @@ const MOCK_AGENTS = [
     description: "Monitors overall system security, reviews PRs for vulnerabilities.",
     domainResponsibilities: ["AuthZ/AuthN", "Audit Logs", "Compliance"],
     parentPrime: null
+  },
+  {
+    id: "agent-5",
+    name: "Cofounder Prime",
+    tier: "Prime",
+    status: "active",
+    description: "Evaluates ideas, generates MVP specs, and creates validation plans.",
+    domainResponsibilities: ["Ideation", "Validation", "Market Research"],
+    parentPrime: null
   }
 ];
 
@@ -220,32 +229,61 @@ export default function AgentsPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="grid grid-cols-2 gap-2 pt-4 border-t border-white/5 mt-auto">
-                      <button 
-                        onClick={() => alert(`Running task on ${agent.name}`)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-medium transition-colors border border-indigo-500/20"
-                      >
-                        <Zap className="w-3.5 h-3.5" /> Run Task
-                      </button>
-                      <button 
-                        onClick={() => alert(`Toggling state for ${agent.name}`)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
-                      >
-                        <Power className="w-3.5 h-3.5" /> Toggle
-                      </button>
-                      <button 
-                        onClick={() => alert(`Viewing reports for ${agent.name}`)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
-                      >
-                        <FileText className="w-3.5 h-3.5" /> Reports
-                      </button>
-                      <button 
-                        onClick={() => alert(`Attaching specialist to ${agent.name}`)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" /> Attach
-                      </button>
-                    </div>
+                    {agent.id === "agent-5" ? (
+                      <div className="grid grid-cols-2 gap-2 pt-4 border-t border-white/5 mt-auto">
+                        <button 
+                          onClick={() => alert(`Creating new idea`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-medium transition-colors border border-indigo-500/20"
+                        >
+                          <Zap className="w-3.5 h-3.5" /> New Idea
+                        </button>
+                        <button 
+                          onClick={() => alert(`Validating idea`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" /> Validate Idea
+                        </button>
+                        <button 
+                          onClick={() => alert(`Generating report`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Generate Report
+                        </button>
+                        <button 
+                          onClick={() => window.location.href = '/cofounder'}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <Workflow className="w-3.5 h-3.5" /> Open Dashboard
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-4 border-t border-white/5 mt-auto">
+                        <button 
+                          onClick={() => alert(`Running task on ${agent.name}`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-medium transition-colors border border-indigo-500/20"
+                        >
+                          <Zap className="w-3.5 h-3.5" /> Run Task
+                        </button>
+                        <button 
+                          onClick={() => alert(`Toggling state for ${agent.name}`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <Power className="w-3.5 h-3.5" /> Toggle
+                        </button>
+                        <button 
+                          onClick={() => alert(`Viewing reports for ${agent.name}`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Reports
+                        </button>
+                        <button 
+                          onClick={() => alert(`Attaching specialist to ${agent.name}`)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-medium transition-colors border border-white/10"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" /> Attach
+                        </button>
+                      </div>
+                    )}
 
                   </motion.div>
                 ))}

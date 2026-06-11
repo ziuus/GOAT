@@ -652,3 +652,12 @@
 * Prime Agents and Specialist Agents definitions.
 * Report system (`src/reports.rs`).
 * Dashboard `/agents` and `/reports` integration.
+## Phase 5.17: Cofounder Agent Phase 1 (✅ COMPLETED)
+* Implemented `CofounderAgent` in `src/agents/cofounder.rs`.
+* Idea intake and transparent scorecard (1-5 scoring on 10 dimensions).
+* Validation Plan generation.
+* MVP Scoping (aggressive reduction).
+* Competitor scan and outreach draft capabilities.
+* Report generation for founder insights.
+* Added `GET /v1/cofounder/*` and `POST /v1/cofounder/*` endpoints.
+* Added Dashboard `/cofounder` route and `/agents` integration.

@@ -10,6 +10,7 @@ const navItems = [
   { name: 'Overview', href: '/', icon: Activity },
   { name: 'Agents', href: '/agents', icon: Users },
   { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Cofounder', href: '/cofounder', icon: Sparkles },
   { name: 'Commands', href: '/commands', icon: Command },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Skill Directory', href: '/skills', icon: Library },

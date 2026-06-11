@@ -2053,6 +2053,71 @@ async fn handle_slash_command(
         }
 
         // ── Phase 5.16: Agents ──────────────────────────────────────────────
+        "/cofounder" => {
+            let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
+            let subcmd = parts.get(1).copied().unwrap_or("list");
+            let target = parts.get(2).copied().unwrap_or("").trim();
+            if let Ok(mut manager) = crate::agents::cofounder::CofounderManager::new() {
+                match subcmd {
+                    "list" => {
+                        println!("[COFOUNDER] Ideas:");
+                        for i in manager.list_ideas() {
+                            println!("  [{}] {} ({:?})", i.id, i.title, i.state);
+                        }
+                    }
+                    "new-idea" => {
+                        match manager.add_idea(target.to_string(), "Mock".into(), "Mock".into()) {
+                            Ok(i) => println!("[COFOUNDER] Created {}", i.id),
+                            Err(e) => println!("[COFOUNDER] Error: {}", e),
+                        }
+                    }
+                    "validate" => {
+                        if let Ok(plan) = manager.generate_validation_plan(target) {
+                            println!("[COFOUNDER] Validation Plan: {} steps", plan.steps.len());
+                        }
+                    }
+                    "score" => {
+                        if let Ok(score) = manager.generate_scorecard(target) {
+                            println!("[COFOUNDER] Scorecard: {}/50", score.total_score);
+                        }
+                    }
+                    "mvp" => {
+                        if let Ok(mvp) = manager.generate_mvp_scope(target) {
+                            println!("[COFOUNDER] MVP Scope: {} features", mvp.core_features.len());
+                        }
+                    }
+                    "competitors" => {
+                        if let Ok(comps) = manager.generate_competitors(target) {
+                            println!("[COFOUNDER] Competitors: {}", comps.len());
+                        }
+                    }
+                    "landing" => {
+                        if let Ok(brief) = manager.generate_landing_page_brief(target) {
+                            println!("[COFOUNDER] Landing: {}", brief);
+                        }
+                    }
+                    "outreach" => {
+                        if let Ok(plan) = manager.generate_outreach_plan(target) {
+                            println!("[COFOUNDER] Outreach: {} channels", plan.channels.len());
+                        }
+                    }
+                    "report" => {
+                        if let Ok(r) = manager.generate_report(target) {
+                            println!("[COFOUNDER] Report: {}", r.summary);
+                        }
+                    }
+                    "show" => {
+                        if let Some(idea) = manager.get_idea(target) {
+                            println!("[COFOUNDER] Idea: {:?}", idea);
+                        }
+                    }
+                    _ => println!("[COFOUNDER] Unknown: {}", subcmd),
+                }
+            } else {
+                println!("[COFOUNDER] Failed to init manager");
+            }
+            true
+        }
         "/agents" => {
             let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
             let subcmd = parts.get(1).copied().unwrap_or("list");

@@ -45,6 +45,12 @@ pub enum TimelineEventKind {
     DesktopStarted,
     AgentEnabled,
     AgentTaskStarted,
+    CofounderIdeaCreated,
+    CofounderValidationCreated,
+    CofounderScorecardCreated,
+    CofounderMvpScoped,
+    CofounderReportGenerated,
+    CofounderHandoffCreated,
     Unknown(String),
 }
 

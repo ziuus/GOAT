@@ -430,6 +430,25 @@ fn all_commands() -> Vec<CommandMetadata> {
             risk: CommandRisk::Low,
             related: None,
         },
+        CommandMetadata {
+            name: "/cofounder",
+            aliases: &["\\cofounder"],
+            category: CommandCategory::System,
+            description: "Cofounder Prime Agent commands",
+            usage: "/cofounder [list | new-idea | validate <id> | score <id> | mvp <id> | competitors <id> | landing <id> | outreach <id> | report <id> | show <id>]",
+            examples: &[
+                "/cofounder list",
+                "/cofounder new-idea",
+                "/cofounder validate <id>",
+                "/cofounder report <id>",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            status: CommandStatus::Working,
+            risk: CommandRisk::Low,
+            related: None,
+        },
         // ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
         CommandMetadata {
             name: "/mode",

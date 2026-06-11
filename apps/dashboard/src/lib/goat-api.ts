@@ -135,3 +135,24 @@ export const chatApi = {
       body: JSON.stringify({ message, mode, context_files: contextFiles })
     }).then(res => res.json()),
 };
+
+// Cofounder API Additions
+export const cofounderApi = {
+  getIdeas: () => fetchGoat<any>('/v1/cofounder/ideas').catch(() => ({ ideas: [] })),
+  createIdea: (idea: any) => 
+    daemonFetch('/v1/cofounder/ideas', { 
+      method: 'POST', 
+      body: JSON.stringify(idea) 
+    }).then(res => res.json()),
+  getIdea: (id: string) => fetchGoat<any>(`/v1/cofounder/ideas/${id}`).catch(() => null),
+  validateIdea: (id: string) => 
+    daemonFetch(`/v1/cofounder/ideas/${id}/validate`, { method: 'POST' }).then(res => res.json()),
+  scoreIdea: (id: string) => 
+    daemonFetch(`/v1/cofounder/ideas/${id}/score`, { method: 'POST' }).then(res => res.json()),
+  generateReport: (id: string) => 
+    daemonFetch(`/v1/cofounder/ideas/${id}/report`, { method: 'POST' }).then(res => res.json()),
+  generateMvp: (id: string) => 
+    daemonFetch(`/v1/cofounder/ideas/${id}/mvp`, { method: 'POST' }).then(res => res.json()),
+  handoffToBuilder: (id: string) => 
+    daemonFetch(`/v1/cofounder/ideas/${id}/handoff`, { method: 'POST' }).then(res => res.json()),
+};

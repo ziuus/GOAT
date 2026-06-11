@@ -32,7 +32,14 @@ impl QuickAccessParser {
                             format!("/agents specialists {}", args)
                         }
                     }
-                    "cofounder" | "socializer" | "designer" | "researcher" | "builder"
+                    "cofounder" => {
+                        if args.is_empty() {
+                            "/cofounder list".to_string()
+                        } else {
+                            format!("/cofounder {}", args)
+                        }
+                    }
+                    "socializer" | "designer" | "researcher" | "builder"
                     | "operator" | "learner" | "finance" | "reddit" | "ui" | "reviewer" => {
                         if args.is_empty() {
                             format!("/agents show {}", cmd)
