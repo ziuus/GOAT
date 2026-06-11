@@ -6,9 +6,9 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::path::PathBuf;
 use tokio_stream::StreamExt;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -570,6 +570,37 @@ pub async fn start_server(
         )
         .route("/v1/builder/artifacts", get(builder_artifacts_handler))
         .route("/v1/builder/reports", get(builder_reports_handler))
+        // Phase 7.3 Compiler-Guided Loop APIs
+        .route("/v1/builder/failures", get(builder_failures_handler))
+        .route(
+            "/v1/builder/analyze-failure",
+            post(builder_analyze_failure_handler),
+        )
+        .route("/v1/builder/retry-plan", post(builder_retry_plan_handler))
+        .route(
+            "/v1/builder/retry-plans/:id",
+            get(builder_get_retry_plan_handler),
+        )
+        .route(
+            "/v1/builder/retry-plans/:id/preview",
+            post(builder_retry_preview_handler),
+        )
+        .route(
+            "/v1/builder/retry-plans/:id/request-approval",
+            post(builder_retry_approval_handler),
+        )
+        .route(
+            "/v1/builder/retry-plans/:id/apply",
+            post(builder_retry_apply_handler),
+        )
+        .route(
+            "/v1/builder/retry-plans/:id/validate",
+            post(builder_retry_validate_handler),
+        )
+        .route(
+            "/v1/builder/retry-plans/:id/report",
+            get(builder_retry_report_handler),
+        )
         // Code Execution APIs
         .route("/v1/code-execution/status", get(ce_status_handler))
         .route("/v1/code-execution/preview", post(ce_preview_handler))
@@ -5582,4 +5613,186 @@ async fn extensions_disable_handler(
         Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
         Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
     }
+}
+
+// --- Phase 7.3 Compiler-Guided Loop Handlers ---
+
+async fn builder_failures_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    // Stub implementation
+    Ok(Json(json!({ "failures": [] })))
+}
+
+#[derive(serde::Deserialize)]
+struct AnalyzeFailureReq {
+    session_id: String,
+}
+
+async fn builder_analyze_failure_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<AnalyzeFailureReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+
+    let session = mgr
+        .get_session(&payload.session_id)
+        .unwrap_or(None)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Session not found" })),
+        ))?;
+
+    let mut all_failures = Vec::new();
+    for res in session.validation_results {
+        if res.status == crate::code_execution::ValidationStatus::Failed {
+            if let Some(out) = res.output {
+                let parsed = crate::validation_parser::ValidationParser::parse_output(
+                    &res.command.command,
+                    &out.stdout,
+                    &out.stderr,
+                    out.exit_code,
+                );
+                all_failures.extend(parsed);
+            }
+        }
+    }
+
+    let clusters = crate::validation_parser::ValidationParser::cluster_failures(all_failures);
+
+    let analysis = crate::code_retry::ValidationFailureAnalysis {
+        session_id: payload.session_id.clone(),
+        clusters,
+        fix_hypothesis: crate::code_retry::ValidationFailureFixHypothesis {
+            description: "Analyze the compiler errors and fix type/syntax issues.".to_string(),
+            expected_outcome: "Compilation passes without errors.".to_string(),
+        },
+    };
+
+    let _ = mgr.save_analysis(&analysis);
+
+    Ok(Json(json!({ "analysis": analysis })))
+}
+
+#[derive(serde::Deserialize)]
+struct RetryPlanReq {
+    session_id: String,
+}
+
+async fn builder_retry_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<RetryPlanReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+
+    let analysis = mgr
+        .get_analysis(&payload.session_id)
+        .unwrap_or(None)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Analysis not found" })),
+        ))?;
+
+    let session = mgr
+        .get_session(&payload.session_id)
+        .unwrap_or(None)
+        .ok_or((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Session not found" })),
+        ))?;
+
+    let plan = crate::code_retry::BuilderRetryPlan {
+        id: uuid::Uuid::new_v4().to_string(),
+        validation_session_id: payload.session_id.clone(),
+        failed_command: "validation suite".to_string(),
+        failure_summary: format!("{} failure clusters detected", analysis.clusters.len()),
+        suspected_root_cause: analysis.fix_hypothesis.description.clone(),
+        proposed_patch_intent: "Fix compiler errors based on hypothesis".to_string(),
+        patch_candidate: crate::code_retry::BuilderRetryPatchCandidate {
+            affected_files: vec![],
+            steps: vec![],
+            diff_preview_summary: None,
+        },
+        risk_level: crate::code_retry::BuilderRetryRiskLevel::Medium,
+        approval_need: crate::code_retry::BuilderRetryApprovalNeed::Standard,
+        validation_plan: crate::code_retry::BuilderRetryValidationPlan {
+            expected_commands: session.validation_commands.clone(),
+        },
+        checkpoint_ref: None,
+        rollback_ref: None,
+        max_retry_count: 3,
+        current_retry_attempt: 1,
+    };
+
+    let _ = mgr.save_retry_plan(&plan);
+
+    Ok(Json(json!({ "plan": plan })))
+}
+
+async fn builder_get_retry_plan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let rt = state.runtime.lock().await;
+    let mgr = crate::code_execution::CodeExecutionManager::new(&rt.paths.data_dir);
+    let plan = mgr.get_retry_plan(&id).unwrap_or(None).ok_or((
+        StatusCode::NOT_FOUND,
+        Json(json!({ "error": "Plan not found" })),
+    ))?;
+    Ok(Json(json!({ "plan": plan })))
+}
+
+async fn builder_retry_preview_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "preview not implemented yet" })))
+}
+
+async fn builder_retry_approval_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "Approval requested" })))
+}
+
+async fn builder_retry_apply_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "Applied" })))
+}
+
+async fn builder_retry_validate_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "Validated" })))
+}
+
+async fn builder_retry_report_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(_id): axum::extract::Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "report": "Report contents" })))
 }

@@ -116,6 +116,9 @@ export default function BuilderPage() {
     }
   };
 
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [retryPlanData, setRetryPlanData] = useState<any>(null);
+
   const mockApprove = () => {
     if (executionSession) {
       setExecutionSession({ ...executionSession, status: 'approved' });
@@ -124,13 +127,53 @@ export default function BuilderPage() {
 
   const mockApply = () => {
     if (executionSession) {
-      setExecutionSession({ ...executionSession, status: 'completed', checkpoint_id: 'cp-' + Date.now() });
+      // jump straight to validating for demo purposes
+      setExecutionSession({ ...executionSession, status: 'validating', checkpoint_id: 'cp-' + Date.now() });
+    }
+  };
+
+  const mockValidate = () => {
+    if (executionSession) {
+      setExecutionSession({ ...executionSession, status: 'failed', validation_results: [{ status: 'Failed' }] });
     }
   };
 
   const mockRollback = () => {
     if (executionSession) {
       setExecutionSession({ ...executionSession, status: 'rolled_back' });
+      setAnalysisData(null);
+      setRetryPlanData(null);
+    }
+  };
+
+  const analyzeFailure = async () => {
+    if (!executionSession) return;
+    try {
+      // Simulate API call to /v1/builder/analyze-failure
+      setAnalysisData({
+        session_id: executionSession.id,
+        clusters: [
+          { primary_failure: { kind: 'rust_compile_error', likely_cause: 'Missing import' } }
+        ],
+        fix_hypothesis: { description: 'Add missing import for PartialEq' }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const generateRetryPlan = async () => {
+    if (!executionSession) return;
+    try {
+      // Simulate API call to /v1/builder/retry-plan
+      setRetryPlanData({
+        id: 'retry-' + Date.now(),
+        suspected_root_cause: 'Missing import for PartialEq',
+        proposed_patch_intent: 'Update use statement in code_execution.rs',
+        risk_level: 'low'
+      });
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -234,7 +277,12 @@ export default function BuilderPage() {
                        Apply & Checkpoint
                      </button>
                    )}
-                   {executionSession.status === 'completed' && (
+                   {executionSession.status === 'validating' && (
+                     <button onClick={mockValidate} className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs font-medium rounded-lg">
+                       Run Validation Check
+                     </button>
+                   )}
+                   {(executionSession.status === 'completed' || executionSession.status === 'failed') && (
                      <button onClick={mockRollback} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium rounded-lg">
                        Rollback Changes
                      </button>
@@ -253,6 +301,45 @@ export default function BuilderPage() {
                    <p className="text-xs text-emerald-400 flex items-center gap-1">
                      <CheckCircle2 className="w-3 h-3" /> Checkpoint saved: {executionSession.checkpoint_id}
                    </p>
+                 )}
+
+                 {executionSession.status === 'failed' && !analysisData && (
+                   <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg space-y-3 mt-4">
+                     <p className="text-sm font-medium text-red-400 flex items-center gap-2">
+                       <AlertTriangle className="w-4 h-4" /> Validation Failed
+                     </p>
+                     <button onClick={analyzeFailure} className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-medium rounded-lg">
+                       Analyze Failure Root Cause
+                     </button>
+                   </div>
+                 )}
+
+                 {analysisData && (
+                   <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-3 mt-4 animate-in fade-in">
+                     <p className="text-sm font-medium text-amber-400">Compiler/Test Failure Analysis</p>
+                     <div className="text-xs text-slate-300 bg-black/40 p-2 rounded border border-white/5 font-mono">
+                       <p className="text-amber-300/80 mb-1">Hypothesis: {analysisData.fix_hypothesis.description}</p>
+                       <p>Cluster 1: {analysisData.clusters[0].primary_failure.kind}</p>
+                     </div>
+                     {!retryPlanData && (
+                       <button onClick={generateRetryPlan} className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-xs font-medium rounded-lg">
+                         Propose Retry Plan
+                       </button>
+                     )}
+                   </div>
+                 )}
+
+                 {retryPlanData && (
+                   <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg space-y-3 mt-4 animate-in fade-in slide-in-from-bottom-2">
+                     <p className="text-sm font-medium text-indigo-400">Retry Plan Ready</p>
+                     <div className="text-xs text-slate-300 bg-black/40 p-2 rounded border border-white/5 space-y-1">
+                       <p><span className="text-slate-500">Intent:</span> {retryPlanData.proposed_patch_intent}</p>
+                       <p><span className="text-slate-500">Risk:</span> <span className="uppercase text-[10px] bg-white/10 px-1.5 py-0.5 rounded ml-1">{retryPlanData.risk_level}</span></p>
+                     </div>
+                     <button className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-medium rounded-lg flex items-center gap-2">
+                       <ShieldCheck className="w-3 h-3" /> Approve Retry Loop
+                     </button>
+                   </div>
                  )}
                </div>
              </div>

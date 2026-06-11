@@ -16,6 +16,7 @@ pub mod browser_workflows;
 pub mod checkpoint;
 mod cli;
 pub mod code_execution;
+pub mod code_retry;
 pub mod command_registry;
 pub mod config;
 pub mod daemon;
@@ -58,6 +59,7 @@ pub mod tool_registry;
 mod tools;
 pub mod transports;
 mod ui;
+pub mod validation_parser;
 pub mod voice;
 
 use anyhow::{Context, Result};

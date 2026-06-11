@@ -56,7 +56,7 @@ pub struct CodeDiffPreview {
     pub summary: CodeDiffSummary,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ValidationStatus {
     Pending,
     Running,
@@ -142,13 +142,23 @@ pub struct CodeExecutionSession {
 
 pub struct CodeExecutionManager {
     base_dir: PathBuf,
+    retry_dir: PathBuf,
+    analysis_dir: PathBuf,
 }
 
 impl CodeExecutionManager {
     pub fn new(data_dir: &Path) -> Self {
         let base_dir = data_dir.join("code_executions");
+        let retry_dir = data_dir.join("code_retries");
+        let analysis_dir = data_dir.join("code_analyses");
         let _ = fs::create_dir_all(&base_dir);
-        Self { base_dir }
+        let _ = fs::create_dir_all(&retry_dir);
+        let _ = fs::create_dir_all(&analysis_dir);
+        Self {
+            base_dir,
+            retry_dir,
+            analysis_dir,
+        }
     }
 
     pub fn create_session(
@@ -231,6 +241,46 @@ impl CodeExecutionManager {
             self.save_session(&session)?;
         }
         Ok(())
+    }
+
+    pub fn save_retry_plan(&self, plan: &crate::code_retry::BuilderRetryPlan) -> Result<()> {
+        let path = self.retry_dir.join(format!("{}.json", plan.id));
+        fs::write(path, serde_json::to_string_pretty(plan)?)?;
+        Ok(())
+    }
+
+    pub fn get_retry_plan(&self, id: &str) -> Result<Option<crate::code_retry::BuilderRetryPlan>> {
+        let path = self.retry_dir.join(format!("{}.json", id));
+        if !path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&path)?;
+        let plan = serde_json::from_str(&content)?;
+        Ok(Some(plan))
+    }
+
+    pub fn save_analysis(
+        &self,
+        analysis: &crate::code_retry::ValidationFailureAnalysis,
+    ) -> Result<()> {
+        let path = self
+            .analysis_dir
+            .join(format!("{}.json", analysis.session_id));
+        fs::write(path, serde_json::to_string_pretty(analysis)?)?;
+        Ok(())
+    }
+
+    pub fn get_analysis(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<crate::code_retry::ValidationFailureAnalysis>> {
+        let path = self.analysis_dir.join(format!("{}.json", session_id));
+        if !path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&path)?;
+        let analysis = serde_json::from_str(&content)?;
+        Ok(Some(analysis))
     }
 
     pub fn execute_validation(
