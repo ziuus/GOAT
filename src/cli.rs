@@ -114,6 +114,15 @@ pub enum Command {
     #[command(name = "new-session")]
     NewSession,
 
+    /// Seed demo data for the dashboard (Phase 6.5).
+    /// Generates local-first JSONL mock data to visualize all Prime Agent UI flows.
+    #[command(name = "seed-demo")]
+    SeedDemo {
+        /// Clear existing demo data before seeding.
+        #[arg(long)]
+        clear: bool,
+    },
+
     /// List and switch model profiles and providers.
     #[command(name = "models")]
     Models {
@@ -400,6 +409,11 @@ pub async fn handle_subcommand(
 
         Command::NewSession => {
             handle_new_session_command(paths)?;
+            Ok(true)
+        }
+
+        Command::SeedDemo { clear } => {
+            handle_seed_demo_command(paths, *clear).await?;
             Ok(true)
         }
 
@@ -726,6 +740,82 @@ fn handle_sessions_command(paths: &crate::paths::GoatPaths) -> anyhow::Result<()
 }
 
 // ── new-session command ────────────────────────────────────────────────────────
+
+async fn handle_seed_demo_command(paths: &crate::paths::GoatPaths, clear: bool) -> anyhow::Result<()> {
+    use std::fs;
+    println!("Seeding demo data for dashboard flows...");
+
+    let prime_dir = paths.data_dir.join("agents").join("prime");
+    let cofounder_file = prime_dir.join("cofounder").join("ideas.jsonl");
+    let learner_goals = prime_dir.join("learner").join("goals.jsonl");
+    let learner_roadmaps = prime_dir.join("learner").join("roadmaps.jsonl");
+    let promptforge_hist = paths.data_dir.join("promptforge").join("history.jsonl");
+    let reports_dir = paths.data_dir.join("reports");
+
+    if clear {
+        println!("Clearing existing demo data...");
+        let _ = fs::remove_file(&cofounder_file);
+        let _ = fs::remove_file(&learner_goals);
+        let _ = fs::remove_file(&learner_roadmaps);
+        let _ = fs::remove_file(&promptforge_hist);
+        if reports_dir.exists() {
+            let _ = fs::remove_dir_all(&reports_dir);
+        }
+    }
+
+    // Seed Cofounder
+    println!("Seeding Cofounder ideas...");
+    if let Ok(mut cofounder) = crate::agents::cofounder::CofounderManager::new() {
+        let _ = cofounder.add_idea(
+            "AI Developer CLI".to_string(),
+            "A terminal-native AI agent platform written in Rust".to_string(),
+            "Developers".to_string(),
+        );
+        let _ = cofounder.add_idea(
+            "HyperFrames Video Studio".to_string(),
+            "Create programmatic videos using React and HTML".to_string(),
+            "Creators".to_string(),
+        );
+    }
+
+    // Seed Learner
+    println!("Seeding Learner goals...");
+    if let Ok(learner) = crate::agents::learner::LearnerAgent::new() {
+        if let Ok(goal) = learner.create_goal(
+            "Master Rust Concurrency",
+            crate::agents::learner::LearningDomain::Rust
+        ) {
+            let _ = learner.create_roadmap(&goal.id);
+        }
+    }
+
+    // Seed Reports
+    println!("Seeding Reports...");
+    let report_mgr = crate::reports::ReportManager::new();
+    let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
+        kind: crate::reports::ReportKind::Research,
+        title: "Rust Async Ecosystem".into(),
+        sections: vec![
+            crate::reports::ReportSection {
+                heading: "Overview".into(),
+                body: "Tokio remains the dominant runtime for async Rust.".into(),
+            }
+        ]
+    });
+    let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
+        kind: crate::reports::ReportKind::CodeReview,
+        title: "Phase 6.5 Audit".into(),
+        sections: vec![
+            crate::reports::ReportSection {
+                heading: "Security".into(),
+                body: "Passed all automated checks.".into(),
+            }
+        ]
+    });
+
+    println!("Demo seed complete! Run `goat dashboard` to see the changes.");
+    Ok(())
+}
 
 fn handle_new_session_command(paths: &crate::paths::GoatPaths) -> anyhow::Result<()> {
     use anyhow::Context;

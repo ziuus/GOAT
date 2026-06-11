@@ -6,6 +6,7 @@ import {
   Activity, Shield, Terminal, Zap, BookOpen, Clock, Play,
   Search, Download, Eye, FileText, ChevronRight
 } from "lucide-react";
+import { goatApi } from '@/lib/goat-api';
 
 interface TimelineEvent {
   id: string;
@@ -32,14 +33,11 @@ export default function TimelinePage() {
     setLoading(true);
     try {
       const url = query 
-        ? `http://localhost:3000/v1/timeline/search?q=${encodeURIComponent(query)}`
-        : "http://localhost:3000/v1/timeline/recent";
+        ? `/v1/timeline/search?q=${encodeURIComponent(query)}`
+        : "/v1/timeline/recent";
       
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data.events || []);
-      }
+      const data = await goatApi.get(url);
+      setEvents(data.events || []);
     } catch (e) {
       console.error("Failed to fetch timeline", e);
     }
@@ -53,7 +51,7 @@ export default function TimelinePage() {
 
   const handleExport = async () => {
     try {
-      await fetch("http://localhost:3000/v1/timeline/export", { method: 'POST' });
+      await goatApi.post("/v1/timeline/export", {});
       alert("Timeline exported successfully.");
     } catch (e) {
       console.error(e);

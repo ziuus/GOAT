@@ -287,3 +287,8 @@ export const runtimeApi = {
   getJobArtifacts: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/artifacts`).then(r => r.json()),
   generateReport: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/report`, { method: "POST" }).then(r => r.json()),
 };
+
+export const reportsApi = {
+  listReports: () => daemonFetch("/v1/reports").then(r => r.json()),
+};
+
