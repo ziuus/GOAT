@@ -282,6 +282,9 @@ pub async fn start_server(
             "/v1/agent-templates/:id/draft",
             post(agent_templates_draft_handler),
         )
+        // ── Phase 5.16: Agents ──────────────────────────────────────────────
+        .route("/v1/agents", get(agents_list_handler))
+        .route("/v1/reports", get(reports_list_handler))
         .layer(cors)
         .with_state(state);
 
@@ -2758,4 +2761,25 @@ async fn setup_doctor_handler(
     Ok(Json(
         serde_json::json!({ "doctor": "All systems nominal for Setup." }),
     ))
+}
+
+// ── Phase 5.16: Agents ──────────────────────────────────────────────
+async fn agents_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let registry = crate::agents::AgentRegistry::new();
+    let agents: Vec<_> = registry.list().into_iter().cloned().collect();
+    Ok(Json(serde_json::json!({ "agents": agents })))
+}
+
+async fn reports_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::reports::ReportManager::new();
+    let reports = mgr.list_reports().unwrap_or_default();
+    Ok(Json(serde_json::json!({ "reports": reports })))
 }

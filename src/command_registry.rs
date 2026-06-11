@@ -410,6 +410,26 @@ impl CommandRegistry {
 /// Every slash command handled in app.rs and headless.rs must be here.
 fn all_commands() -> Vec<CommandMetadata> {
     vec![
+        // ── Phase 5.16: Agent Architecture ──────────────────────────────────────
+        CommandMetadata {
+            name: "/agents",
+            aliases: &["\\agents", "\\agent", "\\prime", "\\specialist"],
+            category: CommandCategory::System,
+            description: "Manage GOAT Prime and Specialist agents",
+            usage: "/agents [list | show <name> | enable <name> | disable <name> | reports <name> | specialists <prime>]",
+            examples: &[
+                "/agents list",
+                "/agents show cofounder",
+                "/agents enable finance_analyst",
+                "/agents reports cofounder",
+            ],
+            shortcut: None,
+            surface: CommandSurface::both(),
+            requires_approval: false,
+            status: CommandStatus::Working,
+            risk: CommandRisk::Low,
+            related: None,
+        },
         // ── Phase 5.14: Agent Modes, Projects, Onboarding ─────────────────────
         CommandMetadata {
             name: "/mode",

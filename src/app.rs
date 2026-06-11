@@ -3830,6 +3830,81 @@ impl App {
                 true
             }
 
+            // ── Phase 5.16: Agents ──────────────────────────────────────────────
+            "/agents" => {
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let subcmd = parts.get(0).copied().unwrap_or("list");
+                let target = parts.get(1).copied().unwrap_or("").trim();
+                let mut registry = crate::agents::AgentRegistry::new();
+                let report_mgr = crate::reports::ReportManager::new();
+
+                match subcmd {
+                    "list" => {
+                        self.push_log("[AGENTS] GOAT Agent Registry:".to_string());
+                        let agents = registry.list();
+                        for a in agents {
+                            self.push_log(format!(
+                                "  [{:?}] {} ({}): {}",
+                                a.tier, a.name, a.id, a.description
+                            ));
+                            self.push_log(format!(
+                                "    Status: {:?} | Affinity: {:?}",
+                                a.status, a.prime_affinity
+                            ));
+                        }
+                    }
+                    "show" => {
+                        if let Some(agent) = registry.get(target) {
+                            self.push_log(format!("[AGENTS] Name: {} ({})", agent.name, agent.id));
+                            self.push_log(format!("  Tier: {:?}", agent.tier));
+                            self.push_log(format!("  Status: {:?}", agent.status));
+                            self.push_log(format!("  Affinity: {:?}", agent.prime_affinity));
+                            self.push_log(format!("  Traits: {:?}", agent.traits));
+                            self.push_log(format!("  Capabilities: {:?}", agent.capabilities));
+                        } else {
+                            self.push_log(format!("[AGENTS] Agent '{}' not found.", target));
+                        }
+                    }
+                    "enable" => {
+                        if let Err(e) = registry.enable(target) {
+                            self.push_log(format!("[AGENTS] Error: {}", e));
+                        } else {
+                            self.push_log(format!("[AGENTS] Agent '{}' enabled (Active).", target));
+                        }
+                    }
+                    "disable" => {
+                        if let Err(e) = registry.disable(target) {
+                            self.push_log(format!("[AGENTS] Error: {}", e));
+                        } else {
+                            self.push_log(format!("[AGENTS] Agent '{}' disabled.", target));
+                        }
+                    }
+                    "reports" => {
+                        self.push_log(format!("[AGENTS] Reports for {}:", target));
+                        if let Ok(reports) = report_mgr.list_reports() {
+                            for r in reports {
+                                self.push_log(format!(
+                                    "  - {} ({}) [{}]",
+                                    r.title, r.id, r.created_at
+                                ));
+                            }
+                        }
+                    }
+                    "specialists" => {
+                        self.push_log(format!("[AGENTS] Specialists for Prime '{}':", target));
+                        for a in registry.list() {
+                            if a.prime_affinity.as_deref() == Some(target) {
+                                self.push_log(format!("  - {} ({})", a.name, a.id));
+                            }
+                        }
+                    }
+                    _ => {
+                        self.push_log("[AGENTS] Valid subcommands: list, show, enable, disable, reports, specialists".to_string());
+                    }
+                }
+                true
+            }
+
             _ => {
                 // Friendly error for unknown slash commands.
                 self.push_log(format!(

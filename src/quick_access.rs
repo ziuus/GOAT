@@ -12,7 +12,37 @@ impl QuickAccessParser {
         let rewritten = match first_char {
             '@' => {
                 let rest = &input[1..];
-                format!("/subagents ask {}", rest)
+                let parts: Vec<&str> = rest.splitn(2, ' ').collect();
+                let cmd = parts[0];
+                let args = if parts.len() > 1 { parts[1] } else { "" };
+
+                match cmd {
+                    "agents" => {
+                        if args.is_empty() {
+                            "/agents list".to_string()
+                        } else {
+                            format!("/agents {}", args)
+                        }
+                    }
+                    "prime" => format!("/agents list"), // or something equivalent
+                    "specialists" => {
+                        if args.is_empty() {
+                            "/agents list".to_string()
+                        } else {
+                            format!("/agents specialists {}", args)
+                        }
+                    }
+                    "cofounder" | "socializer" | "designer" | "researcher" | "builder"
+                    | "operator" | "learner" | "finance" | "reddit" | "ui" | "reviewer" => {
+                        if args.is_empty() {
+                            format!("/agents show {}", cmd)
+                        } else {
+                            // If they type a message, maybe suggest they enable the agent
+                            format!("/agents show {}", cmd)
+                        }
+                    }
+                    _ => format!("/subagents ask {}", rest),
+                }
             }
             '#' => {
                 let rest = &input[1..];

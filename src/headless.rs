@@ -2052,6 +2052,79 @@ async fn handle_slash_command(
             true
         }
 
+        // ── Phase 5.16: Agents ──────────────────────────────────────────────
+        "/agents" => {
+            let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
+            let subcmd = parts.get(1).copied().unwrap_or("list");
+            let target = parts.get(2).copied().unwrap_or("").trim();
+            let mut registry = crate::agents::AgentRegistry::new();
+            let report_mgr = crate::reports::ReportManager::new();
+
+            match subcmd {
+                "list" => {
+                    println!("[AGENTS] GOAT Agent Registry:");
+                    let agents = registry.list();
+                    for a in agents {
+                        println!("  [{:?}] {} ({}): {}", a.tier, a.name, a.id, a.description);
+                        println!(
+                            "    Status: {:?} | Affinity: {:?}",
+                            a.status, a.prime_affinity
+                        );
+                    }
+                }
+                "show" => {
+                    if let Some(agent) = registry.get(target) {
+                        println!("[AGENTS] Name: {} ({})", agent.name, agent.id);
+                        println!("  Tier: {:?}", agent.tier);
+                        println!("  Status: {:?}", agent.status);
+                        println!("  Affinity: {:?}", agent.prime_affinity);
+                        println!("  Traits: {:?}", agent.traits);
+                        println!("  Capabilities: {:?}", agent.capabilities);
+                    } else {
+                        println!("[AGENTS] Agent '{}' not found.", target);
+                    }
+                }
+                "enable" => {
+                    if let Err(e) = registry.enable(target) {
+                        println!("[AGENTS] Error: {}", e);
+                    } else {
+                        println!("[AGENTS] Agent '{}' enabled (Active).", target);
+                        // Using TimelineManager directly if needed, or omit for headless if not readily available
+                        println!("[TIMELINE] Agent {} enabled", target);
+                    }
+                }
+                "disable" => {
+                    if let Err(e) = registry.disable(target) {
+                        println!("[AGENTS] Error: {}", e);
+                    } else {
+                        println!("[AGENTS] Agent '{}' disabled.", target);
+                    }
+                }
+                "reports" => {
+                    println!("[AGENTS] Reports for {}:", target);
+                    if let Ok(reports) = report_mgr.list_reports() {
+                        for r in reports {
+                            println!("  - {} ({}) [{}]", r.title, r.id, r.created_at);
+                        }
+                    }
+                }
+                "specialists" => {
+                    println!("[AGENTS] Specialists for Prime '{}':", target);
+                    for a in registry.list() {
+                        if a.prime_affinity.as_deref() == Some(target) {
+                            println!("  - {} ({})", a.name, a.id);
+                        }
+                    }
+                }
+                _ => {
+                    println!(
+                        "[AGENTS] Valid subcommands: list, show, enable, disable, reports, specialists"
+                    );
+                }
+            }
+            true
+        }
+
         _ => false,
     }
 }

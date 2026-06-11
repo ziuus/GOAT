@@ -22,6 +22,13 @@ Welcome to the GOAT documentation.
 * [Security Policy](../SECURITY.md)
 
 ## Features & Subsystems
+* [Agent Architecture](GOAT_AGENT_ARCHITECTURE.md)
+* [Prime Agents](GOAT_PRIME_AGENTS.md)
+* [Specialist Agents](GOAT_SPECIALIST_AGENTS.md)
+* [Agent Safety & Ethics](GOAT_AGENT_SAFETY_AND_ETHICS.md)
+* [Report System](GOAT_REPORT_SYSTEM.md)
+* [Cofounder Agent Plan](GOAT_COFUNDER_AGENT_PLAN.md)
+* [Socializer Agent Plan](GOAT_SOCIALIZER_AGENT_PLAN.md)
 * [Feature Matrix](GOAT_FEATURE_MATRIX.md)
 * [Command System](GOAT_COMMAND_SYSTEM.md)
 * [Context System](GOAT_CONTEXT_SYSTEM.md)

@@ -1,4 +1,5 @@
 pub mod agent_profiles;
+pub mod agents;
 pub mod api_server;
 mod app;
 mod approval;
@@ -32,6 +33,7 @@ pub mod provider;
 pub mod quick_access;
 pub mod recipe_marketplace;
 pub mod repo_map;
+pub mod reports;
 pub mod runtime;
 pub mod scheduler;
 pub mod skill_marketplace;

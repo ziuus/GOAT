@@ -647,3 +647,8 @@
 *   **[x] Feature Parity Review:** Benchmark against OpenCode, Cursor, Claude Code, and others.
 *   **[x] Setup/Onboarding Polish:** Established robust documentation for installation and troubleshooting.
 *   **[x] UX Small Fixes:** Minor dashboard component improvements and TUI padding/logic refinements applied.
+## Phase 5.16: Prime Agent Architecture + Specialist Agent Layer (✅ COMPLETED)
+* Unified agent architecture (`src/agents/mod.rs`).
+* Prime Agents and Specialist Agents definitions.
+* Report system (`src/reports.rs`).
+* Dashboard `/agents` and `/reports` integration.

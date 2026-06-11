@@ -355,11 +355,27 @@ export default function StudioPage() {
                      </motion.div>
                   )}
                   {activeTab === "agent" && (
-                     <motion.div variants={itemVariants} className="w-full flex justify-center mt-4">
-                        <button className="px-6 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 transition-colors flex items-center gap-2 text-sm shadow-lg shadow-indigo-500/10">
-                           <UserCheck className="w-4 h-4" />
-                           Use Agent Templates
-                        </button>
+                     <motion.div variants={itemVariants} className="w-full flex flex-col items-center gap-4 mt-4">
+                        <div className="flex gap-3">
+                           <button className="px-6 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 transition-colors flex items-center gap-2 text-sm shadow-lg shadow-indigo-500/10">
+                              <Bot className="w-4 h-4" />
+                              Create Custom Prime Agent Draft
+                           </button>
+                           <button className="px-6 py-2 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 transition-colors flex items-center gap-2 text-sm shadow-lg shadow-violet-500/10">
+                              <TerminalSquare className="w-4 h-4" />
+                              Convert Prompt to Agent Draft
+                           </button>
+                           <button className="px-6 py-2 rounded-xl bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/30 text-slate-300 transition-colors flex items-center gap-2 text-sm shadow-lg">
+                              <UserCheck className="w-4 h-4" />
+                              Use Agent Templates
+                           </button>
+                        </div>
+                        <div className="mt-4 p-4 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200/80 text-sm flex items-start gap-3 w-full text-left">
+                           <Sparkles className="w-5 h-5 shrink-0 mt-0.5 text-fuchsia-400" />
+                           <p>
+                              <strong>Coming Soon:</strong> The "Cofounder Agent" integration is planned for a future phase. It will allow you to generate full agent architectures dynamically.
+                           </p>
+                        </div>
                      </motion.div>
                   )}
 

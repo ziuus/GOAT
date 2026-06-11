@@ -22,6 +22,10 @@ GOAT is a comprehensive, local-first AI Agent Operating System designed for deve
 
 * **Local-First & Secure by Default:** GOAT runs locally. All dangerous actions (file writes, command execution, API calls) are blocked by an interactive `ApprovalGate`. 
 * **Multi-Interface Support:** Interact with GOAT via a rich TUI, a headless CLI, a persistent background daemon, a modern web dashboard, or a Tauri desktop app.
+* **Agent OS Architecture:** GOAT acts as the operating system for a hierarchy of intelligent agents:
+  - **Prime Agents:** Built-in domains (e.g., Cofounder, Socializer, Researcher, Builder) that own large-scale strategies.
+  - **Specialist Agents:** Highly-focused experts (e.g., SEO Analyst, UI Critic, Finance Analyst) attached to Prime Agents.
+  - **Subagents:** Temporary executors spawned for single tasks.
 * **Agent Mode & Project Profiles:** Tailor GOAT to your workflow. Are you debugging Rust, refactoring React, or writing a PRD? GOAT automatically detects your project stack and switches to the optimal agent profile.
 * **Memory Galaxy & Brain Search:** A persistent SQLite-backed vector search system stores your code, conversations, and learned skills, acting as a long-term memory system.
 * **Extensive Integrations:**

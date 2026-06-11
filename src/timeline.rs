@@ -43,6 +43,8 @@ pub enum TimelineEventKind {
     EmbeddingRebuildCompleted,
     DaemonStarted,
     DesktopStarted,
+    AgentEnabled,
+    AgentTaskStarted,
     Unknown(String),
 }
 
