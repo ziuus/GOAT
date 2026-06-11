@@ -10,98 +10,7 @@ use crate::config::BrainIndexConfig;
 use crate::embeddings::{EmbeddingProvider, EmbeddingVector, create_provider};
 use crate::paths::GoatPaths;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum BrainDocumentKind {
-    Memory,
-    MemoryCandidate,
-    Skill,
-    SkillProvenance,
-    Recipe,
-    RecipeRun,
-    AgentTemplate,
-    StudioDraft,
-    Job,
-    Approval,
-    AuditLog,
-    SessionSummary,
-    ProjectSummary,
-    Checkpoint,
-    McpTool,
-    ExternalAgentRun,
-    CommandHistory,
-    PromptForgeTemplate,
-    PromptForgeHistory,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TrustLevel {
-    TrustedLocal,
-    Installed,
-    LearnedPending,
-    RemoteUntrusted,
-    GeneratedDraft,
-    AuditOnly,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrainDocument {
-    pub id: String,
-    pub kind: BrainDocumentKind,
-    pub title: String,
-    pub summary: String,
-    pub body: String,
-    pub tags: Vec<String>,
-    pub source_path: Option<String>,
-    pub project_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub redaction_status: String,
-    pub trust_level: TrustLevel,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrainIndexStats {
-    pub total_documents: usize,
-    pub last_indexed_at: Option<String>,
-    pub storage_size_bytes: u64,
-    pub total_vectors: usize,
-    pub embedding_provider: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum BrainSearchMode {
-    Keyword,
-    Fuzzy,
-    Semantic,
-    Hybrid,
-}
-
-impl Default for BrainSearchMode {
-    fn default() -> Self {
-        BrainSearchMode::Keyword
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrainSearchQuery {
-    pub q: String,
-    pub limit: usize,
-    pub kind_filter: Option<Vec<BrainDocumentKind>>,
-    #[serde(default)]
-    pub mode: BrainSearchMode,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrainSearchResult {
-    pub document: BrainDocument,
-    pub score: f32,
-    pub keyword_score: f32,
-    pub semantic_score: f32,
-    pub match_reason: String,
-}
+use crate::brain_models::*;
 
 pub struct BrainIndexManager {
     paths: GoatPaths,
@@ -161,19 +70,17 @@ impl BrainIndexManager {
 
     pub async fn index_all(&self) -> Result<()> {
         if !self.config.enabled {
-            return Err(anyhow!("Brain index is disabled in config"));
+            return Ok(());
         }
-
-        if !self.paths.brain_index_dir.exists() {
-            fs::create_dir_all(&self.paths.brain_index_dir)?;
-        }
-
         let mut docs = Vec::new();
-
         self.ingest_skills(&mut docs);
         self.ingest_memory(&mut docs);
         self.ingest_promptforge(&mut docs);
+        self.ingest_reports(&mut docs);
+        self.ingest_timeline(&mut docs);
+        self.ingest_runtime(&mut docs);
 
+        let mut out = String::new();
         if self.config.deep_ingestion {
             if self.config.index_recipes {
                 self.ingest_dir(
@@ -341,10 +248,21 @@ impl BrainIndexManager {
                         summary: "Global system PromptForge history".to_string(),
                         body: self.truncate(&content),
                         tags: vec!["promptforge".to_string(), "history".to_string()],
-                        source_path: Some(pf_history_file.to_string_lossy().to_string()),
-                        project_id: None,
-                        created_at: chrono::Utc::now().to_rfc3339(),
-                        updated_at: chrono::Utc::now().to_rfc3339(),
+                        source: BrainSourceRef {
+                            source_kind: BrainDocumentKind::PromptForgeHistory,
+                            source_id: "global_promptforge_history".to_string(),
+                            source_path: Some(pf_history_file.to_string_lossy().to_string()),
+                            source_title: "PromptForge History".to_string(),
+                            source_agent: None,
+                            source_project: None,
+                            content_hash: self.hash_text(&content),
+                            created_at: chrono::Utc::now().to_rfc3339(),
+                            updated_at: chrono::Utc::now().to_rfc3339(),
+                            timeline_refs: vec![],
+                            report_refs: vec![],
+                            runtime_refs: vec![],
+                            collaboration_refs: vec![],
+                        },
                         redaction_status: "clean".to_string(),
                         trust_level: TrustLevel::TrustedLocal,
                     });
@@ -370,10 +288,21 @@ impl BrainIndexManager {
                         "template".to_string(),
                         format!("{:?}", tpl.kind),
                     ],
-                    source_path: None,
-                    project_id: None,
-                    created_at: chrono::Utc::now().to_rfc3339(),
-                    updated_at: chrono::Utc::now().to_rfc3339(),
+                    source: BrainSourceRef {
+                        source_kind: BrainDocumentKind::PromptForgeTemplate,
+                        source_id: format!("pf_template_{}", tpl.id),
+                        source_path: None,
+                        source_title: format!("PromptForge Template: {}", tpl.name),
+                        source_agent: None,
+                        source_project: None,
+                        content_hash: self.hash_text(&body),
+                        created_at: chrono::Utc::now().to_rfc3339(),
+                        updated_at: chrono::Utc::now().to_rfc3339(),
+                        timeline_refs: vec![],
+                        report_refs: vec![],
+                        runtime_refs: vec![],
+                        collaboration_refs: vec![],
+                    },
                     redaction_status: "clean".to_string(),
                     trust_level: TrustLevel::TrustedLocal,
                 });
@@ -399,10 +328,21 @@ impl BrainIndexManager {
                             summary: "A local skill definition".to_string(),
                             body: self.truncate(&content),
                             tags: vec!["skill".to_string()],
-                            source_path: Some(entry.path().to_string_lossy().to_string()),
-                            project_id: None,
-                            created_at: Utc::now().to_rfc3339(),
-                            updated_at: Utc::now().to_rfc3339(),
+                            source: BrainSourceRef {
+                                source_kind: BrainDocumentKind::Skill,
+                                source_id: format!("skill_{}", docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: "Local Skill".to_string(),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
                             redaction_status: "clean".to_string(),
                             trust_level: TrustLevel::TrustedLocal,
                         });
@@ -423,10 +363,21 @@ impl BrainIndexManager {
                         summary: "Global system memory context".to_string(),
                         body: self.truncate(&content),
                         tags: vec!["memory".to_string()],
-                        source_path: Some(self.paths.memory_file.to_string_lossy().to_string()),
-                        project_id: None,
-                        created_at: Utc::now().to_rfc3339(),
-                        updated_at: Utc::now().to_rfc3339(),
+                        source: BrainSourceRef {
+                            source_kind: BrainDocumentKind::Memory,
+                            source_id: "global_memory".to_string(),
+                            source_path: Some(self.paths.memory_file.to_string_lossy().to_string()),
+                            source_title: "Global Memory".to_string(),
+                            source_agent: None,
+                            source_project: None,
+                            content_hash: self.hash_text(&content),
+                            created_at: Utc::now().to_rfc3339(),
+                            updated_at: Utc::now().to_rfc3339(),
+                            timeline_refs: vec![],
+                            report_refs: vec![],
+                            runtime_refs: vec![],
+                            collaboration_refs: vec![],
+                        },
                         redaction_status: "clean".to_string(),
                         trust_level: TrustLevel::TrustedLocal,
                     });
@@ -461,12 +412,194 @@ impl BrainIndexManager {
                             summary: format!("Indexed content from {}", target_file),
                             body: self.truncate(&content),
                             tags: vec![format!("{:?}", kind).to_lowercase()],
-                            source_path: Some(entry.path().to_string_lossy().to_string()),
-                            project_id: None,
-                            created_at: Utc::now().to_rfc3339(),
-                            updated_at: Utc::now().to_rfc3339(),
+                            source: BrainSourceRef {
+                                source_kind: kind.clone(),
+                                source_id: format!("{:?}_{}", kind, docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: format!("{} Source", title_prefix),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
                             redaction_status: "clean".to_string(),
                             trust_level: trust_level.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn ingest_reports(&self, docs: &mut Vec<BrainDocument>) {
+        let reports_dir = self.paths.data_dir.join("reports");
+        self.ingest_dir(
+            &reports_dir,
+            BrainDocumentKind::Report,
+            "report.json",
+            "Report",
+            TrustLevel::TrustedLocal,
+            docs,
+        );
+        // Also ingest other report types (for simplicity, just use markdown files or other structures)
+        // We can just rely on traversing for .md or .json. For now, we'll index any .md in reports directory
+        for entry in walkdir::WalkDir::new(&reports_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.path().extension().map_or(false, |e| e == "md" || e == "json") {
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    if !self.contains_secrets(&content) {
+                        docs.push(BrainDocument {
+                            id: format!("report_{}", docs.len()),
+                            kind: BrainDocumentKind::Report,
+                            title: entry.file_name().to_string_lossy().to_string(),
+                            summary: "System Report".to_string(),
+                            body: self.truncate(&content),
+                            tags: vec!["report".to_string()],
+                            source: BrainSourceRef {
+                                source_kind: BrainDocumentKind::Report,
+                                source_id: format!("report_{}", docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: "Report".to_string(),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
+                            redaction_status: "clean".to_string(),
+                            trust_level: TrustLevel::TrustedLocal,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn ingest_timeline(&self, docs: &mut Vec<BrainDocument>) {
+        let timeline_dir = self.paths.data_dir.join("timeline");
+        for entry in walkdir::WalkDir::new(&timeline_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.path().extension().map_or(false, |e| e == "jsonl") {
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    if !self.contains_secrets(&content) {
+                        docs.push(BrainDocument {
+                            id: format!("timeline_{}", docs.len()),
+                            kind: BrainDocumentKind::TimelineEvent,
+                            title: "Timeline Event Log".to_string(),
+                            summary: "Timeline data".to_string(),
+                            body: self.truncate(&content),
+                            tags: vec!["timeline".to_string()],
+                            source: BrainSourceRef {
+                                source_kind: BrainDocumentKind::TimelineEvent,
+                                source_id: format!("timeline_{}", docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: "Timeline".to_string(),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
+                            redaction_status: "clean".to_string(),
+                            trust_level: TrustLevel::TrustedLocal,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn ingest_runtime(&self, docs: &mut Vec<BrainDocument>) {
+        let jobs_dir = self.paths.data_dir.join("runtime_jobs");
+        let artifacts_dir = self.paths.data_dir.join("runtime_artifacts");
+        
+        // Ingest Jobs
+        for entry in walkdir::WalkDir::new(&jobs_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.path().is_file() {
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    if !self.contains_secrets(&content) {
+                        docs.push(BrainDocument {
+                            id: format!("job_{}", docs.len()),
+                            kind: BrainDocumentKind::RuntimeJob,
+                            title: entry.file_name().to_string_lossy().to_string(),
+                            summary: "Runtime Job".to_string(),
+                            body: self.truncate(&content),
+                            tags: vec!["job".to_string(), "runtime".to_string()],
+                            source: BrainSourceRef {
+                                source_kind: BrainDocumentKind::RuntimeJob,
+                                source_id: format!("job_{}", docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: "Job".to_string(),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
+                            redaction_status: "clean".to_string(),
+                            trust_level: TrustLevel::TrustedLocal,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Ingest Artifacts
+        for entry in walkdir::WalkDir::new(&artifacts_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.path().is_file() {
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    if !self.contains_secrets(&content) {
+                        docs.push(BrainDocument {
+                            id: format!("artifact_{}", docs.len()),
+                            kind: BrainDocumentKind::RuntimeArtifact,
+                            title: entry.file_name().to_string_lossy().to_string(),
+                            summary: "Runtime Artifact".to_string(),
+                            body: self.truncate(&content),
+                            tags: vec!["artifact".to_string(), "runtime".to_string()],
+                            source: BrainSourceRef {
+                                source_kind: BrainDocumentKind::RuntimeArtifact,
+                                source_id: format!("artifact_{}", docs.len()),
+                                source_path: Some(entry.path().to_string_lossy().to_string()),
+                                source_title: "Artifact".to_string(),
+                                source_agent: None,
+                                source_project: None,
+                                content_hash: self.hash_text(&content),
+                                created_at: Utc::now().to_rfc3339(),
+                                updated_at: Utc::now().to_rfc3339(),
+                                timeline_refs: vec![],
+                                report_refs: vec![],
+                                runtime_refs: vec![],
+                                collaboration_refs: vec![],
+                            },
+                            redaction_status: "clean".to_string(),
+                            trust_level: TrustLevel::TrustedLocal,
                         });
                     }
                 }
@@ -560,8 +693,22 @@ impl BrainIndexManager {
                     if query_vec.is_none() {
                         keyword_score
                     } else {
-                        keyword_score + (semantic_score * 50.0)
+                        let ks_norm = (keyword_score / 25.0).min(1.0);
+                        let ss_norm = semantic_score.max(0.0);
+                        (ks_norm * 0.4 + ss_norm * 0.6) * 100.0
                     }
+                }
+                BrainSearchMode::Recent => {
+                    // Placeholder for actual recency calculation
+                    keyword_score + 2.0
+                }
+                BrainSearchMode::Agent => {
+                    let is_agent = doc.source.source_agent.as_deref() == query.agent_id.as_deref() && query.agent_id.is_some();
+                    keyword_score + if is_agent { 20.0 } else { 0.0 }
+                }
+                BrainSearchMode::Project => {
+                    let is_project = doc.source.source_project.as_deref() == query.project_id.as_deref() && query.project_id.is_some();
+                    keyword_score + if is_project { 20.0 } else { 0.0 }
                 }
             };
 
@@ -570,6 +717,7 @@ impl BrainIndexManager {
                     document: doc,
                     score,
                     keyword_score,
+                    fuzzy_score: 0.0,
                     semantic_score,
                     match_reason: reasons.join(", "),
                 });
@@ -593,6 +741,8 @@ impl BrainIndexManager {
                 limit: 20,
                 kind_filter: None,
                 mode,
+                agent_id: None,
+                project_id: None,
             })
             .await?;
 
@@ -622,6 +772,42 @@ impl BrainIndexManager {
         } else {
             dot / (norm_a * norm_b)
         }
+    }
+
+    pub fn dedupe(&self) -> Result<usize> {
+        if !self.index_file.exists() {
+            return Ok(0);
+        }
+        let content = fs::read_to_string(&self.index_file)?;
+        let mut unique_docs = HashMap::new();
+        let mut duplicates_removed = 0;
+
+        for line in content.lines().filter(|l| !l.trim().is_empty()) {
+            if let Ok(doc) = serde_json::from_str::<BrainDocument>(line) {
+                let key = BrainDedupKey {
+                    content_hash: doc.source.content_hash.clone(),
+                    title: doc.title.clone(),
+                    kind: doc.kind.clone(),
+                };
+                let key_str = serde_json::to_string(&key).unwrap_or_default();
+                if unique_docs.contains_key(&key_str) {
+                    duplicates_removed += 1;
+                } else {
+                    unique_docs.insert(key_str, doc);
+                }
+            }
+        }
+
+        if duplicates_removed > 0 {
+            let mut out = String::new();
+            for doc in unique_docs.values() {
+                out.push_str(&serde_json::to_string(doc)?);
+                out.push('\n');
+            }
+            fs::write(&self.index_file, out)?;
+        }
+
+        Ok(duplicates_removed)
     }
 
     fn contains_secrets(&self, content: &str) -> bool {

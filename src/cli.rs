@@ -142,6 +142,16 @@ pub enum Command {
         action: String,
     },
 
+    /// Manage Brain Memory and Context Packs (Phase 6.7)
+    #[command(name = "brain")]
+    Brain {
+        /// Action to perform: dedupe, ingest, pack
+        action: String,
+        /// Additional arguments depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Manage tools, permissions, and tool registry.
     #[command(name = "tools")]
     Tools {
@@ -435,6 +445,42 @@ pub async fn handle_subcommand(
         }
         Command::Providers { action } => {
             handle_providers_command(config, action)?;
+            Ok(true)
+        }
+        Command::Brain { action, args } => {
+            let manager = crate::brain_index::BrainIndexManager::new(
+                paths.clone(),
+                config.brain_index.clone(),
+                &config.embeddings,
+            );
+            match action.as_str() {
+                "dedupe" => {
+                    println!("[BRAIN] Starting deduplication...");
+                    let count = manager.dedupe()?;
+                    println!("[BRAIN] Deduplication complete. Removed {} duplicates.", count);
+                }
+                "pack" => {
+                    let query = args.join(" ");
+                    if query.is_empty() {
+                        println!("[BRAIN] Please provide a query for the context pack.");
+                        return Ok(true);
+                    }
+                    let builder = crate::brain_context::BrainContextPackBuilder::new(&manager, query)
+                        .limit_items(5);
+                    let pack = builder.build().await?;
+                    println!("[BRAIN] Context Pack Generated:");
+                    println!("Title: {}", pack.title);
+                    println!("Summary: {}", pack.summary);
+                    println!("Size: {} characters", pack.estimated_size);
+                    println!("Items: {}", pack.items.len());
+                    for (i, doc) in pack.items.iter().enumerate() {
+                        println!("  {}) [{:?}] {}", i + 1, doc.kind, doc.title);
+                    }
+                }
+                _ => {
+                    println!("[BRAIN] Unknown action: {}", action);
+                }
+            }
             Ok(true)
         }
         Command::Project { action } => {

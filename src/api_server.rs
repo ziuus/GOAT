@@ -2127,17 +2127,19 @@ async fn brain_search_handler(
     );
 
     let mode = match query.mode.as_deref() {
-        Some("semantic") => crate::brain_index::BrainSearchMode::Semantic,
-        Some("hybrid") => crate::brain_index::BrainSearchMode::Hybrid,
-        Some("fuzzy") => crate::brain_index::BrainSearchMode::Fuzzy,
-        _ => crate::brain_index::BrainSearchMode::Keyword,
+        Some("semantic") => crate::brain_models::BrainSearchMode::Semantic,
+        Some("hybrid") => crate::brain_models::BrainSearchMode::Hybrid,
+        Some("fuzzy") => crate::brain_models::BrainSearchMode::Fuzzy,
+        _ => crate::brain_models::BrainSearchMode::Keyword,
     };
 
-    let sq = crate::brain_index::BrainSearchQuery {
+    let sq = crate::brain_models::BrainSearchQuery {
         q: query.q,
         limit: 50,
         kind_filter: None,
         mode,
+        agent_id: None,
+        project_id: None,
     };
 
     match manager.search(&sq).await {
@@ -2163,10 +2165,10 @@ async fn brain_recall_handler(
     );
 
     let mode = match query.mode.as_deref() {
-        Some("semantic") => crate::brain_index::BrainSearchMode::Semantic,
-        Some("hybrid") => crate::brain_index::BrainSearchMode::Hybrid,
-        Some("fuzzy") => crate::brain_index::BrainSearchMode::Fuzzy,
-        _ => crate::brain_index::BrainSearchMode::Keyword,
+        Some("semantic") => crate::brain_models::BrainSearchMode::Semantic,
+        Some("hybrid") => crate::brain_models::BrainSearchMode::Hybrid,
+        Some("fuzzy") => crate::brain_models::BrainSearchMode::Fuzzy,
+        _ => crate::brain_models::BrainSearchMode::Keyword,
     };
 
     match manager.recall(&query.q, mode).await {

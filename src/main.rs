@@ -7,6 +7,8 @@ mod app;
 mod approval;
 mod brain;
 pub mod brain_index;
+pub mod brain_models;
+pub mod brain_context;
 pub mod brain_learning;
 pub mod browser_adapter;
 pub mod checkpoint;
