@@ -23,9 +23,12 @@ Local-first AI Agent OS for building, learning, research, automation, workflows,
 * research
 
 ## Manual Setup Checklist
-* [ ] Set repo description in GitHub Settings
-* [ ] Add topics in GitHub Settings
-* [ ] Add website/demo link later
-* [ ] Create first release
-* [ ] Add screenshots to `docs/assets/screenshots` after capture
+* [ ] Set repo description in GitHub Settings (copy from above)
+* [ ] Add topics in GitHub Settings (copy from above)
+* [ ] Capture screenshots, add them to `docs/assets/screenshots/`, and restore the README.md links.
+* [ ] Go to GitHub Releases -> Create Release from Tag `0.14.0-alpha.1` (using `docs/releases/GITHUB_RELEASE_DRAFT_0.14.0_ALPHA_1.md`).
+* [ ] Upload the screenshots zip to the release assets.
+* [ ] Open a blank "Alpha Feedback" issue from the template and pin it to the top of the Issues tab.
+* [ ] Optionally enable GitHub Discussions.
+* [ ] Add project website URL when ready.
 

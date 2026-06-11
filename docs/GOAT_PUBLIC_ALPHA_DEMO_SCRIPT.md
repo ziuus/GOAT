@@ -1,49 +1,47 @@
 # GOAT Public Alpha Demo Script
 
-This script outlines a 3–5 minute recorded or live demo flow to introduce GOAT's core capabilities in the Alpha release.
+This script outlines a 3–5 minute recorded demo flow to introduce GOAT's core capabilities in the Alpha release.
 
-## Prep
-* Run `cargo run --release -- daemon start`.
-* Run `npm run dev` in `apps/dashboard`.
-* Open `http://localhost:3000`.
-* Ensure Demo Data is loaded via Settings.
+## ⚠️ Pre-Flight Setup
+1. **Clear Logs:** `rm -rf logs/*` to start fresh.
+2. **Start Daemon:** `cargo run --release -- daemon start`
+3. **Start Dashboard:** `cd apps/dashboard && npm run dev`
+4. **Open Browser:** Navigate to `http://localhost:3000`. Full screen. Dark mode only.
+5. **Load Demo Data:** Go to Settings -> "Load Demo Data".
 
-## Flow
+## ❌ What NOT to show
+* Do not attempt to click "Run Validation" in Cofounder (it's marked Coming Soon).
+* Do not try to open the Designer or Socializer "New Task" screens (disabled).
+* Do not open the "Agents" chat interface (backend collaboration isn't fully wired to the UI yet).
 
-**1. Open Dashboard (0:00 - 0:30)**
-* "Welcome to GOAT, a local-first AI Agent OS."
-* Show the Home Dashboard. Point out the clear visual separation of tasks.
-* Highlight the `Local Daemon` connection status widget.
+---
 
-**2. Local-First Safety & ApprovalGate (0:30 - 1:00)**
-* Open the **Sidebar Safety** or **Approvals** area.
-* "GOAT runs entirely locally. It features an `ApprovalGate` that intercepts destructive terminal commands or API calls before agents execute them."
+## 🎬 The Flow
 
-**3. Learner OS Roadmap (1:00 - 2:00)**
-* Navigate to **Learner**.
-* "This isn't just for coding. For example, if you want to learn System Design, the Learner agent breaks down a multi-day roadmap and generates practice questions locally."
-* Show the active track and levels.
+### 1. Intro & Architecture (0:00 - 0:45)
+* **Action:** Show the Home Dashboard. Point out the clear visual separation of tasks. Scroll down to show the quick actions.
+* **Script:** "Welcome to the first alpha of GOAT, a local-first AI Agent OS. Unlike typical chat interfaces, GOAT is an orchestration system. Notice the 'Local Daemon' widget—the backend is entirely local Rust, powering this Next.js dashboard."
 
-**4. Cofounder Idea Validation (2:00 - 2:45)**
-* Navigate to **Cofounder**.
-* "If you're building a product, the Cofounder agent reviews your idea, scopes an MVP, and provides an actionable scorecard."
-* Show the structured Idea Validation form and Scorecard.
+### 2. Local-First Safety & ApprovalGate (0:45 - 1:15)
+* **Action:** Click on the **Sidebar Safety** or **Approvals** area. 
+* **Script:** "Security is critical when giving agents tools. GOAT features an `ApprovalGate`. If an agent tries to run a bash script or format your drive, the daemon halts execution and forces you to explicitly approve it here."
 
-**5. PromptForge Refinement (2:45 - 3:30)**
-* Navigate to **PromptForge**.
-* "Vague prompts produce bad results. PromptForge takes a rough draft and compiles it into a strict, structured agent instruction."
-* Type a rough prompt and click **Improve Prompt**. Show the output.
+### 3. Learner OS Roadmap (1:15 - 2:00)
+* **Action:** Navigate to **Learner**. Click on the "DSA Masterclass" active track.
+* **Script:** "We're building Prime Agents for specific domains. The Learner agent isn't just a tutor; it acts as an OS. It breaks down complex topics into multi-day roadmaps, tracks your level, and generates localized practice modules."
 
-**6. Reports & Timeline (3:30 - 4:00)**
-* Navigate to **Reports** and then **Timeline**.
-* "All agent activities, decisions, and handoffs are recorded in the Timeline. You can export structured reports anytime."
+### 4. Cofounder Idea Validation (2:00 - 2:45)
+* **Action:** Navigate to **Cofounder**. Show the Scorecard and structured form.
+* **Script:** "If you're building a product, the Cofounder agent reviews your idea, scopes an MVP, and provides an actionable scorecard. Notice how the UI is structured data, not just a wall of generated text."
 
-**7. Experimental Agents (4:00 - 4:30)**
-* Navigate to **Agents** Command Center.
-* Honestly point out the `Experimental` labels on Socializer, Designer, and Operator.
-* "We are actively building out more Prime Agents, but we want to be honest about what is fully wired up today."
+### 5. PromptForge Refinement (2:45 - 3:30)
+* **Action:** Navigate to **PromptForge**. Type a vague prompt (e.g., "build me a weather app").
+* **Script:** "Agents need rigorous instructions. PromptForge takes your rough idea and compiles it into a strict, structured agent instruction. You can see the compiled output here."
 
-**8. Conclusion & Contribution (4:30 - 5:00)**
-* "GOAT is open-source and in active Alpha."
-* Point viewers to the GitHub repo.
-* "We need your feedback and contributions. Check out the issues, spin up the local daemon, and let's build the ultimate local Agent OS."
+### 6. Transparency & Timeline (3:30 - 4:00)
+* **Action:** Navigate to **Reports** and then **Timeline**.
+* **Script:** "We don't want hidden agent swarms. Every action, handoff, and decision is recorded chronologically in the Timeline, stored locally in SQLite."
+
+### 7. Honesty & Conclusion (4:00 - 5:00)
+* **Action:** Navigate to **Agents** Command Center. Hover over the "Experimental" tags.
+* **Script:** "We are in active Alpha. Agents like Socializer and Operator are structurally planned but explicitly marked experimental today. We're open source, and we need your help to build this local-first future. Check out the GitHub repo, read the `CONTRIBUTING.md`, and let's get building."
