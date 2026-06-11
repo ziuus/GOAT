@@ -1975,15 +1975,59 @@ fn handle_schedule_command(
 }
 
 fn handle_jobs_command(
-    _paths: &crate::paths::GoatPaths,
+    paths: &crate::paths::GoatPaths,
     _config: &crate::config::Config,
     action: &str,
     arg: Option<&str>,
 ) -> anyhow::Result<()> {
+    let mut rt = crate::agent_runtime::AgentRuntime::new(
+        crate::agent_runtime::AgentRuntimeConfig::default(),
+        paths.runtime_dir.clone(),
+    )?;
     match action {
         "list" => {
-            println!("[JOBS] Listing jobs via CLI requires an active runtime session.");
-            println!("Please use `goat` TUI or `/jobs` slash command.");
+            let jobs = rt.list_jobs();
+            println!("[RUNTIME] Active jobs:");
+            if jobs.is_empty() {
+                println!("  No jobs found.");
+            } else {
+                for job in jobs {
+                    println!("  - [{}] {} ({:?}) - {}", job.id, job.agent_id, job.status, job.input_summary);
+                }
+            }
+        }
+        "show" => {
+            if let Some(id) = arg {
+                if let Some(job) = rt.get_job(id) {
+                    println!("Job ID: {}", job.id);
+                    println!("Agent: {}", job.agent_id);
+                    println!("Status: {:?}", job.status);
+                    println!("Task: {}", job.input_summary);
+                    println!("Artifacts: {:?}", job.artifacts);
+                } else {
+                    println!("Job {} not found.", id);
+                }
+            } else {
+                println!("Usage: goat jobs show <id>");
+            }
+        }
+        "pause" => {
+            if let Some(id) = arg {
+                let _ = rt.pause_job(id);
+                println!("Job {} paused.", id);
+            }
+        }
+        "resume" => {
+            if let Some(id) = arg {
+                let _ = rt.resume_job(id);
+                println!("Job {} resumed.", id);
+            }
+        }
+        "cancel" => {
+            if let Some(id) = arg {
+                let _ = rt.cancel_job(id);
+                println!("Job {} cancelled.", id);
+            }
         }
         _ => {
             println!("Unknown jobs action: {}", action);

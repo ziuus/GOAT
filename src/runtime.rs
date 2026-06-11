@@ -112,6 +112,7 @@ pub struct GoatRuntime {
     pub approval_queue: std::sync::Arc<crate::approval::ApprovalQueue>,
     pub transport_manager: crate::transports::TransportManager,
     pub voice_manager: crate::voice::VoiceManager,
+    pub agent_runtime: crate::agent_runtime::AgentRuntime,
 }
 
 impl GoatRuntime {
@@ -309,6 +310,11 @@ impl GoatRuntime {
             approval_queue: std::sync::Arc::new(crate::approval::ApprovalQueue::new()),
             transport_manager: crate::transports::TransportManager::new(config.transports.clone()),
             voice_manager: crate::voice::VoiceManager::new(config.voice.clone()),
+            agent_runtime: crate::agent_runtime::AgentRuntime::new(
+                crate::agent_runtime::AgentRuntimeConfig::default(),
+                paths.runtime_dir.clone(),
+            )
+            .expect("Failed to initialize Agent Runtime"),
         };
 
         (runtime, boot_log)

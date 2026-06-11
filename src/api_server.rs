@@ -210,6 +210,17 @@ pub async fn start_server(
             "/v1/collaboration/sessions/:id/report",
             post(collaboration_report_handler),
         )
+        .route("/v1/runtime/status", get(runtime_status_handler))
+        .route("/v1/runtime/jobs", get(runtime_jobs_list_handler).post(runtime_job_create_handler))
+        .route("/v1/runtime/jobs/:id", get(runtime_job_detail_handler))
+        .route("/v1/runtime/jobs/:id/start", post(runtime_job_start_handler))
+        .route("/v1/runtime/jobs/:id/pause", post(runtime_job_pause_handler))
+        .route("/v1/runtime/jobs/:id/resume", post(runtime_job_resume_handler))
+        .route("/v1/runtime/jobs/:id/cancel", post(runtime_job_cancel_handler))
+        .route("/v1/runtime/jobs/:id/retry", post(runtime_job_retry_handler))
+        .route("/v1/runtime/jobs/:id/events", get(runtime_job_events_handler))
+        .route("/v1/runtime/jobs/:id/artifacts", get(runtime_job_artifacts_handler))
+        .route("/v1/runtime/jobs/:id/report", post(runtime_job_report_handler))
         .route("/health", get(health_handler))
         .route("/v1/status", get(status_handler))
         .route("/v1/jobs", get(jobs_list_handler))
@@ -4495,4 +4506,154 @@ async fn collaboration_report_handler(
         .generate_report(&id)
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(axum::Json(serde_json::json!({ "report": report })))
+}
+
+// ── Runtime Handlers ────────────────────────────────────────────────────────
+
+async fn runtime_status_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let rt = state.runtime.lock().await;
+    let config = rt.agent_runtime.config.clone();
+    let jobs: Vec<_> = rt.agent_runtime.list_jobs();
+    let active_count = jobs.iter().filter(|j| matches!(j.status, crate::agent_runtime::AgentJobStatus::Running | crate::agent_runtime::AgentJobStatus::WaitingForApproval)).count();
+    Ok(axum::Json(serde_json::json!({ "config": config, "active_jobs": active_count, "total_jobs": jobs.len() })))
+}
+
+async fn runtime_jobs_list_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let rt = state.runtime.lock().await;
+    let jobs = rt.agent_runtime.list_jobs();
+    Ok(axum::Json(serde_json::json!({ "jobs": jobs })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct RuntimeJobCreateReq {
+    title: String,
+    agent_id: String,
+    job_kind: crate::agent_runtime::AgentJobKind,
+    task: String,
+}
+
+async fn runtime_job_create_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::Json(req): axum::Json<RuntimeJobCreateReq>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    match rt.agent_runtime.create_job(req.title, req.agent_id, req.job_kind, req.task) {
+        Ok(job_id) => Ok(axum::Json(serde_json::json!({ "job_id": job_id }))),
+        Err(e) => {
+            tracing::error!("Failed to create job: {}", e);
+            Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn runtime_job_detail_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let rt = state.runtime.lock().await;
+    if let Some(job) = rt.agent_runtime.get_job(&id) {
+        Ok(axum::Json(serde_json::json!({ "job": job })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_start_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    if rt.agent_runtime.start_job(&id).is_ok() {
+        Ok(axum::Json(serde_json::json!({ "status": "started" })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_pause_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    if rt.agent_runtime.pause_job(&id).is_ok() {
+        Ok(axum::Json(serde_json::json!({ "status": "paused" })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_resume_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    if rt.agent_runtime.resume_job(&id).is_ok() {
+        Ok(axum::Json(serde_json::json!({ "status": "resumed" })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_cancel_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    if rt.agent_runtime.cancel_job(&id).is_ok() {
+        Ok(axum::Json(serde_json::json!({ "status": "cancelled" })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_retry_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let mut rt = state.runtime.lock().await;
+    if rt.agent_runtime.retry_job(&id).is_ok() {
+        Ok(axum::Json(serde_json::json!({ "status": "retried" })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_events_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    // For now we just return an empty array if we don't have an easy query,
+    // or we could load events.jsonl. Since we didn't implement get_events yet,
+    // we return empty array to unblock dashboard.
+    Ok(axum::Json(serde_json::json!({ "events": [] })))
+}
+
+async fn runtime_job_artifacts_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let rt = state.runtime.lock().await;
+    if let Some(job) = rt.agent_runtime.get_job(&id) {
+        Ok(axum::Json(serde_json::json!({ "artifacts": job.artifacts })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
+}
+
+async fn runtime_job_report_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    let rt = state.runtime.lock().await;
+    if let Some(job) = rt.agent_runtime.get_job(&id) {
+        let title = format!("Report for Job {}", id);
+        let content = format!("# Runtime Job Report\n\n**Job ID:** {}\n**Status:** {:?}\n", id, job.status);
+        Ok(axum::Json(serde_json::json!({ "report_ref": title, "content": content })))
+    } else {
+        Err(axum::http::StatusCode::NOT_FOUND)
+    }
 }

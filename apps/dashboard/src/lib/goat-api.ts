@@ -272,3 +272,18 @@ export const learnerApi = {
   progress: (id: string) => daemonFetch(`/v1/learner/goals/${id}/progress`, { method: "POST" }).then(r => r.json()),
   report: (id: string) => daemonFetch(`/v1/learner/goals/${id}/report`, { method: "POST" }).then(r => r.json()),
 };
+
+export const runtimeApi = {
+  getStatus: () => daemonFetch("/v1/runtime/status").then(r => r.json()),
+  listJobs: () => daemonFetch("/v1/runtime/jobs").then(r => r.json()),
+  createJob: (data: { title: string, agent_id: string, job_kind: string, task: string }) => daemonFetch("/v1/runtime/jobs", { method: "POST", body: JSON.stringify(data) }).then(r => r.json()),
+  getJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}`).then(r => r.json()),
+  startJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/start`, { method: "POST" }).then(r => r.json()),
+  pauseJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/pause`, { method: "POST" }).then(r => r.json()),
+  resumeJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/resume`, { method: "POST" }).then(r => r.json()),
+  cancelJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/cancel`, { method: "POST" }).then(r => r.json()),
+  retryJob: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/retry`, { method: "POST" }).then(r => r.json()),
+  getJobEvents: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/events`).then(r => r.json()),
+  getJobArtifacts: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/artifacts`).then(r => r.json()),
+  generateReport: (id: string) => daemonFetch(`/v1/runtime/jobs/${id}/report`, { method: "POST" }).then(r => r.json()),
+};

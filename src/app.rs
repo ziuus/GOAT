@@ -167,8 +167,11 @@ pub struct App {
     pub hooks_manager: crate::hooks::HooksManager,
     pub scheduler_manager: crate::scheduler::SchedulerManager,
     pub job_tracker: crate::jobs::JobTracker,
+    pub event_bus: std::sync::Arc<crate::events::EventBus>,
+    pub approval_queue: std::sync::Arc<crate::approval::ApprovalQueue>,
     pub transport_manager: crate::transports::TransportManager,
     pub voice_manager: crate::voice::VoiceManager,
+    pub agent_runtime: crate::agent_runtime::AgentRuntime,
 }
 
 impl App {
@@ -269,8 +272,11 @@ impl App {
             hooks_manager: rt.hooks_manager,
             scheduler_manager: rt.scheduler_manager,
             job_tracker: rt.job_tracker,
+            event_bus: rt.event_bus,
+            approval_queue: rt.approval_queue,
             transport_manager: rt.transport_manager,
             voice_manager: rt.voice_manager,
+            agent_runtime: rt.agent_runtime,
         }
     }
 
@@ -2329,23 +2335,77 @@ impl App {
             }
 
             "/jobs" => {
-                let arg = parts.get(1..).unwrap_or(&[]).join(" ");
-                if arg.is_empty() || arg == "list" {
-                    let mut logs = Vec::new();
-                    let statuses = self.job_tracker.list_jobs();
-                    logs.push(format!("[JOBS] {} Active/Recent Jobs:", statuses.len()));
-                    if statuses.is_empty() {
-                        logs.push("[JOBS] No background jobs tracked.".to_string());
-                    } else {
-                        for s in statuses {
-                            logs.push(format!("[JOBS]   [{}] {} - {:?}", s.id, s.r#type, s.status));
+                let action = parts.get(1).map(|s| &**s).unwrap_or("list");
+                let arg = parts.get(2).map(|s| &**s);
+
+                match action {
+                    "list" => {
+                        let mut logs = Vec::new();
+                        let statuses = self.agent_runtime.list_jobs();
+                        logs.push(format!("[RUNTIME] {} Active/Recent Jobs:", statuses.len()));
+                        if statuses.is_empty() {
+                            logs.push("[RUNTIME] No background jobs tracked.".to_string());
+                        } else {
+                            for s in statuses {
+                                logs.push(format!("[RUNTIME]   [{}] {} ({:?}) - {}", s.id, s.agent_id, s.status, s.input_summary));
+                            }
+                        }
+                        for log in logs {
+                            self.push_log(log);
                         }
                     }
-                    for log in logs {
-                        self.push_log(log);
+                    "run" => {
+                        if parts.len() < 4 {
+                            self.push_log("[RUNTIME] Usage: /jobs run <agent_id> <task>".to_string());
+                        } else {
+                            let agent_id = parts[2].to_string();
+                            let task = parts[3..].join(" ");
+                            match self.agent_runtime.create_job(format!("TUI Job: {}", task), agent_id, crate::agent_runtime::AgentJobKind::GenericAgentTask, task) {
+                                Ok(job_id) => {
+                                    self.push_log(format!("[RUNTIME] Created job: {}", job_id));
+                                    let _ = self.agent_runtime.start_job(&job_id);
+                                }
+                                Err(e) => {
+                                    self.push_log(format!("[RUNTIME] Failed to create job: {}", e));
+                                }
+                            }
+                        }
                     }
-                } else {
-                    self.push_log(format!("[JOBS] Unknown action '{}'", arg));
+                    "pause" => {
+                        if let Some(id) = arg {
+                            let _ = self.agent_runtime.pause_job(&id);
+                            self.push_log(format!("[RUNTIME] Job {} paused.", id));
+                        } else {
+                            self.push_log("[RUNTIME] Usage: /jobs pause <id>".to_string());
+                        }
+                    }
+                    "resume" => {
+                        if let Some(id) = arg {
+                            let _ = self.agent_runtime.resume_job(&id);
+                            self.push_log(format!("[RUNTIME] Job {} resumed.", id));
+                        } else {
+                            self.push_log("[RUNTIME] Usage: /jobs resume <id>".to_string());
+                        }
+                    }
+                    "cancel" => {
+                        if let Some(id) = arg {
+                            let _ = self.agent_runtime.cancel_job(&id);
+                            self.push_log(format!("[RUNTIME] Job {} cancelled.", id));
+                        } else {
+                            self.push_log("[RUNTIME] Usage: /jobs cancel <id>".to_string());
+                        }
+                    }
+                    "retry" => {
+                        if let Some(id) = arg {
+                            let _ = self.agent_runtime.retry_job(&id);
+                            self.push_log(format!("[RUNTIME] Job {} retried.", id));
+                        } else {
+                            self.push_log("[RUNTIME] Usage: /jobs retry <id>".to_string());
+                        }
+                    }
+                    _ => {
+                        self.push_log(format!("[RUNTIME] Unknown action '{}'", action));
+                    }
                 }
                 true
             }

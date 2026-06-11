@@ -44,6 +44,7 @@ const navGroups = [
   {
     label: "Workflows",
     items: [
+      { name: 'Agent Runtime', href: '/runtime', icon: TerminalSquare },
       { name: 'AgentFlow', href: '/agentflow', icon: Workflow },
       { name: 'Recipes', href: '/recipes', icon: Workflow },
       { name: 'Timeline', href: '/timeline', icon: Calendar },

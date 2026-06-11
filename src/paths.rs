@@ -45,6 +45,8 @@ pub struct GoatPaths {
     pub tool_catalog_file: PathBuf,
     /// `<data_dir>/brain-index/`
     pub brain_index_dir: PathBuf,
+    /// `<data_dir>/runtime/`
+    pub runtime_dir: PathBuf,
 }
 
 impl GoatPaths {
@@ -89,6 +91,7 @@ impl GoatPaths {
         let mcp_toml_file = config_dir.join("mcp.toml");
         let tool_catalog_file = config_dir.join("tool-catalog.toml");
         let brain_index_dir = data_dir.join("brain-index");
+        let runtime_dir = data_dir.join("runtime");
 
         Ok(Self {
             config_file,
@@ -107,6 +110,7 @@ impl GoatPaths {
             mcp_toml_file,
             tool_catalog_file,
             brain_index_dir,
+            runtime_dir,
         })
     }
 
