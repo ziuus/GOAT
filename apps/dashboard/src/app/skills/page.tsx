@@ -38,6 +38,20 @@ export default function SkillsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<any>(null);
+  const [installedSkills, setInstalledSkills] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:3000/v1/skills/installed", {
+      headers: { "x-goat-token": localStorage.getItem("goat_token") || "goat_dev_token" }
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.installed) {
+          setInstalledSkills(d.installed);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const handleSearch = () => {
     setIsSearching(true);
@@ -241,7 +255,49 @@ export default function SkillsPage() {
               )}
 
               {/* OTHER TABS PLACEHOLDER */}
-              {activeTab !== "marketplace" && (
+                            {activeTab === "installed" && (
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                      <Download className="text-emerald-400" />
+                      Installed Skills
+                    </h2>
+                  </div>
+                  <div className="grid gap-4 mt-4">
+                    {installedSkills.length === 0 ? (
+                      <div className="text-slate-400 text-sm">No skills installed yet. Use the CLI to create one: `goat skill new --name myskill`</div>
+                    ) : (
+                      installedSkills.map((skill: any) => (
+                        <motion.div variants={itemVariants} key={skill.name} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/[0.07] hover:border-white/20 transition-all flex flex-col gap-4 group">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                {skill.name}
+                                {skill.is_suspicious ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-500/20 text-red-400 border border-red-500/30">Suspicious</span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Safe</span>
+                                )}
+                              </h3>
+                              <div className="text-xs text-slate-400 mt-1">Version {skill.version} • Source: {skill.source}</div>
+                            </div>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button className="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-white/10 text-xs font-medium flex items-center gap-2">
+                                <Info className="w-3.5 h-3.5" /> View Content
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-sm text-slate-300 leading-relaxed">
+                            {skill.description}
+                          </p>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+
+              {activeTab !== "marketplace" && activeTab !== "installed" && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center max-w-md mx-auto">
                   <motion.div variants={itemVariants} className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl">
                     <Library className="w-10 h-10 text-emerald-400 opacity-50" />
@@ -253,14 +309,7 @@ export default function SkillsPage() {
                     View and manage your local and installed skills. Ensure you regularly audit imported skills for safety and updates.
                   </motion.p>
                   
-                  {activeTab === "installed" && (
-                     <motion.div variants={itemVariants} className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200/80 text-sm flex items-start gap-3 text-left w-full">
-                     <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5 text-indigo-400" />
-                     <p>
-                       Installed skills have passed Audit and ApprovalGate. They are stored locally at <code>~/.config/goat/skills/</code> and have full offline availability.
-                     </p>
-                   </motion.div>
-                  )}
+                  
                 </div>
               )}
 

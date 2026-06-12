@@ -2054,7 +2054,22 @@ async fn skills_installed_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "installed": [] })))
+    
+    let paths = crate::paths::GoatPaths::resolve().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    
+    // We assume the skills are managed through CLI, but here we can return the cached JSON index or rescan.
+    // Let's rescan so we always return fresh.
+    let config_path = crate::paths::GoatPaths::resolve().unwrap().config_file;
+    let config = crate::config::Config::load_from_path(config_path).map(|r| r.config).unwrap_or_else(|_| crate::config::Config::default());
+    let skill_manager = crate::skills::SkillManager::new(paths, config.skills);
+    let skills = skill_manager.list_skills();
+    
+    Ok(Json(json!({ "installed": skills })))
 }
 
 async fn skills_provenance_handler(

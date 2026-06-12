@@ -1,18 +1,31 @@
 use crate::config::SkillsConfig;
 use crate::paths::GoatPaths;
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Represents a parsed skill from a SKILL.md file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skill {
     pub name: String,
     pub description: String,
+    pub version: String,
+    pub status: String,
+    pub source: String,
+    pub source_mission_id: Option<String>,
+    pub risk_level: String,
     pub triggers: String,
+    #[serde(skip)]
     pub content: String,
     pub is_suspicious: bool,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SkillIndex {
+    pub updated_at: i64,
+    pub skills: Vec<Skill>,
 }
 
 pub struct SkillManager {
@@ -67,6 +80,7 @@ impl SkillManager {
 
         // Sort by name for consistency
         skills.sort_by(|a, b| a.name.cmp(&b.name));
+        let _ = self.save_index(&skills);
         skills
     }
 
@@ -76,6 +90,12 @@ impl SkillManager {
 
         let mut description = String::new();
         let mut triggers = String::new();
+        let mut version = "0.1.0".to_string();
+        let mut status = "active".to_string();
+        let mut source = "manual".to_string();
+        let mut source_mission_id = None;
+        let mut risk_level = "low".to_string();
+        
         let mut is_suspicious = false;
         let mut warnings = Vec::new();
 
@@ -85,11 +105,25 @@ impl SkillManager {
 
         for line in content.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("## Description") {
+            if trimmed.starts_with("name:") && name.is_empty() {
+                // name override
+            } else if trimmed.starts_with("description:") {
+                description = trimmed.replace("description:", "").trim().to_string();
+            } else if trimmed.starts_with("version:") {
+                version = trimmed.replace("version:", "").trim().to_string();
+            } else if trimmed.starts_with("status:") {
+                status = trimmed.replace("status:", "").trim().to_string();
+            } else if trimmed.starts_with("source:") {
+                source = trimmed.replace("source:", "").trim().to_string();
+            } else if trimmed.starts_with("source_mission_id:") {
+                source_mission_id = Some(trimmed.replace("source_mission_id:", "").trim().to_string());
+            } else if trimmed.starts_with("risk_level:") {
+                risk_level = trimmed.replace("risk_level:", "").trim().to_string();
+            } else if trimmed.starts_with("## Description") {
                 in_description = true;
                 in_triggers = false;
                 continue;
-            } else if trimmed.starts_with("## Triggers") {
+            } else if trimmed.starts_with("## Triggers") || trimmed.starts_with("## When to use") {
                 in_description = false;
                 in_triggers = true;
                 continue;
@@ -98,13 +132,8 @@ impl SkillManager {
                 in_triggers = false;
             }
 
-            if in_description && !trimmed.is_empty() {
-                if description.is_empty() {
-                    description = trimmed.to_string();
-                } else {
-                    description.push(' ');
-                    description.push_str(trimmed);
-                }
+            if in_description && !trimmed.is_empty() && description.is_empty() {
+                description = trimmed.to_string();
             } else if in_triggers && !trimmed.is_empty() {
                 if triggers.is_empty() {
                     triggers = trimmed.to_string();
@@ -146,6 +175,11 @@ impl SkillManager {
         Ok(Skill {
             name,
             description,
+            version,
+            status,
+            source,
+            source_mission_id,
+            risk_level,
             triggers,
             content,
             is_suspicious,
@@ -194,16 +228,22 @@ impl SkillManager {
         }
 
         let template = format!(
-            r#"# {name}
+            r#"---
+name: {name}
+description: Short description of what this skill does.
+version: 0.1.0
+status: active
+source: manual
+risk_level: low
+---
 
-## Description
-Short description of what this skill does.
+# Skill: {name}
 
-## Triggers
+## When to use
 - When the user asks about X
 - Trigger alias: `run {name}`
 
-## Tools Needed
+## Required context
 - `bash` (for running scripts)
 - `read_file` (for reading code)
 
@@ -211,11 +251,7 @@ Short description of what this skill does.
 1. Step 1...
 2. Step 2...
 
-## Safety Notes
-- Always check XYZ before proceeding.
-- Approval required for write operations.
-
-## Verification
+## Success criteria
 - How to verify it worked.
 "#,
             name = name
@@ -223,6 +259,17 @@ Short description of what this skill does.
 
         fs::write(&skill_file, template)?;
         Ok(skill_file)
+    }
+
+    pub fn save_index(&self, skills: &[Skill]) -> Result<()> {
+        let index = SkillIndex {
+            updated_at: chrono::Utc::now().timestamp_millis(),
+            skills: skills.to_vec(),
+        };
+        let index_file = self.paths.skills_dir.join("skills_index.json");
+        let content = serde_json::to_string_pretty(&index)?;
+        fs::write(&index_file, content)?;
+        Ok(())
     }
 
     /// Build the skills context injection block for the LLM.

@@ -402,13 +402,16 @@ pub enum Command {
     Recall { query: String },
 
     /// Manage GOAT reusable skills.
-    #[command(name = "skills")]
+    #[command(name = "skills", alias = "skill")]
     Skills {
-        /// "list", "show", "path", "create", "validate", "search", "create-from-session"
+        /// "list", "show", "path", "new", "create", "validate", "search", "create-from-mission"
         #[arg(default_value = "list")]
         action: String,
-        /// The name or query
+        /// The name, query, or mission ID
         arg: Option<String>,
+        /// Skill name for create commands
+        #[arg(long)]
+        name: Option<String>,
         /// Session ID to extract from (for create-from-session)
         #[arg(long)]
         session: Option<String>,
@@ -596,13 +599,8 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Skills {
-            action,
-            arg,
-            session,
-        } => {
-            handle_skills_command(paths, config, action, arg.as_deref(), session.as_deref())
-                .await?;
+        Command::Skills { action, arg, name, session } => {
+            handle_skills_command(paths, config, action, arg.as_deref(), name.as_deref(), session.as_deref()).await?;
             Ok(true)
         }
 
@@ -2066,6 +2064,7 @@ async fn handle_skills_command(
     config: &crate::config::Config,
     action: &str,
     arg: Option<&str>,
+    name_arg: Option<&str>,
     session_id: Option<&str>,
 ) -> anyhow::Result<()> {
     let skill_manager = crate::skills::SkillManager::new(paths.clone(), config.skills.clone());
@@ -2108,11 +2107,19 @@ async fn handle_skills_command(
                 println!("Skill '{}' not found.", name);
             }
         }
-        "create" => {
-            let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+        "new" => {
+            let name = name_arg.or(arg).ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
             let path = skill_manager.create_template(name)?;
             println!("Created skill template at: {}", path.display());
             println!("Edit this file to implement your skill.");
+            let _ = skill_manager.list_skills();
+        }
+        "create" => {
+            let name = name_arg.or(arg).ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let path = skill_manager.create_template(name)?;
+            println!("Created skill template at: {}", path.display());
+            println!("Edit this file to implement your skill.");
+            let _ = skill_manager.list_skills();
         }
         "validate" => {
             let skills = skill_manager.list_skills();
@@ -2142,6 +2149,93 @@ async fn handle_skills_command(
             println!("Found {} matching skills:", results.len());
             for s in results {
                 println!("  - {name:<20} {desc}", name = s.name, desc = s.description);
+            }
+        }
+        "create-from-mission" => {
+            let mission_id = arg.ok_or_else(|| anyhow::anyhow!("Expected mission ID"))?;
+            let mission_manager = crate::mission_control::MissionControlManager::new();
+            
+            let mission = mission_manager.get_missions().into_iter().find(|m| m.mission_id == mission_id).ok_or_else(|| {
+                anyhow::anyhow!("Mission '{}' not found", mission_id)
+            })?;
+
+            let name = name_arg.unwrap_or_else(|| "mission-skill").to_string();
+
+            // Ask for confirmation
+            println!("Do you want to save this mission as a reusable skill '{}'? (y/N)", name);
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                println!("Skill creation cancelled.");
+                return Ok(());
+            }
+
+            println!("Extracting skill '{}' from mission {}...", name, mission_id);
+
+            let mut registry = crate::models::ProfileRegistry::from_config(&config.profiles);
+            let mut router = crate::llm::LlmRouter::from_config(config);
+
+            let profile_name = &registry.default_profile;
+            let (_, chain) = registry.resolve(profile_name);
+
+            let steps: Vec<String> = mission.plan_steps.iter().map(|s| format!("- {}: {}", s.title, s.description)).collect();
+            let steps_str = steps.join("\n");
+
+            let prompt = format!(
+                "You are a skill curator. The user wants to extract a reusable skill from the following completed mission.\n\
+                 Generate a valid SKILL.md file.\n\
+                 The skill name should be: {}\n\
+                 Mission Goal: {}\n\
+                 Steps Executed:\n{}\n\
+                 Artifacts Produced: {}\n\n\
+                 Use the following format strictly:\n\
+                 ---\n\
+                 name: {}\n\
+                 description: <short summary>\n\
+                 version: 0.1.0\n\
+                 status: active\n\
+                 source: mission\n\
+                 source_mission_id: {}\n\
+                 risk_level: <low|medium|high>\n\
+                 ---\n\n\
+                 # Skill: {}\n\n\
+                 ## When to use\n\
+                 <triggers>\n\n\
+                 ## Required context\n\
+                 <context>\n\n\
+                 ## Procedure\n\
+                 <step by step>\n\n\
+                 ## Success criteria\n\
+                 <criteria>\n\n\
+                 Output only the Markdown content.",
+                name, mission.raw_goal, steps_str, mission.expected_artifacts.join(", "), name, mission_id, name
+            );
+
+            let messages = vec![crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            }];
+
+            match router
+                .completion_with_fallback(&chain, messages, None)
+                .await
+            {
+                Ok((resp, _)) => {
+                    let content = resp.content.unwrap_or_default();
+                    let skill_dir = skill_manager.skills_dir().join(&name);
+                    std::fs::create_dir_all(&skill_dir)?;
+                    let skill_file = skill_dir.join("SKILL.md");
+                    std::fs::write(&skill_file, content)?;
+                    println!(
+                        "Extracted and saved skill '{}' to {}",
+                        name,
+                        skill_file.display()
+                    );
+                    let _ = skill_manager.list_skills();
+                }
+                Err(e) => anyhow::bail!("Failed to extract skill from LLM: {}", e),
             }
         }
         "create-from-session" => {

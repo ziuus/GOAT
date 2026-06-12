@@ -323,6 +323,13 @@ export default function MissionControl() {
                       <span>{new Date(m.created_at).toLocaleDateString()}</span>
                       <span>{m.mission_type}</span>
                       <span>{m.progress}% Done</span>
+                      {m.status === "completed" && (
+                        <div className="ml-auto">
+                           <button className="px-3 py-1 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/40 rounded border border-indigo-500/30 transition-colors pointer-events-none">
+                             To save as skill: run `goat skill create-from-mission {m.mission_id}`
+                           </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
