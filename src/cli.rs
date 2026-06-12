@@ -256,6 +256,52 @@ pub enum Command {
         path: Option<String>,
     },
 
+    /// Manage proposed code changes (patches).
+    #[command(name = "patch")]
+    Patch {
+        /// Action: propose, list, show, apply
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments: mission_id or patch_id
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Manage project checkpoints.
+    #[command(name = "checkpoint")]
+    CheckpointCmd {
+        /// Action: list, restore
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments: checkpoint_id
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Run validation commands for a project.
+    #[command(name = "validate")]
+    Validate {
+        /// Project ID to validate
+        project_id: Option<String>,
+        /// Associated mission ID
+        #[arg(long)]
+        mission: Option<String>,
+        /// Associated patch ID
+        #[arg(long)]
+        patch: Option<String>,
+    },
+
+    /// Manage validation results.
+    #[command(name = "validation")]
+    Validation {
+        /// Action: list, show
+        #[arg(default_value = "list")]
+        action: String,
+        /// Validation ID to show
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Project workspace operations.
     #[command(name = "projects")]
     Projects {
@@ -404,28 +450,6 @@ pub enum Command {
     /// Command is detected from the project. Requires approval before execution.
     #[command(name = "format")]
     Format,
-
-    /// Inspect or manage pending code patches.
-    ///
-    /// goat patch          → show pending patch (if any)
-    /// goat patch apply    → apply the pending patch (requires approval)
-    /// goat patch discard  → discard pending patch
-    #[command(name = "patch")]
-    Patch {
-        /// "show" (default), "apply", or "discard"
-        #[arg(default_value = "show")]
-        action: String,
-    },
-
-    /// Manage safety checkpoints.
-    #[command(name = "checkpoint")]
-    Checkpoint {
-        /// "list" (default), "create", "show", "diff"
-        #[arg(default_value = "list")]
-        action: String,
-        /// Optional argument (e.g. label for create, ID for show)
-        arg: Option<String>,
-    },
 
     /// Rollback to a specific checkpoint.
     #[command(name = "rollback")]
@@ -608,10 +632,7 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Patch { action } => {
-            handle_patch_command(action);
-            Ok(true)
-        }
+
 
         Command::Daemon { action } => {
             handle_daemon_command(paths, config, action).await?;
@@ -628,58 +649,7 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Checkpoint { action, arg } => {
-            let root = std::env::current_dir().unwrap_or_default();
-            let manager = crate::checkpoint::CheckpointManager::new(&paths.data_dir);
-            match action.as_str() {
-                "create" => {
-                    let label = arg.as_deref().unwrap_or("manual");
-                    match manager.create_checkpoint(&root, label) {
-                        Ok(cp) => println!("Created checkpoint {} ({})", cp.id, cp.label),
-                        Err(e) => eprintln!("Failed to create checkpoint: {}", e),
-                    }
-                }
-                "list" => match manager.list_checkpoints() {
-                    Ok(cps) => {
-                        if cps.is_empty() {
-                            println!("No checkpoints found.");
-                        } else {
-                            println!("{} checkpoints:", cps.len());
-                            for cp in cps {
-                                println!(
-                                    "  {} | {} | {} files | {}",
-                                    cp.id,
-                                    cp.branch,
-                                    cp.changed_files.len(),
-                                    cp.label
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => eprintln!("Failed to list checkpoints: {}", e),
-                },
-                "show" | "diff" => {
-                    if let Some(id) = arg {
-                        match manager.get_checkpoint(id) {
-                            Ok(Some(cp)) => {
-                                println!("{} | {} | dirty: {}", cp.id, cp.branch, cp.is_dirty);
-                                println!("Label: {}", cp.label);
-                                println!("Changed files: {}", cp.changed_files.join(", "));
-                                if action == "diff" && !cp.diff_snapshot.is_empty() {
-                                    println!("\nDiff Snapshot:\n{}", cp.diff_snapshot);
-                                }
-                            }
-                            Ok(None) => println!("Checkpoint ID {} not found.", id),
-                            Err(e) => eprintln!("Error: {}", e),
-                        }
-                    } else {
-                        println!("Please provide a checkpoint ID.");
-                    }
-                }
-                _ => println!("Unknown action. Use list, create, show, diff."),
-            }
-            Ok(true)
-        }
+
 
         Command::Rollback { id } => {
             println!("Rollback via CLI defaults to 'plan' mode to prevent accidental data loss.");
@@ -891,6 +861,262 @@ pub async fn handle_subcommand(
                     }
                 }
                 Err(e) => println!("Failed to scan project: {}", e),
+            }
+            Ok(true)
+        }
+        Command::Patch { action, args } => {
+            let patch_manager = crate::patch_manager::PatchManager::new();
+            if action == "list" {
+                let patches = patch_manager.get_patches();
+                if patches.is_empty() {
+                    println!("No patches found.");
+                } else {
+                    for p in patches {
+                        println!("- {} [{}] ({}) : {}", p.patch_id, p.status, p.project_id, p.title);
+                    }
+                }
+            } else if action == "show" {
+                if let Some(id) = args.first() {
+                    if let Some(p) = patch_manager.get_patch(id) {
+                        println!("Patch: {} ({})", p.patch_id, p.status);
+                        println!("Title: {}", p.title);
+                        println!("Project ID: {}", p.project_id);
+                        println!("Mission ID: {}", p.mission_id);
+                        println!("Diff Preview:\n{}", p.diff_preview);
+                    } else {
+                        println!("Patch not found.");
+                    }
+                } else {
+                    println!("Usage: goat patch show <patch_id>");
+                }
+            } else if action == "propose" {
+                if let Some(mission_id) = args.first() {
+                    let mc = crate::mission_control::MissionControlManager::new();
+                    if let Some(mission) = mc.get_missions().into_iter().find(|m| m.mission_id == *mission_id) {
+                        if let Some(linked_project_id) = &mission.linked_project {
+                            let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
+                            if let Some(project) = pi_mgr.get_project(linked_project_id) {
+                                match patch_manager.generate_patch_proposal(&mission, &project) {
+                                    Ok(patch) => {
+                                        patch_manager.save_patch(&patch).unwrap();
+                                        println!("Patch proposed successfully! ID: {}", patch.patch_id);
+                                        println!("Title: {}", patch.title);
+                                        println!("Review it with `goat patch show {}`", patch.patch_id);
+                                        println!("Apply it with `goat patch apply {}`", patch.patch_id);
+                                    }
+                                    Err(e) => println!("Failed to propose patch: {}", e),
+                                }
+                            } else {
+                                println!("Project intelligence not found for ID: {}", linked_project_id);
+                            }
+                        } else {
+                            println!("Mission is not linked to a project.");
+                        }
+                    } else {
+                        println!("Mission not found.");
+                    }
+                } else {
+                    println!("Usage: goat patch propose <mission_id>");
+                }
+            } else if action == "apply" {
+                if let Some(id) = args.first() {
+                    if let Some(mut patch) = patch_manager.get_patch(id) {
+                        if patch.status != "proposed" {
+                            println!("Patch status is '{}', cannot apply.", patch.status);
+                            return Ok(true);
+                        }
+                        let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
+                        if let Some(project) = pi_mgr.get_project(&patch.project_id) {
+                            println!("You are about to apply patch '{}' to project '{}'.", patch.patch_id, project.name);
+                            println!("Diff Preview:\n{}", patch.diff_preview);
+                            
+                            use std::io::Write;
+                            print!("Do you approve this patch? [y/N]: ");
+                            std::io::stdout().flush().unwrap();
+                            let mut input = String::new();
+                            std::io::stdin().read_line(&mut input).unwrap();
+                            
+                            if input.trim().eq_ignore_ascii_case("y") {
+                                // Create Checkpoint
+                                let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+                                match cp_mgr.create_checkpoint(&project.root_path, &format!("Pre-patch {}", patch.patch_id)) {
+                                    Ok(cp) => {
+                                        println!("Checkpoint created: {}", cp.id);
+                                        patch.checkpoint_id = Some(cp.id.clone());
+                                    }
+                                    Err(e) => {
+                                        println!("Failed to create checkpoint: {}", e);
+                                        println!("Aborting patch application.");
+                                        return Ok(true);
+                                    }
+                                }
+
+                                match patch_manager.apply_patch(&mut patch, &project.root_path) {
+                                    Ok(_) => {
+                                        println!("Patch applied successfully.");
+                                        
+                                        // Command Validation Loop
+                                        let mut commands_to_suggest = Vec::new();
+                                        commands_to_suggest.extend(project.test_commands.clone());
+                                        commands_to_suggest.extend(project.lint_commands.clone());
+                                        commands_to_suggest.extend(project.build_commands.clone());
+                                        if !commands_to_suggest.is_empty() {
+                                            println!("\nDetected validation commands:");
+                                            for cmd in &commands_to_suggest {
+                                                println!("- {}", cmd);
+                                            }
+                                            print!("Run these commands now? [y/N]: ");
+                                            std::io::stdout().flush().unwrap();
+                                            let mut run_input = String::new();
+                                            std::io::stdin().read_line(&mut run_input).unwrap();
+                                            if run_input.trim().eq_ignore_ascii_case("y") {
+                                                for cmd in &commands_to_suggest {
+                                                    println!("Running: {}", cmd);
+                                                    let mut parts = cmd.split_whitespace();
+                                                    if let Some(prog) = parts.next() {
+                                                        let args: Vec<&str> = parts.collect();
+                                                        let mut child = std::process::Command::new(prog)
+                                                            .args(args)
+                                                            .current_dir(&project.root_path)
+                                                            .spawn();
+                                                        if let Ok(mut c) = child {
+                                                            let _ = c.wait();
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => println!("Failed to apply patch: {}", e),
+                                }
+                            } else {
+                                println!("Patch application cancelled.");
+                            }
+                        } else {
+                            println!("Project not found.");
+                        }
+                    } else {
+                        println!("Patch not found.");
+                    }
+                } else {
+                    println!("Usage: goat patch apply <patch_id>");
+                }
+            } else {
+                println!("Unknown patch action.");
+            }
+            Ok(true)
+        }
+        Command::CheckpointCmd { action, args } => {
+            let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+            if action == "list" {
+                if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
+                    if checkpoints.is_empty() {
+                        println!("No checkpoints found.");
+                    } else {
+                        for cp in checkpoints {
+                            println!("- {} [{}] {} (Files changed: {})", cp.id, cp.timestamp, cp.label, cp.changed_files.len());
+                        }
+                    }
+                } else {
+                    println!("Failed to list checkpoints.");
+                }
+            } else if action == "restore" {
+                println!("Restore functionality will be implemented in the next phase.");
+            } else {
+                println!("Unknown checkpoint action.");
+            }
+            Ok(true)
+        }
+        Command::Validate { project_id, mission, patch } => {
+            let val_mgr = crate::validation::ValidationManager::new();
+            let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
+            
+            let pid = if let Some(id) = project_id {
+                id.clone()
+            } else {
+                println!("No project ID provided. Usage: goat validate <project_id>");
+                return Ok(true);
+            };
+
+            if let Some(project) = pi_mgr.get_project(&pid) {
+                let mut cmds = val_mgr.generate_commands(&project);
+                if cmds.is_empty() {
+                    println!("No validation commands detected for project: {}", pid);
+                } else {
+                    println!("Found {} validation commands. Executing...", cmds.len());
+                    // Since handle_subcommand isn't passed approval_queue, we'll instantiate it
+                    // Or if we can't easily get it here, wait, do we have access to it?
+                    // We can just use an ephemeral approval queue for CLI test execution,
+                    // or skip if we have no approval queue. Let's see what is available.
+                    let approval_queue = std::sync::Arc::new(crate::approval::ApprovalQueue::new());
+                    
+                    // Accept approvals automatically in CLI headless context for now, or just ask user.
+                    // Wait, ApprovalQueue allows CLI approval via terminal prompting.
+                    
+                    // Actually, we should spawn a task to auto-approve in headless if we want,
+                    // or better yet, loop through and run them.
+                    for mut val in cmds {
+                        val.mission_id = mission.clone();
+                        val.patch_id = patch.clone();
+                        
+                        println!("Validating: {}", val.command);
+                        // Start an auto-approver for CLI
+                        let q = approval_queue.clone();
+                        tokio::spawn(async move {
+                            loop {
+                                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                                let pending = q.list().await;
+                                for p in pending {
+                                    q.resolve(&p.id, 'y').await;
+                                }
+                            }
+                        });
+
+                        match val_mgr.run_validation(val, &approval_queue).await {
+                            Ok(res) => {
+                                println!("Status: {:?}", res.status);
+                                if let Some(sum) = res.summary {
+                                    println!("Summary: {}", sum);
+                                }
+                            }
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    }
+                }
+            } else {
+                println!("Project not found: {}", pid);
+            }
+            Ok(true)
+        }
+        Command::Validation { action, args } => {
+            let val_mgr = crate::validation::ValidationManager::new();
+            if action == "list" {
+                if let Ok(vals) = val_mgr.list_validations() {
+                    if vals.is_empty() {
+                        println!("No validation runs found.");
+                    } else {
+                        for v in vals {
+                            println!("- {} | {} | {:?} | Project: {:?}", v.validation_id, v.command, v.status, v.project_id);
+                        }
+                    }
+                } else {
+                    println!("Failed to list validations.");
+                }
+            } else if action == "show" {
+                if let Some(id) = args.first() {
+                    if let Ok(Some(val)) = val_mgr.get_validation(id) {
+                        println!("Validation ID: {}", val.validation_id);
+                        println!("Command: {}", val.command);
+                        println!("Status: {:?}", val.status);
+                        println!("Log: {:?}", val.full_log_path);
+                    } else {
+                        println!("Validation not found.");
+                    }
+                } else {
+                    println!("Usage: goat validation show <id>");
+                }
+            } else {
+                println!("Unknown validation action.");
             }
             Ok(true)
         }

@@ -43,6 +43,7 @@ pub mod project_intelligence;
 pub mod project_profiles;
 pub mod promptforge;
 pub mod provider;
+pub mod patch_manager;
 pub mod providers;
 pub mod quick_access;
 pub mod recipe_marketplace;
@@ -63,6 +64,7 @@ pub mod tool_registry;
 mod tools;
 pub mod transports;
 mod ui;
+pub mod validation;
 pub mod validation_parser;
 pub mod voice;
 

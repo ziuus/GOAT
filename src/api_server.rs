@@ -49,6 +49,8 @@ pub async fn start_server(
         .route("/v1/projects/scan", post(projects_scan_handler))
         .route("/v1/projects/:id", get(projects_get_handler))
         .route("/v1/projects/:id/context", get(projects_context_handler))
+        .route("/v1/patches", get(patches_list_handler))
+        .route("/v1/checkpoints", get(checkpoints_list_handler))
         .route("/v1/designer/status", get(designer_status_handler))
         .route(
             "/v1/designer/reviews",
@@ -6044,5 +6046,20 @@ async fn projects_context_handler(
         Ok(Json(json!({ "context": ctx })))
     } else {
         Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Project not found" }))))
+    }
+}
+
+async fn patches_list_handler() -> impl axum::response::IntoResponse {
+    let patch_mgr = crate::patch_manager::PatchManager::new();
+    let patches = patch_mgr.get_patches();
+    axum::Json(patches)
+}
+
+async fn checkpoints_list_handler() -> impl axum::response::IntoResponse {
+    let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+    if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
+        axum::Json(checkpoints)
+    } else {
+        axum::Json(Vec::<crate::checkpoint::Checkpoint>::new())
     }
 }

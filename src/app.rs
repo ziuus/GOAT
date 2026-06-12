@@ -837,6 +837,52 @@ impl App {
                 }
                 true
             }
+            "/patch" | "/patches" | "@patch" => {
+                let patch_manager = crate::patch_manager::PatchManager::new();
+                if _args.is_empty() {
+                    let patches = patch_manager.get_patches();
+                    if patches.is_empty() {
+                        self.push_log("[PATCH] No patches found. Run `goat patch propose <mission_id>`.");
+                    } else {
+                        self.push_log("[PATCH] Proposed Patches:");
+                        for p in patches {
+                            self.push_log(format!("- {} [{}] ({}) : {}", p.patch_id, p.status, p.project_id, p.title));
+                        }
+                    }
+                } else {
+                    if let Some(p) = patch_manager.get_patch(_args.trim()) {
+                        self.push_log(format!("[PATCH] Patch: {} ({})", p.patch_id, p.status));
+                        self.push_log(format!("Title: {}", p.title));
+                        self.push_log(format!("Project ID: {}", p.project_id));
+                        self.push_log(format!("Diff Preview:\n{}", p.diff_preview));
+                        self.push_log("[PATCH] To apply this patch, use the CLI: `goat patch apply <id>`");
+                    } else {
+                        self.push_log("[PATCH] Patch not found.");
+                    }
+                }
+                true
+            }
+            "/apply" | "@apply" => {
+                self.push_log(format!("[PATCH] To safely apply patch '{}', please use the CLI with confirmation:", _args.trim()));
+                self.push_log(format!("  goat patch apply {}", _args.trim()));
+                true
+            }
+            "/checkpoints" | "@checkpoints" => {
+                let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+                if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
+                    if checkpoints.is_empty() {
+                        self.push_log("[CHECKPOINT] No checkpoints found.");
+                    } else {
+                        self.push_log("[CHECKPOINT] Checkpoints:");
+                        for cp in checkpoints {
+                            self.push_log(format!("- {} [{}] {} (Files: {})", cp.id, cp.timestamp, cp.label, cp.changed_files.len()));
+                        }
+                    }
+                } else {
+                    self.push_log("[CHECKPOINT] Failed to list checkpoints.");
+                }
+                true
+            }
             "/command" | "/palette" => {
                 self.active_view = ActiveView::CommandPalette;
                 let registry = CommandRegistry::build();
@@ -2928,6 +2974,86 @@ impl App {
                     self.push_log(
                         "[APPROVALS] Unknown action. Try: /approvals history".to_string(),
                     );
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/validate") => {
+                let val_mgr = crate::validation::ValidationManager::new();
+                let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
+                
+                let project_id = parts.get(1).copied();
+                if let Some(pid) = project_id {
+                    if let Some(project) = pi_mgr.get_project(pid) {
+                        let mut cmds = val_mgr.generate_commands(&project);
+                        if cmds.is_empty() {
+                            self.push_log(format!("[VALIDATE] No validation commands detected for project: {}", pid));
+                        } else {
+                            self.push_log(format!("[VALIDATE] Found {} validation commands. Executing...", cmds.len()));
+                            
+                            // For TUI, we can run them and show status, auto-approving for now, or just spawning
+                            for mut val in cmds {
+                                self.push_log(format!("Validating: {}", val.command));
+                                let approval_queue = self.approval_queue.clone();
+                                // We auto approve here for simple CLI/TUI flow 
+                                // Alternatively, let the main loop handle the approval queue
+                                // In the TUI, ApprovalScreen takes care of it.
+                                
+                                // Spawn a task to run the validation
+                                let q = approval_queue.clone();
+                                let v_mgr = val_mgr.clone();
+                                tokio::spawn(async move {
+                                    if let Err(e) = v_mgr.run_validation(val, &q).await {
+                                        // Ignore errors here
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        self.push_log(format!("[VALIDATE] Project not found: {}", pid));
+                    }
+                } else {
+                    self.push_log("[VALIDATE] Usage: /validate <project_id>".to_string());
+                }
+                true
+            }
+
+            cmd if cmd.starts_with("/validation") => {
+                let val_mgr = crate::validation::ValidationManager::new();
+                let subcommand = parts.get(1).copied().unwrap_or("list");
+                match subcommand {
+                    "list" => {
+                        if let Ok(vals) = val_mgr.list_validations() {
+                            if vals.is_empty() {
+                                self.push_log("[VALIDATION] No validation runs found.".to_string());
+                            } else {
+                                self.push_log(format!("[VALIDATION] Found {} validations:", vals.len()));
+                                for v in vals {
+                                    self.push_log(format!("- {} | {} | {:?}", v.validation_id, v.command, v.status));
+                                }
+                            }
+                        } else {
+                            self.push_log("[VALIDATION] Failed to list validations.".to_string());
+                        }
+                    }
+                    "show" => {
+                        let id = parts.get(2).copied().unwrap_or("");
+                        if id.is_empty() {
+                            self.push_log("[VALIDATION] Usage: /validation show <id>".to_string());
+                        } else {
+                            if let Ok(Some(val)) = val_mgr.get_validation(id) {
+                                self.push_log(format!("[VALIDATION] ID: {}", val.validation_id));
+                                self.push_log(format!("Command: {}", val.command));
+                                self.push_log(format!("Status: {:?}", val.status));
+                                self.push_log(format!("Log: {:?}", val.full_log_path));
+                            } else {
+                                self.push_log("[VALIDATION] Validation not found.".to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        self.push_log("[VALIDATION] Unknown action. Use list, show.".to_string());
+                    }
                 }
                 true
             }

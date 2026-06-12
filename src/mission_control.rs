@@ -142,6 +142,13 @@ impl MissionControlManager {
         missions
     }
 
+    pub fn update_mission(&self, mission: &Mission) {
+        let mut missions_map = self.missions.lock().unwrap();
+        missions_map.insert(mission.mission_id.clone(), mission.clone());
+        drop(missions_map);
+        self.save_mission(mission);
+    }
+
     pub fn plan_goal(&self, req: &MissionPlanReq) -> Mission {
         let goal_lower = req.goal.to_lowercase();
         
