@@ -29,6 +29,13 @@ struct DeferredToolCall {
     patch_id: Option<String>,
 }
 
+pub struct ActiveSkillSession {
+    pub execution: crate::skill_runner::SkillExecution,
+    pub skill: crate::skills::Skill,
+    pub steps: Vec<crate::skill_runner::SkillStep>,
+    pub waiting_for_user_next: bool,
+}
+
 /// Application status — shown in the header bar.
 #[derive(Clone, PartialEq, Eq)]
 pub enum AppStatus {
@@ -130,8 +137,8 @@ pub struct App {
     pub brain_disabled: bool,
     /// Pending approval (Some ↔ approval overlay visible).
     pending_approval: Option<DeferredToolCall>,
-    /// Explicitly activated skill for the session
     pub active_skill: Option<String>,
+    pub active_skill_session: Option<ActiveSkillSession>,
     /// Command history for ↑ navigation in the input composer.
     pub input_history: Vec<String>,
     /// Current index into input_history when navigating with ↑/↓.
@@ -256,6 +263,7 @@ impl App {
             brain_disabled,
             pending_approval: None,
             active_skill: None,
+            active_skill_session: None,
             input_history: Vec::new(),
             history_idx: None,
             workflow: rt.workflow,
@@ -2560,7 +2568,24 @@ impl App {
                     } else {
                         self.push_log("[SKILLS]   None");
                     }
-                } else if arg == "clear" {
+                } else if arg == "next" {
+                    if let Some(mut session) = self.active_skill_session.take() {
+                        self.push_log("[SKILLS] Advancing to next step...");
+                        session.waiting_for_user_next = false;
+                        self.active_skill_session = Some(session);
+                    } else {
+                        self.push_log("[SKILLS] No active skill execution.");
+                    }
+                } else if arg == "cancel" {
+                    if let Some(mut session) = self.active_skill_session.take() {
+                        self.push_log("[SKILLS] Cancelled skill execution.");
+                        session.execution.status = crate::skill_runner::SkillExecutionStatus::Cancelled;
+                        let runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
+                        let _ = runner.save_execution(&session.execution);
+                    } else {
+                        self.push_log("[SKILLS] No active skill execution.");
+                    }
+                } else if arg == "runs" {
                     self.active_skill = None;
                     self.push_log("[SKILLS] Active skill cleared.");
                 } else if arg == "path" {
@@ -2568,6 +2593,26 @@ impl App {
                         "[SKILLS] Directory: {}",
                         skill_manager.skills_dir().display()
                     ));
+                } else if arg == "run" {
+                    if let Some(skill) = skill_manager.get_skill(&rest) {
+                        let runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
+                        match runner.start_execution(&skill, None, None) {
+                            Ok(exec) => {
+                                let steps = crate::skill_runner::SkillRunner::parse_steps(&skill.content);
+                                self.push_log(format!("[SKILLS] Started execution '{}' for skill '{}'", exec.execution_id, skill.name));
+                                self.push_log(format!("[SKILLS] Steps to execute: {}", exec.total_steps));
+                                self.active_skill_session = Some(ActiveSkillSession {
+                                    execution: exec,
+                                    skill: skill.clone(),
+                                    steps,
+                                    waiting_for_user_next: false,
+                                });
+                            }
+                            Err(e) => self.push_log(format!("[SKILLS] Error starting execution: {}", e)),
+                        }
+                    } else {
+                        self.push_log(format!("[SKILLS] Skill '{}' not found.", rest));
+                    }
                 } else if arg == "create" {
                     if rest.is_empty() {
                         self.push_log("[SKILLS] Usage: /skill create <name>");
@@ -5974,5 +6019,73 @@ impl App {
                 job.id, job.prompt_or_command
             ));
         }
+    }
+
+    pub async fn process_active_skill(&mut self) {
+        let mut session = match self.active_skill_session.take() {
+            Some(s) => s,
+            None => return,
+        };
+
+        if self.pending_approval.is_some() || self.status != AppStatus::Ready {
+            // App is busy, put the session back and wait
+            self.active_skill_session = Some(session);
+            return;
+        }
+
+        if session.waiting_for_user_next {
+            // Waiting for user to type /skill next
+            self.active_skill_session = Some(session);
+            return;
+        }
+
+        if session.execution.current_step >= session.execution.total_steps {
+            self.push_log(format!("[SKILLS] Execution '{}' completed successfully.", session.execution.execution_id));
+            let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
+            session.execution.status = crate::skill_runner::SkillExecutionStatus::Completed;
+            let _ = runner.save_execution(&session.execution);
+            return;
+        }
+
+        let step_idx = session.execution.current_step;
+        // ensure we don't go out of bounds
+        if step_idx >= session.steps.len() {
+            self.push_log(format!("[SKILLS] Execution step index out of bounds. Marking complete."));
+            session.execution.status = crate::skill_runner::SkillExecutionStatus::Completed;
+            let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
+            let _ = runner.save_execution(&session.execution);
+            return;
+        }
+        
+        let step = &session.steps[step_idx];
+
+        // Build the prompt for this step
+        let msg = format!(
+            "Skill Execution: Step {}/{}\nType: {:?}\nDescription: {}\n\n{}",
+            step_idx + 1,
+            session.execution.total_steps,
+            step.step_type,
+            step.description,
+            step.command.as_deref().unwrap_or("No command provided.")
+        );
+
+        self.push_log(format!("[SKILLS] Automatically advancing to Step {}...", step_idx + 1));
+        self.push_log(format!("[SKILLS] {}", step.description));
+        
+        // Advance the execution state
+        session.execution.current_step += 1;
+        
+        let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
+        let _ = runner.save_execution(&session.execution);
+
+        // Put session back, waiting for user next if there are more steps
+        if session.execution.current_step < session.execution.total_steps {
+            session.waiting_for_user_next = true;
+            self.push_log("[SKILLS] Note: You will need to type '/skill next' to proceed to the subsequent step when ready.");
+        }
+        self.active_skill_session = Some(session);
+
+        // Send the step to the LLM. 
+        self.handle_user_input(msg).await;
     }
 }
