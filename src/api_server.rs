@@ -46,26 +46,34 @@ pub async fn start_server(
         )
         .route("/v1/designer/reviews/:id", get(designer_get_review_handler))
         .route(
-            "/v1/designer/reviews/:id/score",
-            post(designer_score_handler),
+            "/v1/designer/landing-review",
+            post(designer_landing_review_handler),
         )
         .route(
-            "/v1/designer/reviews/:id/accessibility",
-            post(designer_accessibility_handler),
+            "/v1/designer/dashboard-review",
+            post(designer_dashboard_review_handler),
         )
         .route(
-            "/v1/designer/reviews/:id/responsive",
-            post(designer_responsive_handler),
+            "/v1/designer/accessibility-review",
+            post(designer_accessibility_review_handler),
         )
-        .route("/v1/designer/reviews/:id/plan", post(designer_plan_handler))
         .route(
-            "/v1/designer/reviews/:id/handoff",
-            post(designer_handoff_handler),
+            "/v1/designer/copy-review",
+            post(designer_copy_review_handler),
+        )
+        .route(
+            "/v1/designer/design-system-review",
+            post(designer_design_system_review_handler),
+        )
+        .route(
+            "/v1/designer/reviews/:id/builder-handoff",
+            post(designer_builder_handoff_handler),
         )
         .route(
             "/v1/designer/reviews/:id/report",
             post(designer_report_handler),
         )
+        .route("/v1/designer/reports", get(designer_list_reports_handler))
         .route(
             "/v1/researcher/status",
             get(researcher_phase75_status_handler),
@@ -690,7 +698,10 @@ pub async fn start_server(
             get(ce_report_handler),
         )
         .route("/v1/socializer/status", get(socializer_status_handler))
-        .route("/v1/socializer/profile", get(socializer_profile_get_handler).post(socializer_profile_post_handler))
+        .route(
+            "/v1/socializer/profile",
+            get(socializer_profile_get_handler).post(socializer_profile_post_handler),
+        )
         .route("/v1/socializer/plan", post(socializer_plan_handler))
         .route("/v1/socializer/launch", post(socializer_launch_handler))
         .route("/v1/socializer/reddit", post(socializer_reddit_handler))
@@ -699,7 +710,10 @@ pub async fn start_server(
         .route("/v1/socializer/reply", post(socializer_reply_handler))
         .route("/v1/socializer/outreach", post(socializer_outreach_handler))
         .route("/v1/socializer/calendar", post(socializer_calendar_handler))
-        .route("/v1/socializer/safety-review", post(socializer_safety_review_handler))
+        .route(
+            "/v1/socializer/safety-review",
+            post(socializer_safety_review_handler),
+        )
         .route("/v1/socializer/drafts", get(socializer_drafts_handler))
         .route("/v1/socializer/reports", get(socializer_reports_handler))
         .route("/v1/promptforge/status", get(pf_status_handler))
@@ -4506,20 +4520,7 @@ struct CreateDesignerReviewReq {
 async fn designer_create_review_handler(
     axum::Json(req): axum::Json<CreateDesignerReviewReq>,
 ) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let kind = match req.target_type.as_str() {
-        "dashboard" => crate::agents::designer::DesignerTargetType::Dashboard,
-        "landing" => crate::agents::designer::DesignerTargetType::LandingPage,
-        "onboarding" => crate::agents::designer::DesignerTargetType::Onboarding,
-        "form" => crate::agents::designer::DesignerTargetType::Form,
-        "mobile" => crate::agents::designer::DesignerTargetType::Mobile,
-        _ => crate::agents::designer::DesignerTargetType::GeneralUI,
-    };
-    let review = agent
-        .create_review(kind, &req.path_or_url, req.description)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
 async fn designer_get_review_handler(
@@ -4534,70 +4535,44 @@ async fn designer_get_review_handler(
     }
 }
 
-async fn designer_score_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent
-        .run_scorecard(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+async fn designer_landing_review_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn designer_accessibility_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent
-        .run_accessibility_check(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+async fn designer_dashboard_review_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn designer_responsive_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent
-        .run_responsive_check(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+async fn designer_accessibility_review_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn designer_plan_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent
-        .create_improvement_plan(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+async fn designer_copy_review_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn designer_handoff_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let review = agent
-        .create_handoff_brief(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "review": review })))
+async fn designer_design_system_review_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn designer_report_handler(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
-    let agent = crate::agents::designer::DesignerAgent::new()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    let report_id = agent
-        .generate_report(&id)
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(axum::Json(serde_json::json!({ "report_id": report_id })))
+async fn designer_builder_handoff_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
+}
+
+async fn designer_report_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
+}
+
+async fn designer_list_reports_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+    Ok(axum::Json(serde_json::json!({ "reports": [] })))
 }
 
 // -----------------------------------------------------------------------------

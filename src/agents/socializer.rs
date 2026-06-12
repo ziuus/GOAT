@@ -1,13 +1,13 @@
+use crate::brain_index::BrainIndexManager;
+use crate::llm::LlmRouter;
+use crate::models::ModelChain;
 use crate::reports::ReportManager;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
-use crate::llm::LlmRouter;
-use crate::models::ModelChain;
-use crate::brain_index::BrainIndexManager;
 
 // Enum matching requirements
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -75,9 +75,9 @@ pub struct SocialBrandConstraint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SocialToneProfile {
     pub professionalism: String, // professional, casual
-    pub technicality: String, // technical, educational
-    pub pacing: String, // concise, detailed
-    pub storytelling: String, // founder-story
+    pub technicality: String,    // technical, educational
+    pub pacing: String,          // concise, detailed
+    pub storytelling: String,    // founder-story
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,21 +201,41 @@ impl SocializerAgent {
                    \"safety_notes\": [{\"note\": \"string\"}],\n\
                    \"source_refs\": []\n\
                }\n\
-             }"
+             }",
         );
 
-        let user_prompt = format!("Generate a draft for platform {:?} of kind {:?}.", platform, kind);
+        let user_prompt = format!(
+            "Generate a draft for platform {:?} of kind {:?}.",
+            platform, kind
+        );
 
         let messages = vec![
-            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
-            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message {
+                role: "system".to_string(),
+                content: Some(sys_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(user_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
         ];
 
-        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let (response, _) = llm_router
+            .completion_with_fallback(model_chain, messages, None)
+            .await
+            .map_err(|e| anyhow!("LLM failed: {}", e))?;
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
-        let mut asset = serde_json::from_str::<SocialContentAsset>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        let mut asset = serde_json::from_str::<SocialContentAsset>(cleaned)
+            .map_err(|e| anyhow!("Parse error: {}", e))?;
         asset.id = Uuid::new_v4().to_string();
         self.drafts.insert(asset.id.clone(), asset.clone());
         Ok(asset)
@@ -240,21 +260,38 @@ impl SocializerAgent {
                \"checklists\": [\"string\"],\n\
                \"risks\": [\"string\"],\n\
                \"metrics\": [\"string\"]\n\
-             }"
+             }",
         );
 
         let user_prompt = format!("Generate a launch plan for goal: {}", goal);
 
         let messages = vec![
-            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
-            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message {
+                role: "system".to_string(),
+                content: Some(sys_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(user_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
         ];
 
-        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let (response, _) = llm_router
+            .completion_with_fallback(model_chain, messages, None)
+            .await
+            .map_err(|e| anyhow!("LLM failed: {}", e))?;
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
-        let mut plan = serde_json::from_str::<LaunchPlan>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        let mut plan = serde_json::from_str::<LaunchPlan>(cleaned)
+            .map_err(|e| anyhow!("Parse error: {}", e))?;
         plan.id = Uuid::new_v4().to_string();
         self.launch_plans.insert(plan.id.clone(), plan.clone());
         Ok(plan)
@@ -274,21 +311,38 @@ impl SocializerAgent {
              {\n\
                \"id\": \"string\",\n\
                \"items\": [{\"day\": 1, \"platform\": \"Generic\", \"theme\": \"string\"}]\n\
-             }"
+             }",
         );
 
         let user_prompt = format!("Generate a content calendar for goal: {}", goal);
 
         let messages = vec![
-            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
-            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message {
+                role: "system".to_string(),
+                content: Some(sys_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
+            crate::llm::Message {
+                role: "user".to_string(),
+                content: Some(user_prompt),
+                tool_calls: None,
+                tool_call_id: None,
+            },
         ];
 
-        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let (response, _) = llm_router
+            .completion_with_fallback(model_chain, messages, None)
+            .await
+            .map_err(|e| anyhow!("LLM failed: {}", e))?;
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
-        let mut cal = serde_json::from_str::<SocialContentCalendar>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        let mut cal = serde_json::from_str::<SocialContentCalendar>(cleaned)
+            .map_err(|e| anyhow!("Parse error: {}", e))?;
         cal.id = Uuid::new_v4().to_string();
         self.calendars.insert(cal.id.clone(), cal.clone());
         Ok(cal)
