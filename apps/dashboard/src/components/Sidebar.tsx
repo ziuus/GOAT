@@ -15,6 +15,7 @@ const navGroups = [
   {
     label: "Core",
     items: [
+      { name: 'Mission Control', href: '/mission-control', icon: Activity },
       { name: 'Dashboard', href: '/', icon: Activity },
       { name: 'Chat', href: '/chat', icon: MessageSquare },
       { name: 'Command Palette', href: '/commands', icon: Command },

@@ -34,6 +34,7 @@ pub mod llm;
 pub mod mcp;
 pub mod mcp_runtime;
 pub mod memory;
+pub mod mission_control;
 pub mod models;
 pub mod onboarding;
 pub mod paths;

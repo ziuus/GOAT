@@ -39,6 +39,12 @@ pub async fn start_server(
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/v1/mission-control/status", get(mission_control_status_handler))
+        .route("/v1/mission-control/feed", get(mission_control_feed_handler))
+        .route("/v1/mission-control/artifacts", get(mission_control_artifacts_handler))
+        .route("/v1/mission-control/projects", get(mission_control_projects_get_handler).post(mission_control_projects_post_handler))
+        .route("/v1/mission-control/plan-goal", post(mission_control_plan_goal_handler))
+        .route("/v1/mission-control/recommendations", get(mission_control_recommendations_handler))
         .route("/v1/designer/status", get(designer_status_handler))
         .route(
             "/v1/designer/reviews",
@@ -5900,4 +5906,66 @@ async fn researcher_reports_list_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     Ok(Json(json!({ "reports": [] })))
+}
+
+// ── Mission Control Handlers ──────────────────────────────────────────────
+
+async fn mission_control_status_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "status": "ok", "active_jobs": 0, "pending_approvals": 0 })))
+}
+
+async fn mission_control_feed_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "feed": [] })))
+}
+
+async fn mission_control_artifacts_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "artifacts": [] })))
+}
+
+async fn mission_control_projects_get_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "projects": [] })))
+}
+
+async fn mission_control_projects_post_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "project": payload })))
+}
+
+async fn mission_control_plan_goal_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<crate::mission_control::MissionPlanReq>,
+) -> Result<Json<crate::mission_control::MissionPlanRes>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mc = crate::mission_control::MissionControlManager::new();
+    let plan = mc.plan_goal(&req);
+    Ok(Json(plan))
+}
+
+async fn mission_control_recommendations_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(json!({ "recommendations": [] })))
 }

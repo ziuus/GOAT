@@ -759,6 +759,21 @@ impl App {
                 }
                 true
             }
+            "/mission" | "@mission" | "@plan" | "@start" => {
+                self.push_log(format!("[SYSTEM] Mission Control Workspace. Go to http://127.0.0.1:3000/mission-control"));
+                if _args.len() > 0 {
+                    self.push_log(format!("[SYSTEM] Goal received: {}", _args));
+                    self.push_log(format!("[SYSTEM] Preparing plan... (view in dashboard)"));
+                }
+                true
+            }
+            "/projects" | "@projects" | "@project" | "@resume" | "@next" => {
+                self.push_log(format!("[SYSTEM] Project Workspace. Go to http://127.0.0.1:3000/mission-control"));
+                if _args.len() > 0 {
+                    self.push_log(format!("[SYSTEM] Project argument: {}", _args));
+                }
+                true
+            }
             "/command" | "/palette" => {
                 self.active_view = ActiveView::CommandPalette;
                 let registry = CommandRegistry::build();

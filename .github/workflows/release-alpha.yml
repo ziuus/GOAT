@@ -1,0 +1,39 @@
+name: Alpha Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-alpha.*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Package Alpha
+        run: ./scripts/package-alpha.sh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          prerelease: true
+          files: |
+            *.tar.gz
+            *.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

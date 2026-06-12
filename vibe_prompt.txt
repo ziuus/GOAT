@@ -1,0 +1,56 @@
+Implement Phase 8.1: GOAT Dream Face — Unified Mission Control
+
+You need to modify the GOAT codebase to implement the Unified Mission Control workspace.
+Follow these steps carefully:
+
+1. **Dashboard Home / Mission Control**
+- Update the Next.js app to make `/mission-control` the main workspace. If it doesn't exist, create `apps/dashboard/src/app/mission-control/page.tsx`.
+- The page must have:
+  - A central input "What are we building / solving today?"
+  - Active project selector.
+  - Recommended agents section.
+  - Unified activity feed (Timeline events, Runtime jobs, Reports, AgentFlow, Approval events).
+  - Unified artifact panel (Reports, Plans, etc).
+  - Pending approvals panel.
+- Update `apps/dashboard/src/app/page.tsx` (the old home) to clearly explain GOAT is a local-first Agent OS and link strongly to Mission Control, or just redirect to `/mission-control`.
+- Update `apps/dashboard/src/components/Sidebar.tsx` (or equivalent) so "Mission Control" is the primary navigation item at the top. Keep other routes.
+
+2. **Project Workspace Concept in Rust**
+- Create or update the project workspace model in Rust (e.g., `src/projects.rs` or `src/mission_control.rs` or extend `ProjectProfile`).
+- The model should be `GoatProject` containing: `id`, `goal`, `status`, `context_refs`, `agent_refs`, `artifact_refs`, `next_action`.
+
+3. **Mission Control API in Rust**
+- In `src/api_server.rs`, add the following endpoints requiring token auth (if auth is used):
+  - `GET /v1/mission-control/status`
+  - `GET /v1/mission-control/feed`
+  - `GET /v1/mission-control/artifacts`
+  - `GET /v1/mission-control/projects`
+  - `POST /v1/mission-control/projects`
+  - `POST /v1/mission-control/plan-goal`
+  - `GET /v1/mission-control/recommendations`
+- `plan-goal` must safely classify the goal (e.g., build, research, validate), suggest agents, suggest a workflow, expected artifacts, required approvals, next actions, and safety notes. DO NOT execute anything automatically. It only returns a plan.
+
+4. **Agent Team Recommendation Logic**
+- In the `plan-goal` or recommendations endpoint, add deterministic logic:
+  - "validate local workers marketplace" -> Cofounder + Researcher + Socializer
+  - "improve dashboard UI" -> Designer + Builder
+  - "fix failing release" -> Operator + Builder
+  - "learn Solidity" -> Learner + Researcher
+  - "launch product" -> Cofounder + Designer + Socializer + Operator
+
+5. **Brain & Timeline Integration**
+- The Mission Control status or feed should pull recent metadata from the Brain and Timeline.
+- Add Timeline events: `mission_goal_planned`, `project_created`, `project_resumed`, `project_next_action_generated`, `mission_artifact_linked`.
+- Add a report kind: `mission_plan_report`, `project_status_report`.
+
+6. **TUI & Commands**
+- In `src/cli.rs` and `src/app.rs` (TUI), add or update the command system:
+  - CLI: `goat mission`, `goat mission plan "<goal>"`, `goat projects`, `goat projects new "<goal>"`, `goat projects show <project-id>`
+  - Slash commands: `/mission`, `/mission plan <goal>`, `/projects`, `/projects new <goal>`, `/projects show <project-id>`
+  - Aliases: `@mission`, `@start`, `@plan`, `@project`, `@resume`, `@next`.
+- Update TUI startup/help to mention Mission Control.
+
+7. **Documentation Updates**
+- Update `README.md`, `CHANGELOG.md`, `docs/README.md`, `docs/GOAT_FEATURE_MATRIX.md`, `docs/GOAT_IMPLEMENTATION_ROADMAP.md`, `docs/GOAT_AGENT_RUNTIME.md`, `docs/GOAT_AGENT_COLLABORATION.md`, `docs/GOAT_PROJECT_PROFILES.md` (if exists), `docs/GOAT_COMMAND_SYSTEM.md`, `docs/GOAT_SLASH_COMMAND_INVENTORY.md`, `docs/GOAT_QUICK_ACCESS_PREFIXES.md`.
+
+Use simple deterministic fallbacks where deep integrations are partial. Do not bypass ApprovalGate. Do not create fake autonomous behavior. Keep changes focused on unity and user experience. Ensure all tests still pass and the dashboard builds successfully.

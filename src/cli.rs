@@ -238,6 +238,28 @@ pub enum Command {
         task: String,
     },
 
+    /// Mission Control workspace operations.
+    #[command(name = "mission")]
+    Mission {
+        /// Action to perform: plan, status.
+        #[arg(default_value = "status")]
+        action: String,
+        /// Additional arguments depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Project workspace operations.
+    #[command(name = "projects")]
+    Projects {
+        /// Action to perform: list, new, show.
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments depending on action
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     #[command(name = "mcp")]
     Mcp {
         /// Action to perform: status, list, show, doctor, start, stop, restart.
@@ -801,6 +823,16 @@ pub async fn handle_subcommand(
         }
         Command::Jobs { action, arg } => {
             handle_jobs_command(paths, config, &action, arg.as_deref())?;
+            Ok(true)
+        }
+        Command::Mission { action, args } => {
+            println!("Mission Control: {} {:?}", action, args);
+            println!("View the full Mission Control workspace at http://127.0.0.1:3000/mission-control");
+            Ok(true)
+        }
+        Command::Projects { action, args } => {
+            println!("Project Workspace: {} {:?}", action, args);
+            println!("View active projects at http://127.0.0.1:3000/mission-control");
             Ok(true)
         }
     }
