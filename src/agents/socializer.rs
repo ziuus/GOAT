@@ -1,105 +1,164 @@
 use crate::reports::ReportManager;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
+use crate::llm::LlmRouter;
+use crate::models::ModelChain;
+use crate::brain_index::BrainIndexManager;
+
+// Enum matching requirements
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum SocialPlatform {
+    #[default]
+    Generic,
+    LinkedIn,
+    X,
+    Reddit,
+    GitHub,
+    IndieHackers,
+    HackerNews,
+    Blog,
+    Email,
+    Discord,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SocialContentKind {
+    LaunchPost,
+    BuildInPublicUpdate,
+    FounderStory,
+    FeatureAnnouncement,
+    ProblemValidationPost,
+    ResearchSummaryPost,
+    ChangelogPost,
+    CommunityReply,
+    ColdOutreachDraft,
+    RedditPost,
+    LinkedinPost,
+    XThread,
+    BlogOutline,
+    EmailDraft,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub enum SocializerWorkflowState {
+pub enum SocialContentStatus {
     #[default]
     Draft,
-    AudienceMapped,
-    ChannelStrategyDefined,
-    ContentDrafted,
-    LaunchPlanned,
-    Active,
-    Completed,
+    Reviewed,
+    NeedsSources,
+    NeedsApproval,
+    ApprovedToCopy,
+    Archived,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SocialSpamRisk {
+    Low,
+    Medium,
+    High,
+    Blocked,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerCampaign {
+pub struct SocialVoiceRule {
+    pub rule: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialBrandConstraint {
+    pub constraint: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialToneProfile {
+    pub professionalism: String, // professional, casual
+    pub technicality: String, // technical, educational
+    pub pacing: String, // concise, detailed
+    pub storytelling: String, // founder-story
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialProfile {
     pub id: String,
-    pub title: String,
-    pub project_or_idea_ref: Option<String>,
-    pub target_audience: String,
-    pub value_proposition: String,
-    pub state: SocializerWorkflowState,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerAudience {
-    pub segments: Vec<String>,
-    pub pain_points: Vec<String>,
-    pub gathering_places: Vec<String>,
-    pub objections: Vec<String>,
-    pub trust_signals: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerChannel {
     pub name: String,
-    pub fit_score: u8,
-    pub reason: String,
-    pub content_type: String,
-    pub risks: Vec<String>,
-    pub etiquette: Vec<String>,
+    pub tone: SocialToneProfile,
+    pub voice_rules: Vec<SocialVoiceRule>,
+    pub constraints: Vec<SocialBrandConstraint>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerContentAngle {
-    pub angle_type: String, // story, problem, build-in-public, lesson-learned, etc.
-    pub target_platform: String,
-    pub hook: String,
-    pub main_point: String,
-    pub cta: String,
-    pub spam_risk: String,
+pub struct SocialContentSourceRef {
+    pub source_id: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerContentDraft {
-    pub platform: String,
-    pub title_options: Vec<String>,
+pub struct SocialContentSafetyNote {
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialDraftVariant {
+    pub title: String,
     pub body: String,
-    pub non_promotional_version: String,
-    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerLaunchPlan {
-    pub pre_launch_checklist: Vec<String>,
-    pub launch_day_plan: Vec<String>,
-    pub metrics_to_track: Vec<String>,
+pub struct SocialDraft {
+    pub variants: Vec<SocialDraftVariant>,
+    pub status: SocialContentStatus,
+    pub spam_risk: SocialSpamRisk,
+    pub safety_notes: Vec<SocialContentSafetyNote>,
+    pub source_refs: Vec<SocialContentSourceRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerCalendarItem {
-    pub day: i32,
-    pub platform: String,
-    pub theme: String,
-    pub status: String,
+pub struct SocialContentAsset {
+    pub id: String,
+    pub kind: SocialContentKind,
+    pub platform: SocialPlatform,
+    pub draft: SocialDraft,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerFeedbackLoop {
-    pub comments_summary: String,
-    pub user_objections: Vec<String>,
-    pub positive_signals: Vec<String>,
-    pub negative_signals: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocializerEthicsPolicy {
+pub struct SocialDistributionPolicy {
     pub allowed: bool,
-    pub violations: Vec<String>,
+    pub community_rules: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchPlan {
+    pub id: String,
+    pub goal: String,
+    pub channels: Vec<SocialPlatform>,
+    pub assets_needed: Vec<SocialContentKind>,
+    pub checklists: Vec<String>,
+    pub risks: Vec<String>,
+    pub metrics: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialCalendarItem {
+    pub day: i32,
+    pub platform: SocialPlatform,
+    pub theme: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialContentCalendar {
+    pub id: String,
+    pub items: Vec<SocialCalendarItem>,
 }
 
 pub struct SocializerAgent {
     base_dir: PathBuf,
-    campaigns: HashMap<String, SocializerCampaign>,
+    profiles: HashMap<String, SocialProfile>,
+    drafts: HashMap<String, SocialContentAsset>,
+    launch_plans: HashMap<String, LaunchPlan>,
+    calendars: HashMap<String, SocialContentCalendar>,
 }
 
 impl SocializerAgent {
@@ -110,230 +169,146 @@ impl SocializerAgent {
 
         let mut agent = Self {
             base_dir,
-            campaigns: HashMap::new(),
+            profiles: HashMap::new(),
+            drafts: HashMap::new(),
+            launch_plans: HashMap::new(),
+            calendars: HashMap::new(),
         };
-        agent.load_campaigns()?;
         Ok(agent)
     }
 
-    fn campaigns_file(&self) -> PathBuf {
-        self.base_dir.join("campaigns.jsonl")
-    }
-
-    fn load_campaigns(&mut self) -> Result<()> {
-        let path = self.campaigns_file();
-        if !path.exists() {
-            return Ok(());
-        }
-
-        let content = fs::read_to_string(&path)?;
-        for line in content.lines() {
-            if line.trim().is_empty() {
-                continue;
-            }
-            if let Ok(campaign) = serde_json::from_str::<SocializerCampaign>(line) {
-                self.campaigns.insert(campaign.id.clone(), campaign);
-            }
-        }
-        Ok(())
-    }
-
-    fn save_campaigns(&self) -> Result<()> {
-        let path = self.campaigns_file();
-        let mut lines = Vec::new();
-        for campaign in self.campaigns.values() {
-            if let Ok(json) = serde_json::to_string(campaign) {
-                lines.push(json);
-            }
-        }
-        fs::write(&path, lines.join("\n"))?;
-        Ok(())
-    }
-
-    pub fn list_campaigns(&self) -> Vec<SocializerCampaign> {
-        self.campaigns.values().cloned().collect()
-    }
-
-    pub fn get_campaign(&self, id: &str) -> Option<SocializerCampaign> {
-        self.campaigns.get(id).cloned()
-    }
-
-    pub fn add_campaign(
+    pub async fn deep_generate_draft(
         &mut self,
-        title: String,
-        target_audience: String,
-        value_proposition: String,
-        project_or_idea_ref: Option<String>,
-    ) -> Result<SocializerCampaign> {
-        let id = Uuid::new_v4().to_string();
-        let campaign = SocializerCampaign {
-            id: id.clone(),
-            title,
-            target_audience,
-            value_proposition,
-            project_or_idea_ref,
-            state: SocializerWorkflowState::Draft,
-            created_at: chrono::Utc::now().timestamp(),
-            updated_at: chrono::Utc::now().timestamp(),
-        };
-        self.campaigns.insert(id, campaign.clone());
-        self.save_campaigns()?;
-        Ok(campaign)
+        _id: &str, // contextual id like campaign or project
+        platform: SocialPlatform,
+        kind: SocialContentKind,
+        _brain_manager: &BrainIndexManager,
+        llm_router: &LlmRouter,
+        model_chain: &ModelChain,
+    ) -> Result<SocialContentAsset> {
+        let sys_prompt = String::from(
+            "You are the GOAT Socializer Agent. You create ethical, non-spammy content drafts.\n\
+             Return ONLY a JSON object representing the SocialContentAsset. No markdown.\n\
+             The JSON format must be:\n\
+             {\n\
+               \"id\": \"string\",\n\
+               \"kind\": \"LaunchPost\",\n\
+               \"platform\": \"Generic\",\n\
+               \"draft\": {\n\
+                   \"variants\": [{\"title\": \"string\", \"body\": \"string\"}],\n\
+                   \"status\": \"Draft\",\n\
+                   \"spam_risk\": \"Low\",\n\
+                   \"safety_notes\": [{\"note\": \"string\"}],\n\
+                   \"source_refs\": []\n\
+               }\n\
+             }"
+        );
+
+        let user_prompt = format!("Generate a draft for platform {:?} of kind {:?}.", platform, kind);
+
+        let messages = vec![
+            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+        ];
+
+        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let text = response.content.unwrap_or_default().trim().to_string();
+        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+
+        let mut asset = serde_json::from_str::<SocialContentAsset>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        asset.id = Uuid::new_v4().to_string();
+        self.drafts.insert(asset.id.clone(), asset.clone());
+        Ok(asset)
     }
 
-    pub fn generate_audience_map(&mut self, id: &str) -> Result<SocializerAudience> {
-        if let Some(campaign) = self.campaigns.get_mut(id) {
-            campaign.state = SocializerWorkflowState::AudienceMapped;
-            campaign.updated_at = chrono::Utc::now().timestamp();
-            self.save_campaigns()?;
-        } else {
-            return Err(anyhow::anyhow!("Campaign {} not found", id));
-        }
+    pub async fn deep_generate_launch_plan(
+        &mut self,
+        goal: &str,
+        _brain_manager: &BrainIndexManager,
+        llm_router: &LlmRouter,
+        model_chain: &ModelChain,
+    ) -> Result<LaunchPlan> {
+        let sys_prompt = String::from(
+            "You are the GOAT Socializer Agent. You create ethical launch plans.\n\
+             Return ONLY a JSON object representing the LaunchPlan. No markdown.\n\
+             The JSON format must be:\n\
+             {\n\
+               \"id\": \"string\",\n\
+               \"goal\": \"string\",\n\
+               \"channels\": [\"Generic\"],\n\
+               \"assets_needed\": [\"LaunchPost\"],\n\
+               \"checklists\": [\"string\"],\n\
+               \"risks\": [\"string\"],\n\
+               \"metrics\": [\"string\"]\n\
+             }"
+        );
 
-        Ok(SocializerAudience {
-            segments: vec!["Founders".to_string(), "Developers".to_string()],
-            pain_points: vec!["Too much boilerplate".to_string()],
-            gathering_places: vec![
-                "Reddit/r/Entrepreneur".to_string(),
-                "Hacker News".to_string(),
-            ],
-            objections: vec!["Too expensive".to_string()],
-            trust_signals: vec!["Open source".to_string()],
-        })
+        let user_prompt = format!("Generate a launch plan for goal: {}", goal);
+
+        let messages = vec![
+            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+        ];
+
+        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let text = response.content.unwrap_or_default().trim().to_string();
+        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+
+        let mut plan = serde_json::from_str::<LaunchPlan>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        plan.id = Uuid::new_v4().to_string();
+        self.launch_plans.insert(plan.id.clone(), plan.clone());
+        Ok(plan)
     }
 
-    pub fn generate_channel_strategy(&mut self, id: &str) -> Result<Vec<SocializerChannel>> {
-        if let Some(campaign) = self.campaigns.get_mut(id) {
-            campaign.state = SocializerWorkflowState::ChannelStrategyDefined;
-            campaign.updated_at = chrono::Utc::now().timestamp();
-            self.save_campaigns()?;
-        } else {
-            return Err(anyhow::anyhow!("Campaign {} not found", id));
-        }
+    pub async fn deep_generate_calendar(
+        &mut self,
+        goal: &str,
+        _brain_manager: &BrainIndexManager,
+        llm_router: &LlmRouter,
+        model_chain: &ModelChain,
+    ) -> Result<SocialContentCalendar> {
+        let sys_prompt = String::from(
+            "You are the GOAT Socializer Agent. You create ethical content calendars.\n\
+             Return ONLY a JSON object representing the SocialContentCalendar. No markdown.\n\
+             The JSON format must be:\n\
+             {\n\
+               \"id\": \"string\",\n\
+               \"items\": [{\"day\": 1, \"platform\": \"Generic\", \"theme\": \"string\"}]\n\
+             }"
+        );
 
-        Ok(vec![
-            SocializerChannel {
-                name: "Reddit".to_string(),
-                fit_score: 85,
-                reason: "Good for highly technical deep dives.".to_string(),
-                content_type: "Story/Architecture post".to_string(),
-                risks: vec!["Hostile to pure marketing".to_string()],
-                etiquette: vec!["No links in post body".to_string()],
-            },
-            SocializerChannel {
-                name: "LinkedIn".to_string(),
-                fit_score: 90,
-                reason: "Professional audience".to_string(),
-                content_type: "Build in public update".to_string(),
-                risks: vec!["Can sound cringe if over-hyped".to_string()],
-                etiquette: vec!["Be authentic".to_string()],
-            },
-        ])
+        let user_prompt = format!("Generate a content calendar for goal: {}", goal);
+
+        let messages = vec![
+            crate::llm::Message { role: "system".to_string(), content: Some(sys_prompt), tool_calls: None, tool_call_id: None },
+            crate::llm::Message { role: "user".to_string(), content: Some(user_prompt), tool_calls: None, tool_call_id: None },
+        ];
+
+        let (response, _) = llm_router.completion_with_fallback(model_chain, messages, None).await.map_err(|e| anyhow!("LLM failed: {}", e))?;
+        let text = response.content.unwrap_or_default().trim().to_string();
+        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+
+        let mut cal = serde_json::from_str::<SocialContentCalendar>(cleaned).map_err(|e| anyhow!("Parse error: {}", e))?;
+        cal.id = Uuid::new_v4().to_string();
+        self.calendars.insert(cal.id.clone(), cal.clone());
+        Ok(cal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_socializer_agent_creation() {
+        let agent = SocializerAgent::new();
+        assert!(agent.is_ok());
     }
 
-    pub fn generate_content_angles(&self, _id: &str) -> Result<Vec<SocializerContentAngle>> {
-        Ok(vec![SocializerContentAngle {
-            angle_type: "Lesson Learned".to_string(),
-            target_platform: "X".to_string(),
-            hook: "I spent 3 weeks building X, here is why it failed.".to_string(),
-            main_point: "Validation is more important than code.".to_string(),
-            cta: "Follow for more updates.".to_string(),
-            spam_risk: "Low".to_string(),
-        }])
-    }
-
-    pub fn generate_draft(&mut self, id: &str, platform: &str) -> Result<SocializerContentDraft> {
-        if let Some(campaign) = self.campaigns.get_mut(id) {
-            campaign.state = SocializerWorkflowState::ContentDrafted;
-            campaign.updated_at = chrono::Utc::now().timestamp();
-            self.save_campaigns()?;
-        } else {
-            return Err(anyhow::anyhow!("Campaign {} not found", id));
-        }
-
-        Ok(SocializerContentDraft {
-            platform: platform.to_string(),
-            title_options: vec![
-                "How we built X".to_string(),
-                "The story behind X".to_string(),
-            ],
-            body: format!("Here is the draft for {}.", platform),
-            non_promotional_version: "Just wanted to share our learnings...".to_string(),
-            warnings: vec!["Do not post this in self-promotion free zones.".to_string()],
-        })
-    }
-
-    pub fn generate_launch_plan(&mut self, id: &str) -> Result<SocializerLaunchPlan> {
-        if let Some(campaign) = self.campaigns.get_mut(id) {
-            campaign.state = SocializerWorkflowState::LaunchPlanned;
-            campaign.updated_at = chrono::Utc::now().timestamp();
-            self.save_campaigns()?;
-        } else {
-            return Err(anyhow::anyhow!("Campaign {} not found", id));
-        }
-
-        Ok(SocializerLaunchPlan {
-            pre_launch_checklist: vec![
-                "Warm up audience".to_string(),
-                "Prepare assets".to_string(),
-            ],
-            launch_day_plan: vec![
-                "Post on Product Hunt".to_string(),
-                "Send Newsletter".to_string(),
-            ],
-            metrics_to_track: vec!["Signups".to_string(), "Visitors".to_string()],
-        })
-    }
-
-    pub fn generate_calendar(&self, _id: &str) -> Result<Vec<SocializerCalendarItem>> {
-        Ok(vec![
-            SocializerCalendarItem {
-                day: 1,
-                platform: "X".to_string(),
-                theme: "Teaser".to_string(),
-                status: "Draft".to_string(),
-            },
-            SocializerCalendarItem {
-                day: 2,
-                platform: "LinkedIn".to_string(),
-                theme: "Story".to_string(),
-                status: "Idea".to_string(),
-            },
-        ])
-    }
-
-    pub fn generate_outreach(&self, _id: &str) -> Result<SocializerContentDraft> {
-        Ok(SocializerContentDraft {
-            platform: "Email".to_string(),
-            title_options: vec!["Quick question about [Topic]".to_string()],
-            body: "Hi [Name],\n\nI'm building [Project] and would love your feedback.\n\nBest,\n[My Name]".to_string(),
-            non_promotional_version: "Hi [Name], saw your post on X and wanted to connect.".to_string(),
-            warnings: vec!["Ensure [Name] and [Topic] are highly personalized.".to_string()],
-        })
-    }
-
-    pub fn track_feedback(&self, _id: &str) -> Result<SocializerFeedbackLoop> {
-        Ok(SocializerFeedbackLoop {
-            comments_summary: "Mostly positive, some pricing concerns.".to_string(),
-            user_objections: vec!["Price too high".to_string()],
-            positive_signals: vec!["Love the UI".to_string()],
-            negative_signals: vec!["Missing X feature".to_string()],
-        })
-    }
-
-    pub fn generate_report(&self, id: &str) -> Result<String> {
-        let report_manager = ReportManager::new();
-        let template = crate::reports::ReportTemplate {
-            kind: crate::reports::ReportKind::General,
-            title: format!("Socializer Distribution Report {}", id),
-            sections: vec![crate::reports::ReportSection {
-                heading: "Campaign Summary".to_string(),
-                body: format!("Report for campaign {}", id),
-            }],
-        };
-        let output = report_manager
-            .generate_report(template)
-            .map_err(|e| anyhow::anyhow!("Report Error: {}", e))?;
-        Ok(format!("Report {} generated.", output.id))
+    #[test]
+    fn test_enums_serialize_correctly() {
+        let platform = SocialPlatform::LinkedIn;
+        let serialized = serde_json::to_string(&platform).unwrap();
+        assert_eq!(serialized, "\"LinkedIn\"");
     }
 }

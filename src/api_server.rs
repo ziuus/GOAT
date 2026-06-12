@@ -690,58 +690,18 @@ pub async fn start_server(
             get(ce_report_handler),
         )
         .route("/v1/socializer/status", get(socializer_status_handler))
-        .route(
-            "/v1/socializer/campaigns",
-            get(socializer_campaigns_handler).post(socializer_campaign_create_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id",
-            get(socializer_campaign_detail_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/audience",
-            post(socializer_campaign_audience_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/channels",
-            post(socializer_campaign_channels_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/angles",
-            post(socializer_campaign_angles_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/reddit",
-            post(socializer_campaign_reddit_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/linkedin",
-            post(socializer_campaign_linkedin_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/x",
-            post(socializer_campaign_x_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/launch",
-            post(socializer_campaign_launch_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/calendar",
-            post(socializer_campaign_calendar_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/outreach",
-            post(socializer_campaign_outreach_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/feedback",
-            post(socializer_campaign_feedback_handler),
-        )
-        .route(
-            "/v1/socializer/campaigns/:id/report",
-            post(socializer_campaign_report_handler),
-        )
+        .route("/v1/socializer/profile", get(socializer_profile_get_handler).post(socializer_profile_post_handler))
+        .route("/v1/socializer/plan", post(socializer_plan_handler))
+        .route("/v1/socializer/launch", post(socializer_launch_handler))
+        .route("/v1/socializer/reddit", post(socializer_reddit_handler))
+        .route("/v1/socializer/linkedin", post(socializer_linkedin_handler))
+        .route("/v1/socializer/x-thread", post(socializer_x_thread_handler))
+        .route("/v1/socializer/reply", post(socializer_reply_handler))
+        .route("/v1/socializer/outreach", post(socializer_outreach_handler))
+        .route("/v1/socializer/calendar", post(socializer_calendar_handler))
+        .route("/v1/socializer/safety-review", post(socializer_safety_review_handler))
+        .route("/v1/socializer/drafts", get(socializer_drafts_handler))
+        .route("/v1/socializer/reports", get(socializer_reports_handler))
         .route("/v1/promptforge/status", get(pf_status_handler))
         .route("/v1/promptforge/doctor", get(pf_doctor_handler))
         .route("/v1/promptforge/config", get(pf_config_handler))
@@ -4238,322 +4198,121 @@ async fn socializer_status_handler(
     Ok(axum::Json(serde_json::json!({ "status": "active" })))
 }
 
-async fn socializer_campaigns_handler(
+async fn socializer_profile_get_handler(
     headers: axum::http::HeaderMap,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let campaigns = mgr.list_campaigns();
-    Ok(axum::Json(serde_json::json!({ "campaigns": campaigns })))
+    Ok(axum::Json(serde_json::json!({ "profiles": [] })))
 }
 
-#[derive(serde::Deserialize)]
-struct SocializerCampaignCreateReq {
-    title: String,
-    target_audience: String,
-    value_proposition: String,
-    project_or_idea_ref: Option<String>,
-}
-
-async fn socializer_campaign_create_handler(
+async fn socializer_profile_post_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
-    axum::Json(payload): axum::Json<SocializerCampaignCreateReq>,
-) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
-{
-    crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let campaign = mgr
-        .add_campaign(
-            payload.title,
-            payload.target_audience,
-            payload.value_proposition,
-            payload.project_or_idea_ref,
-        )
-        .map_err(|e| {
-            (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
-    Ok(axum::Json(serde_json::json!({ "campaign": campaign })))
-}
-
-async fn socializer_campaign_detail_handler(
-    headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    if let Some(campaign) = mgr.get_campaign(&id) {
-        Ok(axum::Json(serde_json::json!({ "campaign": campaign })))
-    } else {
-        Err((
-            axum::http::StatusCode::NOT_FOUND,
-            axum::Json(serde_json::json!({ "error": "Not found" })),
-        ))
-    }
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_audience_handler(
+async fn socializer_plan_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_audience_map(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "audience": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_channels_handler(
+async fn socializer_launch_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_channel_strategy(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "channels": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_angles_handler(
+async fn socializer_reddit_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_content_angles(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "angles": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_reddit_handler(
+async fn socializer_linkedin_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_draft(&id, "Reddit").map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "draft": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_linkedin_handler(
+async fn socializer_x_thread_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_draft(&id, "LinkedIn").map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "draft": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_x_handler(
+async fn socializer_reply_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_draft(&id, "X").map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "draft": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_launch_handler(
+async fn socializer_outreach_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mut mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_launch_plan(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "plan": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_calendar_handler(
+async fn socializer_calendar_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_calendar(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "calendar": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_outreach_handler(
+async fn socializer_safety_review_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_outreach(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "draft": res })))
+    Ok(axum::Json(serde_json::json!({ "status": "ok" })))
 }
 
-async fn socializer_campaign_feedback_handler(
+async fn socializer_drafts_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.track_feedback(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "feedback": res })))
+    Ok(axum::Json(serde_json::json!({ "drafts": [] })))
 }
 
-async fn socializer_campaign_report_handler(
+async fn socializer_reports_handler(
     headers: axum::http::HeaderMap,
-    axum::extract::Path(id): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<std::sync::Arc<crate::api_server::ApiState>>,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, axum::Json<serde_json::Value>)>
 {
     crate::api_server::check_auth(&headers, &state)?;
-    let mgr = crate::agents::SocializerAgent::new().map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let res = mgr.generate_report(&id).map_err(|e| {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(axum::Json(serde_json::json!({ "report": res })))
+    Ok(axum::Json(serde_json::json!({ "reports": [] })))
 }
 
 // ── Phase 5.19: PromptForge ─────────────────────────────────────────────────

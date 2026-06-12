@@ -4950,126 +4950,14 @@ impl App {
 
             "/socializer" => {
                 let parts: Vec<&str> = _args.splitn(2, ' ').collect();
-                let subcmd = parts.get(0).copied().unwrap_or("list");
-                let target = parts.get(1).copied().unwrap_or("").trim();
-                let mut manager = crate::agents::SocializerAgent::new().unwrap_or_else(|_| {
-                    // Provide a default unwrap for fallback if fs fails
-                    panic!("Failed to init SocializerAgent")
-                });
-
+                let subcmd = parts.get(0).copied().unwrap_or("status");
                 match subcmd {
-                    "list" => {
-                        let campaigns = manager.list_campaigns();
-                        self.push_log(format!("[SOCIALIZER] {} campaigns found.", campaigns.len()));
-                        for c in campaigns {
-                            self.push_log(format!(
-                                "  [{}] {} (State: {:?})",
-                                c.id, c.title, c.state
-                            ));
-                        }
+                    "status" => {
+                        self.push_log(format!("[SOCIALIZER] New socializer agent active. Deep workflows incoming."));
                     }
-                    "new-campaign" => {
-                        match manager.add_campaign(
-                            "Mock Title".to_string(),
-                            "Mock Audience".to_string(),
-                            "Mock Value Prop".to_string(),
-                            None,
-                        ) {
-                            Ok(c) => {
-                                self.push_log(format!("[SOCIALIZER] Campaign created: {}", c.id))
-                            }
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
+                    _ => {
+                        self.push_log(format!("[SOCIALIZER] Unknown or unimplemented command: {}", subcmd));
                     }
-                    "audience" => match manager.generate_audience_map(target) {
-                        Ok(a) => self.push_log(format!(
-                            "[SOCIALIZER] Audience mapped: {} segments",
-                            a.segments.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "channels" => match manager.generate_channel_strategy(target) {
-                        Ok(c) => self.push_log(format!(
-                            "[SOCIALIZER] Channel strategy: {} channels",
-                            c.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "angles" => match manager.generate_content_angles(target) {
-                        Ok(a) => self.push_log(format!(
-                            "[SOCIALIZER] Content angles: {} generated",
-                            a.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "reddit" => match manager.generate_draft(target, "Reddit") {
-                        Ok(d) => self.push_log(format!(
-                            "[SOCIALIZER] Reddit Draft generated: {} warnings",
-                            d.warnings.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "linkedin" => match manager.generate_draft(target, "LinkedIn") {
-                        Ok(d) => self.push_log(format!("[SOCIALIZER] LinkedIn Draft generated")),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "x" => match manager.generate_draft(target, "X") {
-                        Ok(d) => self.push_log(format!("[SOCIALIZER] X Draft generated")),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "launch" => match manager.generate_launch_plan(target) {
-                        Ok(lp) => self.push_log(format!(
-                            "[SOCIALIZER] Launch Plan generated: {} checklist items",
-                            lp.pre_launch_checklist.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "calendar" => match manager.generate_calendar(target) {
-                        Ok(c) => self.push_log(format!("[SOCIALIZER] Calendar: {} items", c.len())),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "outreach" => match manager.generate_outreach(target) {
-                        Ok(d) => self.push_log(format!(
-                            "[SOCIALIZER] Outreach draft: {} warnings",
-                            d.warnings.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "feedback" => match manager.track_feedback(target) {
-                        Ok(fb) => self.push_log(format!(
-                            "[SOCIALIZER] Feedback: {} positive signals",
-                            fb.positive_signals.len()
-                        )),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "report" => match manager.generate_report(target) {
-                        Ok(r) => self.push_log(format!("[SOCIALIZER] Report: {}", r)),
-                        Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                    },
-                    "from-idea" => {
-                        match manager.add_campaign(
-                            "Idea Title".to_string(),
-                            "Idea Audience".to_string(),
-                            "Idea Prop".to_string(),
-                            Some(target.to_string()),
-                        ) {
-                            Ok(c) => self.push_log(format!(
-                                "[SOCIALIZER] Campaign created from idea: {}",
-                                c.id
-                            )),
-                            Err(e) => self.push_log(format!("[SOCIALIZER] Error: {}", e)),
-                        }
-                    }
-                    "show" => {
-                        if let Some(c) = manager.get_campaign(target) {
-                            self.push_log(format!("[SOCIALIZER] ID: {}", c.id));
-                            self.push_log(format!("  Title: {}", c.title));
-                            self.push_log(format!("  State: {:?}", c.state));
-                        } else {
-                            self.push_log(format!("[SOCIALIZER] Campaign '{}' not found", target));
-                        }
-                    }
-                    _ => self.push_log(format!("[SOCIALIZER] Unknown subcmd: {}", subcmd)),
                 }
                 true
             }
