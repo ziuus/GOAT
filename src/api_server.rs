@@ -534,28 +534,40 @@ pub async fn start_server(
             post(cofounder_idea_validate_handler),
         )
         .route(
-            "/v1/cofounder/ideas/:id/score",
-            post(cofounder_idea_score_handler),
+            "/v1/cofounder/ideas/:id/signals",
+            get(cofounder_idea_signals_handler).post(cofounder_idea_add_signal_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/experiment",
+            post(cofounder_idea_experiment_handler),
         )
         .route(
             "/v1/cofounder/ideas/:id/mvp",
             post(cofounder_idea_mvp_handler),
         )
         .route(
-            "/v1/cofounder/ideas/:id/competitors",
-            post(cofounder_idea_competitors_handler),
+            "/v1/cofounder/ideas/:id/pricing",
+            post(cofounder_idea_pricing_handler),
         )
         .route(
-            "/v1/cofounder/ideas/:id/landing",
-            post(cofounder_idea_landing_handler),
+            "/v1/cofounder/ideas/:id/landing-review",
+            post(cofounder_idea_landing_review_handler),
         )
         .route(
-            "/v1/cofounder/ideas/:id/outreach",
-            post(cofounder_idea_outreach_handler),
+            "/v1/cofounder/ideas/:id/researcher-scan",
+            post(cofounder_idea_researcher_scan_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/builder-handoff",
+            post(cofounder_idea_builder_handoff_handler),
         )
         .route(
             "/v1/cofounder/ideas/:id/report",
             post(cofounder_idea_report_handler),
+        )
+        .route(
+            "/v1/cofounder/ideas/:id/reports",
+            get(cofounder_idea_reports_handler),
         )
         // ── Phase 7.1: Builder ───────────────────────────────────────────────
         .route("/v1/builder/status", get(builder_status_handler))
@@ -3958,16 +3970,79 @@ async fn cofounder_idea_validate_handler(
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    let plan = mgr.generate_validation_plan(&id).map_err(|e| {
+    let rt = state.runtime.lock().await;
+    let brain_mgr = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    let score = mgr.deep_evaluate_idea(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    Ok(Json(serde_json::json!({ "plan": plan })))
+    Ok(Json(serde_json::json!({ "score": score })))
 }
 
-async fn cofounder_idea_score_handler(
+async fn cofounder_idea_signals_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let signals = mgr.signals.get(&id).cloned().unwrap_or_default();
+    Ok(Json(serde_json::json!({ "signals": signals })))
+}
+
+#[derive(serde::Deserialize)]
+struct AddSignalPayload {
+    signal_type: crate::agents::cofounder::MarketSignalType,
+    strength: crate::agents::cofounder::MarketSignalStrength,
+    source: String,
+    description: String,
+}
+
+async fn cofounder_idea_add_signal_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<AddSignalPayload>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let sig = crate::agents::cofounder::MarketSignal {
+        id: uuid::Uuid::new_v4().to_string(),
+        idea_id: id.clone(),
+        signal_type: payload.signal_type,
+        strength: payload.strength,
+        source: payload.source,
+        description: payload.description,
+        linked_assumptions: vec![],
+        status: crate::agents::cofounder::MarketSignalStatus::Raw,
+        created_at: chrono::Utc::now().timestamp(),
+    };
+    mgr.add_signal(&id, sig.clone()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!({ "signal": sig })))
+}
+
+async fn cofounder_idea_experiment_handler(
     headers: HeaderMap,
     Path(id): Path<String>,
     State(state): State<Arc<ApiState>>,
@@ -3979,13 +4054,22 @@ async fn cofounder_idea_score_handler(
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    let score = mgr.generate_scorecard(&id).map_err(|e| {
+    let exp = crate::agents::cofounder::ValidationExperiment {
+        id: uuid::Uuid::new_v4().to_string(),
+        idea_id: id.clone(),
+        experiment_type: "Landing Page Test".into(),
+        steps: vec![],
+        metrics: vec![],
+        result: None,
+        created_at: chrono::Utc::now().timestamp(),
+    };
+    mgr.add_experiment(&id, exp.clone()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    Ok(Json(serde_json::json!({ "score": score })))
+    Ok(Json(serde_json::json!({ "experiment": exp })))
 }
 
 async fn cofounder_idea_mvp_handler(
@@ -4000,7 +4084,13 @@ async fn cofounder_idea_mvp_handler(
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    let mvp = mgr.generate_mvp_scope(&id).map_err(|e| {
+    let rt = state.runtime.lock().await;
+    let brain_mgr = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    let mvp = mgr.deep_generate_mvp_scope(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
@@ -4009,49 +4099,7 @@ async fn cofounder_idea_mvp_handler(
     Ok(Json(serde_json::json!({ "mvp": mvp })))
 }
 
-async fn cofounder_idea_competitors_handler(
-    headers: HeaderMap,
-    Path(id): Path<String>,
-    State(state): State<Arc<ApiState>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let comps = mgr.generate_competitors(&id).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(Json(serde_json::json!({ "competitors": comps })))
-}
-
-async fn cofounder_idea_landing_handler(
-    headers: HeaderMap,
-    Path(id): Path<String>,
-    State(state): State<Arc<ApiState>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&headers, &state)?;
-    let mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    let brief = mgr.generate_landing_page_brief(&id).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
-    Ok(Json(serde_json::json!({ "brief": brief })))
-}
-
-async fn cofounder_idea_outreach_handler(
+async fn cofounder_idea_pricing_handler(
     headers: HeaderMap,
     Path(id): Path<String>,
     State(state): State<Arc<ApiState>>,
@@ -4063,13 +4111,64 @@ async fn cofounder_idea_outreach_handler(
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    let plan = mgr.generate_outreach_plan(&id).map_err(|e| {
+    let rt = state.runtime.lock().await;
+    let brain_mgr = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    let pricing = mgr.deep_generate_pricing_hypothesis(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
     })?;
-    Ok(Json(serde_json::json!({ "plan": plan })))
+    Ok(Json(serde_json::json!({ "pricing": pricing })))
+}
+
+async fn cofounder_idea_landing_review_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "review": "Landing page review feature not implemented yet." })))
+}
+
+async fn cofounder_idea_researcher_scan_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    Ok(Json(serde_json::json!({ "scan": "Researcher integration not implemented yet." })))
+}
+
+async fn cofounder_idea_builder_handoff_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mut mgr = crate::agents::cofounder::CofounderManager::new().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    let rt = state.runtime.lock().await;
+    let brain_mgr = crate::brain_index::BrainIndexManager::new(
+        rt.paths.clone(),
+        rt.config.brain_index.clone(),
+        &rt.config.embeddings,
+    );
+    let handoff = mgr.deep_generate_builder_handoff(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+    Ok(Json(serde_json::json!({ "handoff": handoff })))
 }
 
 async fn cofounder_idea_report_handler(
@@ -4091,6 +4190,21 @@ async fn cofounder_idea_report_handler(
         )
     })?;
     Ok(Json(serde_json::json!({ "report": report })))
+}
+
+async fn cofounder_idea_reports_handler(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let mgr = crate::reports::ReportManager::new();
+    let reports = mgr.list_reports().unwrap_or_default();
+    let cofounder_reports: Vec<_> = reports
+        .into_iter()
+        .filter(|r| r.title.contains(&id))
+        .collect();
+    Ok(Json(serde_json::json!({ "reports": cofounder_reports })))
 }
 
 // ── Phase 5.18: Socializer Agent ──────────────────────────────────────────────
