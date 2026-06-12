@@ -785,10 +785,55 @@ impl App {
                 self.push_log(format!("[SYSTEM] View full details at http://127.0.0.1:3000/mission-control"));
                 true
             }
-            "/projects" | "@projects" | "@project" => {
-                self.push_log(format!("[SYSTEM] Project Workspace. Go to http://127.0.0.1:3000/mission-control"));
-                if _args.len() > 0 {
-                    self.push_log(format!("[SYSTEM] Project argument: {}", _args));
+            "/projects" | "@projects" => {
+                let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+                let projects = manager.get_projects();
+                if projects.is_empty() {
+                    self.push_log("[PROJECTS] No projects learned yet. Use `/learn <path>`.");
+                } else {
+                    self.push_log("[PROJECTS] Learned Projects:");
+                    for p in projects {
+                        self.push_log(format!("- {} ({}) | {}", p.name, p.project_id, p.architecture_summary));
+                    }
+                }
+                true
+            }
+            "/project" | "@project" => {
+                if _args.is_empty() {
+                    self.push_log("[PROJECTS] Usage: /project <id>");
+                } else {
+                    let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+                    if let Some(p) = manager.get_project(_args.trim()) {
+                        self.push_log(format!("[PROJECTS] Project: {} ({})", p.name, p.project_id));
+                        self.push_log(format!("Path: {}", p.root_path.display()));
+                        self.push_log(format!("Stack: {}", p.detected_stack.join(", ")));
+                    } else {
+                        self.push_log("[PROJECTS] Project not found.");
+                    }
+                }
+                true
+            }
+            "/learn" | "@learn" => {
+                let target_path = if _args.is_empty() { ".".to_string() } else { _args.to_string() };
+                let target_path_buf = std::path::PathBuf::from(&target_path);
+                let canonical = target_path_buf.canonicalize().unwrap_or_else(|_| target_path_buf.clone());
+                
+                // TODO: In TUI, we should prompt using a modal, but for now we'll auto-scan since it's user initiated
+                self.push_log(format!("[LEARN] Scanning project at: {}", canonical.display()));
+                let scanner = crate::project_intelligence::DeepProjectScanner::new(canonical);
+                match scanner.scan() {
+                    Ok(pi) => {
+                        let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+                        if let Err(e) = manager.save_project(&pi) {
+                            self.push_log(format!("[LEARN] Failed to save project: {}", e));
+                        } else {
+                            self.push_log(format!("[LEARN] Learned project: {} ({})", pi.name, pi.project_id));
+                            self.push_log(format!("[LEARN] Stack: {}", pi.detected_stack.join(", ")));
+                        }
+                    }
+                    Err(e) => {
+                        self.push_log(format!("[LEARN] Failed to scan project: {}", e));
+                    }
                 }
                 true
             }

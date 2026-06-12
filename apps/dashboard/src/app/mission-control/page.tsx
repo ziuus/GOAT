@@ -43,10 +43,12 @@ export default function MissionControl() {
   const [isPlanning, setIsPlanning] = useState(false);
   const [plan, setPlan] = useState<Mission | null>(null);
   const [feed, setFeed] = useState<Mission[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
 
   useEffect(() => {
     fetchFeed();
+    fetchProjects();
   }, []);
 
   const fetchFeed = async () => {
@@ -65,9 +67,31 @@ export default function MissionControl() {
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:3000/v1/projects', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('goat_token')}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data.projects || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch projects", e);
+    }
+  };
+
   const handlePlanGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goal.trim()) return;
+
+    let matchedProjectId = null;
+    if (projects.length === 1) {
+      matchedProjectId = projects[0].project_id;
+    } else if (projects.length > 1) {
+      const match = projects.find(p => goal.toLowerCase().includes(p.name.toLowerCase()));
+      if (match) matchedProjectId = match.project_id;
+    }
 
     setIsPlanning(true);
     setPlan(null);
@@ -78,7 +102,7 @@ export default function MissionControl() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('goat_token')}`
         },
-        body: JSON.stringify({ goal, project_id: null, constraints: null })
+        body: JSON.stringify({ goal, project_id: matchedProjectId, constraints: null })
       });
       const data = await res.json();
       setPlan(data);
@@ -309,14 +333,33 @@ export default function MissionControl() {
 
         <div className="space-y-8">
           <section className="bg-gray-900/40 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Active Workspace Context</h2>
-            <div className="bg-black/40 p-5 rounded-xl border border-white/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full" />
-              <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2">Local Project</div>
-              <div className="text-sm text-white font-medium mb-1">GOAT Subagent Architecture</div>
-              <div className="text-xs text-gray-500 mb-4">/home/zius/Projects/GOAT</div>
-              <button className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Change Workspace &rarr;</button>
-            </div>
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+              <span>Active Workspace Context</span>
+            </h2>
+            {projects.length === 0 ? (
+              <div className="bg-black/40 p-5 rounded-xl border border-dashed border-gray-800 text-center">
+                <div className="text-sm text-gray-500 mb-2">No projects learned yet.</div>
+                <div className="text-xs text-indigo-400 font-medium">Run `goat learn &lt;path&gt;` in your terminal.</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projects.map((p, i) => (
+                  <div key={p.project_id} className="bg-black/40 p-5 rounded-xl border border-white/5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition duration-500" />
+                    <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2">Local Project</div>
+                    <div className="text-sm text-white font-medium mb-1">{p.name}</div>
+                    <div className="text-xs text-gray-500 mb-2">{p.root_path}</div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">Stack: {p.detected_stack.join(', ')}</div>
+                    {p.available_commands.slice(0,3).map((cmd: string) => (
+                      <div key={cmd} className="text-xs text-indigo-300 font-mono mb-1">&gt; {cmd}</div>
+                    ))}
+                    {p.available_commands.length > 3 && (
+                      <div className="text-xs text-gray-600 font-mono">+{p.available_commands.length - 3} more...</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="bg-gray-900/40 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl">

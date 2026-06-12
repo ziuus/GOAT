@@ -39,6 +39,7 @@ pub mod models;
 pub mod onboarding;
 pub mod paths;
 pub mod project;
+pub mod project_intelligence;
 pub mod project_profiles;
 pub mod promptforge;
 pub mod provider;

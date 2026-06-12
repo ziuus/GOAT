@@ -249,6 +249,13 @@ pub enum Command {
         args: Vec<String>,
     },
 
+    /// Learn the current or specified project folder.
+    #[command(name = "learn")]
+    Learn {
+        /// Path to learn (defaults to current directory)
+        path: Option<String>,
+    },
+
     /// Project workspace operations.
     #[command(name = "projects")]
     Projects {
@@ -852,9 +859,74 @@ pub async fn handle_subcommand(
             println!("\nView the full Mission Control workspace at http://127.0.0.1:3000/mission-control");
             Ok(true)
         }
+        Command::Learn { path } => {
+            let target_path = path.clone().unwrap_or_else(|| ".".to_string());
+            let target_path_buf = std::path::PathBuf::from(&target_path);
+            let canonical = target_path_buf.canonicalize().unwrap_or_else(|_| target_path_buf.clone());
+            
+            println!("You are about to scan: {}", canonical.display());
+            println!("This will analyze files for tech stack, commands, and project context.");
+            println!("Sensitive files (secrets, .env) and large directories (.git, node_modules) will be ignored.");
+            
+            let mut prompt = String::new();
+            println!("Do you want to proceed? [y/N]: ");
+            std::io::stdin().read_line(&mut prompt).ok();
+            if prompt.trim().to_lowercase() != "y" {
+                println!("Scan aborted.");
+                return Ok(true);
+            }
+            
+            let scanner = crate::project_intelligence::DeepProjectScanner::new(canonical);
+            match scanner.scan() {
+                Ok(pi) => {
+                    let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+                    manager.save_project(&pi)?;
+                    println!("\nProject learned successfully!");
+                    println!("Name: {}", pi.name);
+                    println!("ID: {}", pi.project_id);
+                    println!("Stack: {}", pi.detected_stack.join(", "));
+                    println!("Summary: {}", pi.architecture_summary);
+                    if !pi.risk_notes.is_empty() {
+                        println!("Notes: {} sensitive files ignored.", pi.risk_notes.len());
+                    }
+                }
+                Err(e) => println!("Failed to scan project: {}", e),
+            }
+            Ok(true)
+        }
         Command::Projects { action, args } => {
-            println!("Project Workspace: {} {:?}", action, args);
-            println!("View active projects at http://127.0.0.1:3000/mission-control");
+            let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+            if action == "list" {
+                let projects = manager.get_projects();
+                if projects.is_empty() {
+                    println!("No projects learned yet. Run `goat learn <path>` to add one.");
+                } else {
+                    println!("Learned Projects:");
+                    for p in projects {
+                        println!("- {} ({}) | {}", p.name, p.project_id, p.architecture_summary);
+                    }
+                }
+            } else if action == "show" {
+                if let Some(id) = args.first() {
+                    if let Some(p) = manager.get_project(id) {
+                        println!("Project: {} ({})", p.name, p.project_id);
+                        println!("Path: {}", p.root_path.display());
+                        println!("Stack: {}", p.detected_stack.join(", "));
+                        println!("Commands:");
+                        for cmd in p.available_commands {
+                            println!("  - {}", cmd);
+                        }
+                    } else {
+                        println!("Project not found.");
+                    }
+                } else {
+                    println!("Usage: goat projects show <id>");
+                }
+            } else if action == "scan" {
+                println!("Use `goat learn <path>` instead.");
+            } else {
+                println!("Unknown action: {}", action);
+            }
             Ok(true)
         }
     }

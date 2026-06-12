@@ -45,6 +45,10 @@ pub async fn start_server(
         .route("/v1/mission-control/projects", get(mission_control_projects_get_handler).post(mission_control_projects_post_handler))
         .route("/v1/mission-control/plan-goal", post(mission_control_plan_goal_handler))
         .route("/v1/mission-control/recommendations", get(mission_control_recommendations_handler))
+        .route("/v1/projects", get(projects_list_handler))
+        .route("/v1/projects/scan", post(projects_scan_handler))
+        .route("/v1/projects/:id", get(projects_get_handler))
+        .route("/v1/projects/:id/context", get(projects_context_handler))
         .route("/v1/designer/status", get(designer_status_handler))
         .route(
             "/v1/designer/reviews",
@@ -5974,4 +5978,71 @@ async fn mission_control_recommendations_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     Ok(Json(json!({ "recommendations": [] })))
+}
+
+#[derive(serde::Deserialize)]
+struct ScanReq {
+    path: String,
+}
+
+async fn projects_list_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+    let projects = manager.get_projects();
+    Ok(Json(json!({ "projects": projects })))
+}
+
+async fn projects_get_handler(
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+    if let Some(p) = manager.get_project(&id) {
+        Ok(Json(json!({ "project": p })))
+    } else {
+        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Project not found" }))))
+    }
+}
+
+async fn projects_scan_handler(
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+    Json(req): Json<ScanReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let path = std::path::PathBuf::from(&req.path);
+    let scanner = crate::project_intelligence::DeepProjectScanner::new(path);
+    match scanner.scan() {
+        Ok(pi) => {
+            let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+            if let Err(e) = manager.save_project(&pi) {
+                Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+            } else {
+                Ok(Json(json!({ "project": pi })))
+            }
+        }
+        Err(e) => {
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+        }
+    }
+}
+
+async fn projects_context_handler(
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_auth(&headers, &state)?;
+    let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+    if let Some(p) = manager.get_project(&id) {
+        let ctx = format!("Project Name: {}\nStack: {}\nSummary: {}", p.name, p.detected_stack.join(", "), p.architecture_summary);
+        Ok(Json(json!({ "context": ctx })))
+    } else {
+        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Project not found" }))))
+    }
 }
