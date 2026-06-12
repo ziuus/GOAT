@@ -4165,8 +4165,8 @@ impl App {
                         self.push_log(format!("[COFOUNDER] {} ideas found.", ideas.len()));
                         for i in ideas {
                             self.push_log(format!(
-                                "  [{}] {} (State: {:?})",
-                                i.id, i.title, i.state
+                                "  [{}] {} (Status: {:?})",
+                                i.id, i.title, i.validation_status
                             ));
                         }
                     }
@@ -4183,47 +4183,38 @@ impl App {
                             Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                         }
                     }
-                    "validate" => match manager.generate_validation_plan(target) {
-                        Ok(plan) => self.push_log(format!(
-                            "[COFOUNDER] Validation Plan for {}: {} steps",
-                            plan.idea_id,
-                            plan.steps.len()
-                        )),
-                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                    },
+                    "validate" => {
+                        self.push_log(format!(
+                            "[COFOUNDER] Deep evaluation requires async context (use API)."
+                        ));
+                    }
                     "score" => match manager.generate_scorecard(target) {
                         Ok(score) => self.push_log(format!(
-                            "[COFOUNDER] Scorecard for {}: {}/50",
+                            "[COFOUNDER] Scorecard for {}: {}/100",
                             score.idea_id, score.total_score
                         )),
                         Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                     },
                     "mvp" => match manager.generate_mvp_scope(target) {
                         Ok(mvp) => self.push_log(format!(
-                            "[COFOUNDER] MVP Scope for {}: {} core features",
+                            "[COFOUNDER] MVP Scope for {}: {} features",
                             mvp.idea_id,
-                            mvp.core_features.len()
+                            mvp.features.len()
                         )),
                         Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                     },
-                    "competitors" => match manager.generate_competitors(target) {
-                        Ok(comps) => self.push_log(format!(
-                            "[COFOUNDER] {} competitors found for {}",
-                            comps.len(),
-                            target
+                    "pricing" => match manager.generate_pricing_hypothesis(target) {
+                        Ok(pricing) => self.push_log(format!(
+                            "[COFOUNDER] Pricing for {}: {} tiers",
+                            pricing.idea_id,
+                            pricing.tiers.len()
                         )),
                         Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                     },
-                    "landing" => match manager.generate_landing_page_brief(target) {
-                        Ok(brief) => {
-                            self.push_log(format!("[COFOUNDER] Landing Page Brief: {}", brief))
-                        }
-                        Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
-                    },
-                    "outreach" => match manager.generate_outreach_plan(target) {
-                        Ok(plan) => self.push_log(format!(
-                            "[COFOUNDER] Outreach Plan: {} channels",
-                            plan.channels.len()
+                    "handoff" => match manager.generate_builder_handoff(target) {
+                        Ok(handoff) => self.push_log(format!(
+                            "[COFOUNDER] Builder Handoff created for {}",
+                            handoff.idea_id
                         )),
                         Err(e) => self.push_log(format!("[COFOUNDER] Error: {}", e)),
                     },
@@ -4237,7 +4228,7 @@ impl App {
                         if let Some(idea) = manager.get_idea(target) {
                             self.push_log(format!("[COFOUNDER] ID: {}", idea.id));
                             self.push_log(format!("  Title: {}", idea.title));
-                            self.push_log(format!("  State: {:?}", idea.state));
+                            self.push_log(format!("  Status: {:?}", idea.validation_status));
                         } else {
                             self.push_log(format!("[COFOUNDER] Idea '{}' not found", target));
                         }

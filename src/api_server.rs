@@ -66,10 +66,14 @@ pub async fn start_server(
             "/v1/designer/reviews/:id/report",
             post(designer_report_handler),
         )
-        .route("/v1/researcher/status", get(researcher_phase75_status_handler))
+        .route(
+            "/v1/researcher/status",
+            get(researcher_phase75_status_handler),
+        )
         .route(
             "/v1/researcher/projects",
-            get(researcher_phase75_projects_list_handler).post(researcher_phase75_projects_create_handler),
+            get(researcher_phase75_projects_list_handler)
+                .post(researcher_phase75_projects_create_handler),
         )
         .route(
             "/v1/researcher/projects/:id",
@@ -77,7 +81,8 @@ pub async fn start_server(
         )
         .route(
             "/v1/researcher/projects/:id/sources",
-            get(researcher_phase75_sources_list_handler).post(researcher_phase75_sources_add_handler),
+            get(researcher_phase75_sources_list_handler)
+                .post(researcher_phase75_sources_add_handler),
         )
         .route(
             "/v1/researcher/projects/:id/ingest-browser",
@@ -3976,12 +3981,15 @@ async fn cofounder_idea_validate_handler(
         rt.config.brain_index.clone(),
         &rt.config.embeddings,
     );
-    let score = mgr.deep_evaluate_idea(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let score = mgr
+        .deep_evaluate_idea(&id, &brain_mgr, &rt.llm_router, &rt.model_chain)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(Json(serde_json::json!({ "score": score })))
 }
 
@@ -4090,12 +4098,15 @@ async fn cofounder_idea_mvp_handler(
         rt.config.brain_index.clone(),
         &rt.config.embeddings,
     );
-    let mvp = mgr.deep_generate_mvp_scope(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let mvp = mgr
+        .deep_generate_mvp_scope(&id, &brain_mgr, &rt.llm_router, &rt.model_chain)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(Json(serde_json::json!({ "mvp": mvp })))
 }
 
@@ -4117,12 +4128,15 @@ async fn cofounder_idea_pricing_handler(
         rt.config.brain_index.clone(),
         &rt.config.embeddings,
     );
-    let pricing = mgr.deep_generate_pricing_hypothesis(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let pricing = mgr
+        .deep_generate_pricing_hypothesis(&id, &brain_mgr, &rt.llm_router, &rt.model_chain)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(Json(serde_json::json!({ "pricing": pricing })))
 }
 
@@ -4132,7 +4146,9 @@ async fn cofounder_idea_landing_review_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "review": "Landing page review feature not implemented yet." })))
+    Ok(Json(
+        serde_json::json!({ "review": "Landing page review feature not implemented yet." }),
+    ))
 }
 
 async fn cofounder_idea_researcher_scan_handler(
@@ -4141,7 +4157,9 @@ async fn cofounder_idea_researcher_scan_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(serde_json::json!({ "scan": "Researcher integration not implemented yet." })))
+    Ok(Json(
+        serde_json::json!({ "scan": "Researcher integration not implemented yet." }),
+    ))
 }
 
 async fn cofounder_idea_builder_handoff_handler(
@@ -4162,12 +4180,15 @@ async fn cofounder_idea_builder_handoff_handler(
         rt.config.brain_index.clone(),
         &rt.config.embeddings,
     );
-    let handoff = mgr.deep_generate_builder_handoff(&id, &brain_mgr, &rt.llm_router, &rt.model_chain).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let handoff = mgr
+        .deep_generate_builder_handoff(&id, &brain_mgr, &rt.llm_router, &rt.model_chain)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     Ok(Json(serde_json::json!({ "handoff": handoff })))
 }
 

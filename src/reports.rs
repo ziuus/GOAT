@@ -4,12 +4,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum ReportKind {
     Research,
     CodeReview,
     Finance,
     General,
+    FounderValidationReport,
+    FounderMarketSignalReport,
+    ValidationExperimentReport,
+    MvpScopeReport,
+    PricingHypothesisReport,
+    FounderDecisionReport,
+    BuilderHandoffReport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,6 +67,13 @@ impl ReportManager {
                 ReportKind::CodeReview => "review",
                 ReportKind::Finance => "finance",
                 ReportKind::General => "report",
+                ReportKind::FounderValidationReport => "founder_validation",
+                ReportKind::FounderMarketSignalReport => "market_signal",
+                ReportKind::ValidationExperimentReport => "experiment",
+                ReportKind::MvpScopeReport => "mvp_scope",
+                ReportKind::PricingHypothesisReport => "pricing",
+                ReportKind::FounderDecisionReport => "decision",
+                ReportKind::BuilderHandoffReport => "handoff",
             },
             Utc::now().format("%Y%m%d%H%M%S")
         );

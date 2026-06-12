@@ -2268,7 +2268,7 @@ async fn handle_slash_command(
                     "list" => {
                         println!("[COFOUNDER] Ideas:");
                         for i in manager.list_ideas() {
-                            println!("  [{}] {} ({:?})", i.id, i.title, i.state);
+                            println!("  [{}] {} ({:?})", i.id, i.title, i.validation_status);
                         }
                     }
                     "new-idea" => {
@@ -2278,36 +2278,26 @@ async fn handle_slash_command(
                         }
                     }
                     "validate" => {
-                        if let Ok(plan) = manager.generate_validation_plan(target) {
-                            println!("[COFOUNDER] Validation Plan: {} steps", plan.steps.len());
-                        }
+                        println!("[COFOUNDER] Validation requires API for async evaluation.");
                     }
                     "score" => {
                         if let Ok(score) = manager.generate_scorecard(target) {
-                            println!("[COFOUNDER] Scorecard: {}/50", score.total_score);
+                            println!("[COFOUNDER] Scorecard: {}/100", score.total_score);
                         }
                     }
                     "mvp" => {
                         if let Ok(mvp) = manager.generate_mvp_scope(target) {
-                            println!(
-                                "[COFOUNDER] MVP Scope: {} features",
-                                mvp.core_features.len()
-                            );
+                            println!("[COFOUNDER] MVP Scope: {} features", mvp.features.len());
                         }
                     }
-                    "competitors" => {
-                        if let Ok(comps) = manager.generate_competitors(target) {
-                            println!("[COFOUNDER] Competitors: {}", comps.len());
+                    "pricing" => {
+                        if let Ok(pricing) = manager.generate_pricing_hypothesis(target) {
+                            println!("[COFOUNDER] Pricing: {} tiers", pricing.tiers.len());
                         }
                     }
-                    "landing" => {
-                        if let Ok(brief) = manager.generate_landing_page_brief(target) {
-                            println!("[COFOUNDER] Landing: {}", brief);
-                        }
-                    }
-                    "outreach" => {
-                        if let Ok(plan) = manager.generate_outreach_plan(target) {
-                            println!("[COFOUNDER] Outreach: {} channels", plan.channels.len());
+                    "handoff" => {
+                        if let Ok(handoff) = manager.generate_builder_handoff(target) {
+                            println!("[COFOUNDER] Handoff created for {}", handoff.idea_id);
                         }
                     }
                     "report" => {

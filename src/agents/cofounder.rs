@@ -1,5 +1,5 @@
 use crate::error::GoatError;
-use crate::reports::{ReportManager, ReportTemplate, ReportKind, ReportSection};
+use crate::reports::{ReportKind, ReportManager, ReportSection, ReportTemplate};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -308,12 +308,24 @@ impl CofounderManager {
         Ok(manager)
     }
 
-    fn ideas_file(&self) -> PathBuf { self.base_dir.join("ideas.jsonl") }
-    fn signals_file(&self) -> PathBuf { self.base_dir.join("signals.jsonl") }
-    fn experiments_file(&self) -> PathBuf { self.base_dir.join("experiments.jsonl") }
-    fn mvps_file(&self) -> PathBuf { self.base_dir.join("mvps.jsonl") }
-    fn pricing_file(&self) -> PathBuf { self.base_dir.join("pricing.jsonl") }
-    fn handoffs_file(&self) -> PathBuf { self.base_dir.join("handoffs.jsonl") }
+    fn ideas_file(&self) -> PathBuf {
+        self.base_dir.join("ideas.jsonl")
+    }
+    fn signals_file(&self) -> PathBuf {
+        self.base_dir.join("signals.jsonl")
+    }
+    fn experiments_file(&self) -> PathBuf {
+        self.base_dir.join("experiments.jsonl")
+    }
+    fn mvps_file(&self) -> PathBuf {
+        self.base_dir.join("mvps.jsonl")
+    }
+    fn pricing_file(&self) -> PathBuf {
+        self.base_dir.join("pricing.jsonl")
+    }
+    fn handoffs_file(&self) -> PathBuf {
+        self.base_dir.join("handoffs.jsonl")
+    }
 
     fn load_all(&mut self) -> Result<()> {
         if self.ideas_file().exists() {
@@ -326,14 +338,20 @@ impl CofounderManager {
         if self.signals_file().exists() {
             for line in fs::read_to_string(self.signals_file())?.lines() {
                 if let Ok(sig) = serde_json::from_str::<MarketSignal>(line) {
-                    self.signals.entry(sig.idea_id.clone()).or_default().push(sig);
+                    self.signals
+                        .entry(sig.idea_id.clone())
+                        .or_default()
+                        .push(sig);
                 }
             }
         }
         if self.experiments_file().exists() {
             for line in fs::read_to_string(self.experiments_file())?.lines() {
                 if let Ok(exp) = serde_json::from_str::<ValidationExperiment>(line) {
-                    self.experiments.entry(exp.idea_id.clone()).or_default().push(exp);
+                    self.experiments
+                        .entry(exp.idea_id.clone())
+                        .or_default()
+                        .push(exp);
                 }
             }
         }
@@ -363,44 +381,68 @@ impl CofounderManager {
 
     pub fn save_all(&self) -> Result<()> {
         let mut lines = Vec::new();
-        for item in self.ideas.values() { lines.push(serde_json::to_string(item)?); }
+        for item in self.ideas.values() {
+            lines.push(serde_json::to_string(item)?);
+        }
         fs::write(self.ideas_file(), lines.join("\n"))?;
 
         lines.clear();
         for list in self.signals.values() {
-            for item in list { lines.push(serde_json::to_string(item)?); }
+            for item in list {
+                lines.push(serde_json::to_string(item)?);
+            }
         }
         fs::write(self.signals_file(), lines.join("\n"))?;
 
         lines.clear();
         for list in self.experiments.values() {
-            for item in list { lines.push(serde_json::to_string(item)?); }
+            for item in list {
+                lines.push(serde_json::to_string(item)?);
+            }
         }
         fs::write(self.experiments_file(), lines.join("\n"))?;
 
         lines.clear();
-        for item in self.mvps.values() { lines.push(serde_json::to_string(item)?); }
+        for item in self.mvps.values() {
+            lines.push(serde_json::to_string(item)?);
+        }
         fs::write(self.mvps_file(), lines.join("\n"))?;
 
         lines.clear();
-        for item in self.pricing.values() { lines.push(serde_json::to_string(item)?); }
+        for item in self.pricing.values() {
+            lines.push(serde_json::to_string(item)?);
+        }
         fs::write(self.pricing_file(), lines.join("\n"))?;
 
         lines.clear();
-        for item in self.handoffs.values() { lines.push(serde_json::to_string(item)?); }
+        for item in self.handoffs.values() {
+            lines.push(serde_json::to_string(item)?);
+        }
         fs::write(self.handoffs_file(), lines.join("\n"))?;
 
         Ok(())
     }
 
-    pub fn add_idea(&mut self, title: String, pitch: String, audience: String) -> Result<CofounderIdea> {
+    pub fn add_idea(
+        &mut self,
+        title: String,
+        pitch: String,
+        audience: String,
+    ) -> Result<CofounderIdea> {
         let id = Uuid::new_v4().to_string();
         let idea = CofounderIdea {
             id: id.clone(),
             title,
             one_line_pitch: pitch,
-            target_user: TargetUserSegment { description: audience, demographics: vec![] },
-            problem: FounderProblem { description: "Needs definition".into(), pain_intensity: 0, urgency: 0 },
+            target_user: TargetUserSegment {
+                description: audience,
+                demographics: vec![],
+            },
+            problem: FounderProblem {
+                description: "Needs definition".into(),
+                pain_intensity: 0,
+                urgency: 0,
+            },
             current_alternatives: vec![],
             willingness_to_pay_hypothesis: "Unknown".into(),
             distribution_channels: vec![],
@@ -427,13 +469,19 @@ impl CofounderManager {
     }
 
     pub fn add_signal(&mut self, idea_id: &str, signal: MarketSignal) -> Result<()> {
-        self.signals.entry(idea_id.to_string()).or_default().push(signal);
+        self.signals
+            .entry(idea_id.to_string())
+            .or_default()
+            .push(signal);
         self.save_all()?;
         Ok(())
     }
 
     pub fn add_experiment(&mut self, idea_id: &str, exp: ValidationExperiment) -> Result<()> {
-        self.experiments.entry(idea_id.to_string()).or_default().push(exp);
+        self.experiments
+            .entry(idea_id.to_string())
+            .or_default()
+            .push(exp);
         self.save_all()?;
         Ok(())
     }
@@ -442,11 +490,25 @@ impl CofounderManager {
         let mvp = MVPHypothesis {
             id: Uuid::new_v4().to_string(),
             idea_id: idea_id.to_string(),
-            features: vec![MVPFeature { name: "Landing page smoke test".into(), description: "Collect emails".into(), is_must_have: true }],
-            non_goals: vec![MVPNonGoal { description: "Full backend automation".into() }],
-            risks: vec![MVPBuildRisk { description: "Technical unknowns in APIs".into() }],
-            weekly_plans: vec![MVPWeekPlan { week_number: 1, goals: vec!["Validate demand".into()] }],
-            builder_handoff: MVPBuilderHandoff { ready: false, technical_unknowns: vec![] },
+            features: vec![MVPFeature {
+                name: "Landing page smoke test".into(),
+                description: "Collect emails".into(),
+                is_must_have: true,
+            }],
+            non_goals: vec![MVPNonGoal {
+                description: "Full backend automation".into(),
+            }],
+            risks: vec![MVPBuildRisk {
+                description: "Technical unknowns in APIs".into(),
+            }],
+            weekly_plans: vec![MVPWeekPlan {
+                week_number: 1,
+                goals: vec!["Validate demand".into()],
+            }],
+            builder_handoff: MVPBuilderHandoff {
+                ready: false,
+                technical_unknowns: vec![],
+            },
             riskiest_assumption_tested: "People want this".into(),
         };
         self.mvps.insert(idea_id.to_string(), mvp.clone());
@@ -459,8 +521,14 @@ impl CofounderManager {
             id: Uuid::new_v4().to_string(),
             idea_id: idea_id.to_string(),
             free_manual_test_option: "Manual onboarding via concierge".into(),
-            tiers: vec![PricingTier { name: "Starter".into(), price: "$10/mo".into(), description: "Basic value".into() }],
-            rationale: vec![PricingRationale { reason: "Competitors charge $20".into() }],
+            tiers: vec![PricingTier {
+                name: "Starter".into(),
+                price: "$10/mo".into(),
+                description: "Basic value".into(),
+            }],
+            rationale: vec![PricingRationale {
+                reason: "Competitors charge $20".into(),
+            }],
             value_metric: "Usage".into(),
             pricing_risks: vec!["Willingness to pay might be lower".into()],
             evidence_needed: vec!["Paid pre-orders".into()],
@@ -506,7 +574,11 @@ impl CofounderManager {
             evidence_strength: evidence_score.min(10),
             total_score: total.min(100),
             evidence_grade: grade.to_string(),
-            confidence_level: if total > 50 { "Moderate".into() } else { "Low".into() },
+            confidence_level: if total > 50 {
+                "Moderate".into()
+            } else {
+                "Low".into()
+            },
             missing_evidence: vec!["Need direct user interviews".into()],
             recommendation: "Collect more market signals before building".into(),
         };
@@ -519,13 +591,27 @@ impl CofounderManager {
             kind: ReportKind::FounderValidationReport,
             title: format!("Cofounder Validation Report {}", id),
             sections: vec![
-                ReportSection { heading: "Executive Summary".into(), body: "Evidence-first analysis".into() },
-                ReportSection { heading: "Missing Evidence".into(), body: "Market signals needed.".into() },
-                ReportSection { heading: "Limitations".into(), body: "No real interviews conducted yet.".into() },
+                ReportSection {
+                    heading: "Executive Summary".into(),
+                    body: "Evidence-first analysis".into(),
+                },
+                ReportSection {
+                    heading: "Missing Evidence".into(),
+                    body: "Market signals needed.".into(),
+                },
+                ReportSection {
+                    heading: "Limitations".into(),
+                    body: "No real interviews conducted yet.".into(),
+                },
             ],
         };
-        let rep = rm.generate_report(template).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(CofounderReport { idea_id: id.to_string(), summary: format!("Generated report {}", rep.id) })
+        let rep = rm
+            .generate_report(template)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        Ok(CofounderReport {
+            idea_id: id.to_string(),
+            summary: format!("Generated report {}", rep.id),
+        })
     }
 
     pub async fn deep_evaluate_idea(
@@ -535,7 +621,11 @@ impl CofounderManager {
         llm_router: &crate::llm::LlmRouter,
         model_chain: &crate::models::ModelChain,
     ) -> Result<CofounderScorecard> {
-        let idea = self.ideas.get(id).cloned().ok_or_else(|| anyhow!("Idea not found"))?;
+        let idea = self
+            .ideas
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Idea not found"))?;
         let signals = self.signals.get(id).cloned().unwrap_or_default();
         let experiments = self.experiments.get(id).cloned().unwrap_or_default();
 
@@ -555,7 +645,7 @@ impl CofounderManager {
                \"strongest_signals\": [\"string\"],\n\
                \"verdict\": \"string\",\n\
                \"next_action\": \"string\"\n\
-             }"
+             }",
         );
 
         let mut user_prompt = format!(
@@ -565,22 +655,36 @@ impl CofounderManager {
 
         user_prompt.push_str("Market Signals:\n");
         for s in &signals {
-            user_prompt.push_str(&format!("- [{:?}] (Strength: {:?}) {}\n", s.signal_type, s.strength, s.description));
+            user_prompt.push_str(&format!(
+                "- [{:?}] (Strength: {:?}) {}\n",
+                s.signal_type, s.strength, s.description
+            ));
         }
 
         user_prompt.push_str("\nValidation Experiments:\n");
         for e in &experiments {
-            let status = if e.result.is_some() { "Completed" } else { "Pending" };
+            let status = if e.result.is_some() {
+                "Completed"
+            } else {
+                "Pending"
+            };
             user_prompt.push_str(&format!("- [{}] Status: {}\n", e.experiment_type, status));
             if let Some(r) = &e.result {
-                user_prompt.push_str(&format!("  Success: {}, Evidence: {}\n", r.success, r.evidence_collected));
+                user_prompt.push_str(&format!(
+                    "  Success: {}, Evidence: {}\n",
+                    r.success, r.evidence_collected
+                ));
             }
         }
 
         // Fetch similar past ideas from the brain
-        let context_packer = crate::agent_quality::AgentContextPacker::new(brain_manager, "cofounder");
+        let context_packer =
+            crate::agent_quality::AgentContextPacker::new(brain_manager, "cofounder");
         if let Ok(context) = context_packer.pack_for_task(&idea.title).await {
-            user_prompt.push_str(&format!("\nBrain Context / Past Knowledge:\n{:?}\n", context));
+            user_prompt.push_str(&format!(
+                "\nBrain Context / Past Knowledge:\n{:?}\n",
+                context
+            ));
         }
 
         let messages = vec![
@@ -604,7 +708,10 @@ impl CofounderManager {
             .map_err(|e| anyhow!("LLM Evaluation failed: {}", e))?;
 
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
         match serde_json::from_str::<CofounderScorecard>(cleaned) {
             Ok(mut scorecard) => {
@@ -625,7 +732,11 @@ impl CofounderManager {
         llm_router: &crate::llm::LlmRouter,
         model_chain: &crate::models::ModelChain,
     ) -> Result<MVPHypothesis> {
-        let idea = self.ideas.get(id).cloned().ok_or_else(|| anyhow!("Idea not found"))?;
+        let idea = self
+            .ideas
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Idea not found"))?;
 
         let sys_prompt = String::from(
             "You are the GOAT Cofounder AI. You are scoping an MVP for a validated idea.\n\
@@ -641,7 +752,7 @@ impl CofounderManager {
                \"weekly_plans\": [{\"week_number\": number, \"goals\": [\"string\"]}],\n\
                \"builder_handoff\": {\"ready\": bool, \"technical_unknowns\": [\"string\"]},\n\
                \"riskiest_assumption_tested\": \"string\"\n\
-             }"
+             }",
         );
 
         let user_prompt = format!(
@@ -670,7 +781,10 @@ impl CofounderManager {
             .map_err(|e| anyhow!("LLM Evaluation failed: {}", e))?;
 
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
         match serde_json::from_str::<MVPHypothesis>(cleaned) {
             Ok(mut mvp) => {
@@ -678,9 +792,7 @@ impl CofounderManager {
                 mvp.id = uuid::Uuid::new_v4().to_string();
                 Ok(mvp)
             }
-            Err(_) => {
-                self.generate_mvp_scope(id)
-            }
+            Err(_) => self.generate_mvp_scope(id),
         }
     }
 
@@ -691,7 +803,11 @@ impl CofounderManager {
         llm_router: &crate::llm::LlmRouter,
         model_chain: &crate::models::ModelChain,
     ) -> Result<PricingHypothesis> {
-        let idea = self.ideas.get(id).cloned().ok_or_else(|| anyhow!("Idea not found"))?;
+        let idea = self
+            .ideas
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Idea not found"))?;
 
         let sys_prompt = String::from(
             "You are the GOAT Cofounder AI. You are creating a pricing hypothesis for a startup idea.\n\
@@ -707,7 +823,7 @@ impl CofounderManager {
                \"value_metric\": \"string\",\n\
                \"pricing_risks\": [\"string\"],\n\
                \"evidence_needed\": [\"string\"]\n\
-             }"
+             }",
         );
 
         let user_prompt = format!(
@@ -736,7 +852,10 @@ impl CofounderManager {
             .map_err(|e| anyhow!("LLM Evaluation failed: {}", e))?;
 
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
         match serde_json::from_str::<PricingHypothesis>(cleaned) {
             Ok(mut pricing) => {
@@ -744,9 +863,7 @@ impl CofounderManager {
                 pricing.id = uuid::Uuid::new_v4().to_string();
                 Ok(pricing)
             }
-            Err(_) => {
-                self.generate_pricing_hypothesis(id)
-            }
+            Err(_) => self.generate_pricing_hypothesis(id),
         }
     }
 
@@ -757,7 +874,11 @@ impl CofounderManager {
         llm_router: &crate::llm::LlmRouter,
         model_chain: &crate::models::ModelChain,
     ) -> Result<FounderHandoff> {
-        let idea = self.ideas.get(id).cloned().ok_or_else(|| anyhow!("Idea not found"))?;
+        let idea = self
+            .ideas
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Idea not found"))?;
 
         let sys_prompt = String::from(
             "You are the GOAT Cofounder AI. You are creating a builder handoff document.\n\
@@ -774,7 +895,7 @@ impl CofounderManager {
                \"constraints\": [\"string\"],\n\
                \"risks\": [\"string\"],\n\
                \"validation_metric\": \"string\"\n\
-             }"
+             }",
         );
 
         let user_prompt = format!(
@@ -803,7 +924,10 @@ impl CofounderManager {
             .map_err(|e| anyhow!("LLM Evaluation failed: {}", e))?;
 
         let text = response.content.unwrap_or_default().trim().to_string();
-        let cleaned = text.trim_start_matches("```json").trim_end_matches("```").trim();
+        let cleaned = text
+            .trim_start_matches("```json")
+            .trim_end_matches("```")
+            .trim();
 
         match serde_json::from_str::<FounderHandoff>(cleaned) {
             Ok(mut handoff) => {
@@ -811,9 +935,7 @@ impl CofounderManager {
                 handoff.id = uuid::Uuid::new_v4().to_string();
                 Ok(handoff)
             }
-            Err(_) => {
-                self.generate_builder_handoff(id)
-            }
+            Err(_) => self.generate_builder_handoff(id),
         }
     }
 }
