@@ -38,6 +38,7 @@ Every tool call must declare its operation category:
 | `ReadFile` | read_file, list_dir | Approve once per session |
 | `WriteFile` | write_file, create_dir | **Always require approval** |
 | `Shell` | bash, exec | **Always require approval** |
+| `ValidationExecution` | goat validate | **Always require approval** (Phase 8.5.1) |
 | `Network` | HTTP calls to arbitrary URLs | Approve once per session |
 | `SubagentSpawn` | call_subagent, MCP spawn | **Always require approval** |
 | `MemoryRead` | brain queries | Auto-approved |
@@ -76,6 +77,15 @@ Before any `Shell`, `WriteFile`, or `SubagentSpawn` operation, GOAT:
   [y] Approve once  [n] Deny  [a] Always allow (session)  [d] Always deny (session)
 ╚════════════════════════════════════════════════╝
 ```
+
+### 2.3 Validation Runner Gate (✅ IMPLEMENTED — Phase 8.5.1)
+
+All `ValidationExecution` commands (builds, tests, linters) explicitly route through `ApprovalGate` to prevent unsafe arbitrary code execution by default. 
+Validation requests are assigned risk levels based on command contents:
+- **Low Risk**: Standard safe frameworks (e.g., `cargo check`).
+- **Medium Risk**: General builds, linting scripts.
+- **High Risk**: Destructive or system-level actions (e.g., `rm -rf`, `sudo`, `install`).
+Auto-approval is strictly opt-in via `--auto-approve` CLI flag.
 
 ### 2.3 Allowlist and Blocklist (MISSING — Phase 2)
 

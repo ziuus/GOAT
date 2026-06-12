@@ -699,3 +699,28 @@
 * Rebuilt `apps/dashboard/src/app/mission-control/page.tsx` with premium GSAP/Tailwind glassmorphism UI.
 * Updated `goat mission` CLI and `@mission` TUI slash commands to use real backend data models.
 * Created deterministic rules engine mapping user goals to Prime Agents.
+
+## Phase 8.3: Project & Patch Intelligence Integration (✅ COMPLETED)
+* Implemented Project Intelligence engine in `src/project_intelligence.rs`.
+* Integrated patch diffs tracking and association with missions in `src/mission_control.rs`.
+* Added `GET /v1/project/scan` API and CLI command `goat project scan`.
+* Extended Dashboard UI to display project context and attached patches in mission details.
+
+## Phase 8.4: Mission Terminal Engine (✅ COMPLETED)
+* Implemented `src/mission_terminal.rs` to provide dedicated PTY environments per mission.
+* Exposed `POST /v1/missions/:id/terminal/execute` and `GET /v1/missions/:id/terminal/logs` endpoints.
+* Added `goat mission run` CLI command to spawn non-blocking mission execution.
+* Dashboard now renders real-time stdout/stderr xterm.js views for mission progress.
+
+## Phase 8.5: Validation Runner & Mission Execution Loop (✅ COMPLETED)
+* Implemented `src/validation.rs` for executing `ValidationCommand` (test, build, lint).
+* Added `ValidationResult` integration with `MissionControl` to auto-log test failures.
+* Implemented `goat validate` CLI command for standalone validation.
+* Connected mission terminal engine to trigger validation runs automatically upon patch application.
+
+## Phase 8.5.1: Validation Approval Safety Fix (✅ COMPLETED)
+* Removed dangerous silent auto-approval from `ValidationManager`.
+* Validation commands (build, test, lint) now emit formal `ApprovalRequest` via `ApprovalGate` before execution.
+* Implemented Risk Classification (Low/Medium/High) based on shell command payload (e.g. `rm -rf` = High).
+* Added explicit `--auto-approve` flag to `goat validate` and test runner for CI opt-in.
+* Enforced "Deny-by-default" semantics.

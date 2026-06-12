@@ -156,6 +156,7 @@ npm run dev
 * **Socializer cannot auto-post:** It generates drafts only.
 * **Operator cannot auto-deploy/rollback:** It generates safe plans.
 * **Builder controls code execution:** Requires explicit oversight.
+* **Validation requires manual approval:** Shell execution for test suites or build commands will not auto-approve without the `--auto-approve` flag.
 * **PromptForge only refines prompts:** It does not initiate actions.
 
 ## 📸 Screenshots

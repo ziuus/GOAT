@@ -9,6 +9,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Phase 8.5.1 Validation Approval Safety Fix**: Removed silent auto-approval of validation commands (e.g. `goat validate`). Validation now routes explicitly through `ApprovalGate` to prevent unsafe arbitrary code execution by default. Added `--auto-approve` CLI flag for explicit opt-in CI automation.
+- **Validation Risk Classification**: Validation commands are parsed and assigned risk levels (Low, Medium, High). High risk triggers on destructive actions (`rm -rf`, `sudo`, `install`), medium on general builds/lints, low on safe framework checkers (`cargo check`).
+
+### Added (Previous)
 - **Mission Control Intelligence (Phase 8.2)**: Introduced `goat-mission-control` to handle planning, scoping, and persisting agent workflows.
 - **Mission Persistence**: Implemented local-first SQLite/JSONL persistence for missions in `~/.local/share/goat/missions`.
 - **Mission Control Dashboard**: Completely rebuilt `/mission-control` Next.js UI using premium Tailiwind/GSAP patterns.

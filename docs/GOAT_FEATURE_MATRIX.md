@@ -238,6 +238,7 @@ Status legend:
 | Approval gate for bash | `working` | Phase 1.1 — `src/approval.rs` |
 | Approval gate for write_file | `working` | Phase 1.1 — `src/approval.rs` |
 | Approval gate for call_subagent | `working` | Phase 1.1 — `src/approval.rs` |
+| Approval gate for validation commands | `working` | Phase 8.5.1 — Manual approval enforced by default |
 | Command allowlist/blocklist | `planned` | Phase 2 |
 | Path allowlist/blocklist | `planned` | Phase 2 |
 | Persistent audit log | `planned` | Phase 2 |

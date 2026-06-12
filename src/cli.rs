@@ -289,6 +289,9 @@ pub enum Command {
         /// Associated patch ID
         #[arg(long)]
         patch: Option<String>,
+        /// Automatically approve the validation command (opt-in)
+        #[arg(long, default_value_t = false)]
+        auto_approve: bool,
     },
 
     /// Manage validation results.
@@ -1027,7 +1030,7 @@ pub async fn handle_subcommand(
             }
             Ok(true)
         }
-        Command::Validate { project_id, mission, patch } => {
+        Command::Validate { project_id, mission, patch, auto_approve } => {
             let val_mgr = crate::validation::ValidationManager::new();
             let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
             
@@ -1060,14 +1063,41 @@ pub async fn handle_subcommand(
                         val.patch_id = patch.clone();
                         
                         println!("Validating: {}", val.command);
-                        // Start an auto-approver for CLI
                         let q = approval_queue.clone();
+                        let auto_approve_flag = *auto_approve;
                         tokio::spawn(async move {
                             loop {
                                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                                 let pending = q.list().await;
                                 for p in pending {
-                                    q.resolve(&p.id, 'y').await;
+                                    if auto_approve_flag {
+                                        q.resolve(&p.id, 'y').await;
+                                    } else {
+                                        for line in p.request.display_lines() {
+                                            println!("{}", line);
+                                        }
+                                        if let Some(wd) = &p.request.working_directory {
+                                            println!("  Dir    : {}", wd);
+                                        }
+                                        println!("╚══════════════════════════════════════════════════════╝");
+                                        print!("Allow execution? (y/n/a): ");
+                                        let dec = tokio::task::spawn_blocking(|| {
+                                            use std::io::Write;
+                                            let _ = std::io::stdout().flush();
+                                            let mut input = String::new();
+                                            if std::io::stdin().read_line(&mut input).is_ok() {
+                                                let input = input.trim().to_lowercase();
+                                                if input == "y" || input == "yes" {
+                                                    'y'
+                                                } else {
+                                                    'n'
+                                                }
+                                            } else {
+                                                'n'
+                                            }
+                                        }).await.unwrap_or('n');
+                                        q.resolve(&p.id, dec).await;
+                                    }
                                 }
                             }
                         });

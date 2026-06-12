@@ -173,12 +173,29 @@ impl ValidationManager {
         mut val: ValidationResult,
         approval_queue: &crate::approval::ApprovalQueue,
     ) -> Result<ValidationResult> {
-        // 1. Approval Gate
+        let risk_level = if val.command.contains("rm -rf") || val.command.contains("sudo ") || val.command.contains("curl | sh") || val.command.contains("wget | sh") || val.command.contains("install") || val.command.contains("remove") || val.command.contains("delete") {
+            crate::approval::RiskLevel::High
+        } else if val.command.contains("build") || val.command.contains("lint") || val.command.contains("npm ") || val.command.contains("yarn ") || val.command.contains("pnpm ") {
+            crate::approval::RiskLevel::Medium
+        } else if val.command.contains("cargo test") || val.command.contains("cargo check") || val.command.contains("cargo fmt") {
+            crate::approval::RiskLevel::Low
+        } else {
+            crate::approval::RiskLevel::Medium
+        };
+
+        let mut explanation = format!("Command Type: {:?}\nProject: {:?}\n", val.command_type, val.project_id);
+        if let Some(m) = &val.mission_id {
+            explanation.push_str(&format!("Linked Mission: {}\n", m));
+        }
+        if let Some(p) = &val.patch_id {
+            explanation.push_str(&format!("Linked Patch: {}\n", p));
+        }
+
         let req = crate::approval::ApprovalRequest {
             tool_name: "ValidationRunner".to_string(),
-            action_summary: format!("Run {} in {}", val.command, val.working_directory.display()),
-            risk_level: crate::approval::RiskLevel::Medium,
-            explanation: Some(format!("Execute {:?} command automatically", val.command_type)),
+            action_summary: format!("Run validation command: {}", val.command),
+            risk_level,
+            explanation: Some(explanation),
             working_directory: Some(val.working_directory.to_string_lossy().to_string()),
         };
 
@@ -298,5 +315,134 @@ impl ValidationManager {
         }
 
         Ok(val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::approval::{ApprovalQueue, RiskLevel};
+
+    #[tokio::test]
+    async fn test_validation_does_not_auto_approve() {
+        let mgr = ValidationManager::new();
+        let q = std::sync::Arc::new(ApprovalQueue::new());
+        let val = ValidationResult {
+            validation_id: "test-1".to_string(),
+            project_id: None,
+            patch_id: None,
+            command: "echo test".to_string(),
+            command_type: ValidationType::Custom,
+            working_directory: PathBuf::from("."),
+            status: ValidationStatus::Pending,
+            exit_code: None,
+            stdout_preview: None,
+            stderr_preview: None,
+            full_log_path: None,
+            started_at: None,
+            finished_at: None,
+            duration_ms: None,
+            summary: None,
+            suggested_next_action: None,
+            mission_id: None,
+        };
+
+        // If we spawn it, it should just block waiting for approval.
+        let q_clone = q.clone();
+        let handle = tokio::spawn(async move {
+            mgr.run_validation(val, &q_clone).await
+        });
+
+        // The queue should get a pending request
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let pending = q.list().await;
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].request.risk_level, RiskLevel::Medium);
+        
+        // Deny it
+        q.resolve(&pending[0].id, 'n').await;
+        
+        let res = handle.await.unwrap();
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().to_string(), "Validation denied");
+    }
+
+    #[tokio::test]
+    async fn test_validation_dangerous_command_classified_high() {
+        let mgr = ValidationManager::new();
+        let q = std::sync::Arc::new(ApprovalQueue::new());
+        let val = ValidationResult {
+            validation_id: "test-2".to_string(),
+            project_id: None,
+            patch_id: None,
+            command: "rm -rf /".to_string(),
+            command_type: ValidationType::Custom,
+            working_directory: PathBuf::from("."),
+            status: ValidationStatus::Pending,
+            exit_code: None,
+            stdout_preview: None,
+            stderr_preview: None,
+            full_log_path: None,
+            started_at: None,
+            finished_at: None,
+            duration_ms: None,
+            summary: None,
+            suggested_next_action: None,
+            mission_id: None,
+        };
+
+        let q_clone = q.clone();
+        let handle = tokio::spawn(async move {
+            mgr.run_validation(val, &q_clone).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let pending = q.list().await;
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].request.risk_level, RiskLevel::High);
+        
+        // Approve it but wait, it will run rm -rf / ! So deny it.
+        q.resolve(&pending[0].id, 'n').await;
+        let _ = handle.await;
+    }
+
+    #[tokio::test]
+    async fn test_validation_safe_command_classified_low_but_still_requires_approval() {
+        let mgr = ValidationManager::new();
+        let q = std::sync::Arc::new(ApprovalQueue::new());
+        let val = ValidationResult {
+            validation_id: "test-3".to_string(),
+            project_id: None,
+            patch_id: None,
+            command: "cargo check".to_string(),
+            command_type: ValidationType::Test,
+            working_directory: PathBuf::from("."),
+            status: ValidationStatus::Pending,
+            exit_code: None,
+            stdout_preview: None,
+            stderr_preview: None,
+            full_log_path: None,
+            started_at: None,
+            finished_at: None,
+            duration_ms: None,
+            summary: None,
+            suggested_next_action: None,
+            mission_id: None,
+        };
+
+        let q_clone = q.clone();
+        let handle = tokio::spawn(async move {
+            mgr.run_validation(val, &q_clone).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let pending = q.list().await;
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].request.risk_level, RiskLevel::Low);
+        
+        // Deny it
+        q.resolve(&pending[0].id, 'n').await;
+        let res = handle.await.unwrap();
+        assert!(res.is_err());
     }
 }
