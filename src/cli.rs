@@ -826,8 +826,30 @@ pub async fn handle_subcommand(
             Ok(true)
         }
         Command::Mission { action, args } => {
-            println!("Mission Control: {} {:?}", action, args);
-            println!("View the full Mission Control workspace at http://127.0.0.1:3000/mission-control");
+            let mc = crate::mission_control::MissionControlManager::new();
+            if action == "plan" && !args.is_empty() {
+                let goal = args.join(" ");
+                let req = crate::mission_control::MissionPlanReq {
+                    goal,
+                    project_id: None,
+                    constraints: None,
+                };
+                let plan = mc.plan_goal(&req);
+                println!("Created Mission: {} (Type: {:?})", plan.title, plan.mission_type);
+                for step in plan.plan_steps {
+                    println!("  - [{}] {} (Agent: {:?})", step.status, step.title, step.assigned_agent);
+                }
+            } else {
+                let missions = mc.get_missions();
+                if let Some(m) = missions.first() {
+                    println!("Active Mission: {} ({:?})", m.title, m.status);
+                    println!("  Goal: {}", m.raw_goal);
+                    println!("  Progress: {}%", m.progress);
+                } else {
+                    println!("No active missions found. Run `goat mission plan \"<goal>\"` to plan one.");
+                }
+            }
+            println!("\nView the full Mission Control workspace at http://127.0.0.1:3000/mission-control");
             Ok(true)
         }
         Command::Projects { action, args } => {

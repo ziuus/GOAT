@@ -295,3 +295,16 @@ Status legend:
 | docs/GOAT_SECURITY_MODEL.md | `working` | Created in Phase 0 |
 | docs/GOAT_CODEBASE_AUDIT.md | `working` | Created in Phase 0 |
 | Inline code documentation | `partial` | Some comments, no rustdoc |
+
+---
+
+## Mission Control & Orchestration
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Mission Control Workspace UI | `working` | apps/dashboard/src/app/mission-control/page.tsx |
+| Mission Model & Persistence | `working` | JSONL via MissionControlManager |
+| Mission Planning Logic | `working` | Rule-based deterministic planning |
+| Prime Agent Recommendations | `working` | Maps goals to Builder/Operator/etc. |
+| Actual Agent Orchestration | `partial` | UI and backend state exist, execution bindings planned |
+

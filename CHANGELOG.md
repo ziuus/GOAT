@@ -9,6 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Mission Control Intelligence (Phase 8.2)**: Introduced `goat-mission-control` to handle planning, scoping, and persisting agent workflows.
+- **Mission Persistence**: Implemented local-first SQLite/JSONL persistence for missions in `~/.local/share/goat/missions`.
+- **Mission Control Dashboard**: Completely rebuilt `/mission-control` Next.js UI using premium Tailiwind/GSAP patterns.
+- **CLI/TUI Mission Hooks**: `goat mission` and `@mission` now hook into real backend persistent data models.
+- **Release Packaging (Phase 8.1)**: Built `install.sh`, `uninstall.sh`, and GitHub Actions release workflows to package GOAT.
+
+### Added (Previous)
 - **Browser Automation Workflows (Phase 6.9)**: Introduced structured browser workflows (`ui-qa`, `landing-review`, `dashboard-qa`, `web-health-check`) allowing GOAT to safely inspect, review, and QA local/remote targets.
 - **Workflow Management API & CLI**: Implemented `/v1/browser/workflows` endpoints and CLI command group `goat browser <action>` (workflows, screenshot, inspect, qa, landing-review, dashboard-qa, health).
 - **Dashboard UI Improvements**: Overhauled `/browser` dashboard page to display execution details, steps trace, and custom workflow creations.

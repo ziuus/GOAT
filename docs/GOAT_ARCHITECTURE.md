@@ -195,6 +195,12 @@ GOAT/                              # Cargo workspace root
 - REST API for sessions, memory, settings, subagent runs
 - Not required until Phase 8
 
+#### `goat-mission-control`
+- Mission persistence and lifecycle management (Draft -> Completed)
+- Agent recommendation engine mapping goals to Prime Agents
+- Execution plans and expected artifact generation
+- Exposes API for Dashboard and CLI/TUI integration
+
 #### `goat-indexer`
 - Project scanner: detects tech stack, commands, important files
 - Ignores: secrets, node_modules, build artifacts, .git internals, binaries

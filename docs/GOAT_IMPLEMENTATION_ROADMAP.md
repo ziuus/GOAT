@@ -685,3 +685,17 @@
 * Added `deep_plan_roadmap` to `LearnerAgent` using `QualityGate` markdown validations.
 * Added `deep_generate_brief` to `ResearcherAgent`.
 * Added `AgentJobKind::BuilderPlan` logic inside `src/agent_runtime.rs` to structure execution.
+
+## Phase 8.1: Installer / Packaging Polish (✅ COMPLETED)
+* Created `docs/GOAT_PACKAGING_AUDIT.md`.
+* Wrote `scripts/build-release.sh`, `scripts/package-alpha.sh`, `scripts/install.sh`, `scripts/uninstall.sh`.
+* Created GitHub release action `.github/workflows/release-alpha.yml`.
+* Configured Next.js dashboard as main Mission Control.
+
+## Phase 8.2: Mission Control Intelligence (✅ COMPLETED)
+* Overhauled `src/mission_control.rs` with `Mission`, `MissionType`, `MissionStatus`, `AgentRef`.
+* Implemented local-first SQLite/JSONL persistence for missions in `~/.local/share/goat/missions`.
+* Refactored `/v1/mission-control/*` endpoints.
+* Rebuilt `apps/dashboard/src/app/mission-control/page.tsx` with premium GSAP/Tailwind glassmorphism UI.
+* Updated `goat mission` CLI and `@mission` TUI slash commands to use real backend data models.
+* Created deterministic rules engine mapping user goals to Prime Agents.

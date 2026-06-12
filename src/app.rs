@@ -759,15 +759,33 @@ impl App {
                 }
                 true
             }
-            "/mission" | "@mission" | "@plan" | "@start" => {
-                self.push_log(format!("[SYSTEM] Mission Control Workspace. Go to http://127.0.0.1:3000/mission-control"));
+            "/mission" | "@mission" | "@plan" | "@start" | "@resume" | "@next" => {
+                let mc = crate::mission_control::MissionControlManager::new();
                 if _args.len() > 0 {
-                    self.push_log(format!("[SYSTEM] Goal received: {}", _args));
-                    self.push_log(format!("[SYSTEM] Preparing plan... (view in dashboard)"));
+                    let req = crate::mission_control::MissionPlanReq {
+                        goal: _args.to_string(),
+                        project_id: None,
+                        constraints: None,
+                    };
+                    let plan = mc.plan_goal(&req);
+                    self.push_log(format!("[MISSION] Created new mission: {} (Type: {:?})", plan.title, plan.mission_type));
+                    for step in plan.plan_steps {
+                        self.push_log(format!("  - [{}] {} (Agent: {:?})", step.status, step.title, step.assigned_agent));
+                    }
+                } else {
+                    let missions = mc.get_missions();
+                    if let Some(m) = missions.first() {
+                        self.push_log(format!("[MISSION] Active Mission: {} ({:?})", m.title, m.status));
+                        self.push_log(format!("  Goal: {}", m.raw_goal));
+                        self.push_log(format!("  Progress: {}%", m.progress));
+                    } else {
+                        self.push_log("[MISSION] No active missions found. Use `/mission <goal>` to plan one.");
+                    }
                 }
+                self.push_log(format!("[SYSTEM] View full details at http://127.0.0.1:3000/mission-control"));
                 true
             }
-            "/projects" | "@projects" | "@project" | "@resume" | "@next" => {
+            "/projects" | "@projects" | "@project" => {
                 self.push_log(format!("[SYSTEM] Project Workspace. Go to http://127.0.0.1:3000/mission-control"));
                 if _args.len() > 0 {
                     self.push_log(format!("[SYSTEM] Project argument: {}", _args));

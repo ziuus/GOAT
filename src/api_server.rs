@@ -5915,7 +5915,11 @@ async fn mission_control_status_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "status": "ok", "active_jobs": 0, "pending_approvals": 0 })))
+    let mc = crate::mission_control::MissionControlManager::new();
+    let missions = mc.get_missions();
+    let running = missions.iter().filter(|m| m.status == crate::mission_control::MissionStatus::Running).count();
+    let planned = missions.iter().filter(|m| m.status == crate::mission_control::MissionStatus::Planned).count();
+    Ok(Json(json!({ "status": "ok", "active_missions": running, "planned_missions": planned, "total_missions": missions.len() })))
 }
 
 async fn mission_control_feed_handler(
@@ -5923,7 +5927,9 @@ async fn mission_control_feed_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    Ok(Json(json!({ "feed": [] })))
+    let mc = crate::mission_control::MissionControlManager::new();
+    let missions = mc.get_missions();
+    Ok(Json(json!({ "feed": missions })))
 }
 
 async fn mission_control_artifacts_handler(
@@ -5955,7 +5961,7 @@ async fn mission_control_plan_goal_handler(
     headers: HeaderMap,
     State(state): State<Arc<ApiState>>,
     Json(req): Json<crate::mission_control::MissionPlanReq>,
-) -> Result<Json<crate::mission_control::MissionPlanRes>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<crate::mission_control::Mission>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
     let mc = crate::mission_control::MissionControlManager::new();
     let plan = mc.plan_goal(&req);
