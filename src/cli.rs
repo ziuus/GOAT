@@ -219,23 +219,19 @@ pub enum Command {
         task: String,
     },
 
-    /// Manage External Agent Adapters (Phase 2.8).
-    #[command(name = "external-agents")]
-    ExternalAgents {
-        /// Action: list, detect, doctor, audit, show.
-        #[arg(default_value = "list")]
+    /// Manage external AI agents.
+    #[command(name = "agent", alias = "agents")]
+    Agent {
+        /// "list", "doctor", "run", "runs", "run-show", "compare"
         action: String,
-        /// Target agent name for 'show'.
+        /// The agent name or run ID
         arg: Option<String>,
-    },
-
-    /// Delegate a task to an external agent.
-    #[command(name = "delegate-external")]
-    DelegateExternal {
-        /// External agent name.
-        agent: String,
-        /// Task summary/prompt.
-        task: String,
+        /// Prompt for the agent
+        #[arg(long)]
+        prompt: Option<String>,
+        /// Mission ID
+        #[arg(long)]
+        mission: Option<String>,
     },
 
     /// Mission Control workspace operations.
@@ -404,7 +400,7 @@ pub enum Command {
     /// Manage GOAT reusable skills.
     #[command(name = "skills", alias = "skill")]
     Skills {
-        /// "list", "show", "path", "new", "create", "validate", "search", "create-from-mission"
+        /// "list", "show", "path", "new", "create", "validate", "search", "create-from-mission", "run", "runs", "run-show", "recommend", "curate"
         #[arg(default_value = "list")]
         action: String,
         /// The name, query, or mission ID
@@ -764,7 +760,7 @@ pub async fn handle_subcommand(
             handle_ask_agent_command(&name, &task, &rt).await?;
             Ok(true)
         }
-        Command::ExternalAgents { action, arg } => {
+        Command::Agent { action, arg, prompt, mission } => {
             let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
                 config.clone(),
                 paths.clone(),
@@ -772,19 +768,7 @@ pub async fn handle_subcommand(
                 false,
                 None,
             );
-            handle_external_agents_command(rt, &action, arg.as_deref());
-            Ok(true)
-        }
-
-        Command::DelegateExternal { agent, task } => {
-            let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
-                config.clone(),
-                paths.clone(),
-                vec![],
-                false,
-                None,
-            );
-            handle_delegate_external_command(rt, &agent, &task).await;
+            handle_agent_command(rt, &action, arg.as_deref(), prompt.as_deref(), mission.as_deref());
             Ok(true)
         }
         Command::Mcp { action, arg } => {
@@ -2151,6 +2135,68 @@ async fn handle_skills_command(
                 println!("  - {name:<20} {desc}", name = s.name, desc = s.description);
             }
         }
+        "run" => {
+            let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let skill = skill_manager.get_skill(name).ok_or_else(|| anyhow::anyhow!("Skill not found"))?;
+            
+            let runner = crate::skill_runner::SkillRunner::new(&paths.data_dir);
+            let exec = runner.start_execution(&skill, None, None)?;
+            println!("Started execution {} for skill '{}'", exec.execution_id, skill.name);
+            println!("Steps to execute: {}", exec.total_steps);
+            // We just print status here. A real TUI/CLI would loop and ask for approvals.
+        }
+        "runs" => {
+            let runner = crate::skill_runner::SkillRunner::new(&paths.data_dir);
+            let runs = runner.list_executions();
+            if runs.is_empty() {
+                println!("No skill runs found.");
+            } else {
+                println!("Skill Runs ({}):", runs.len());
+                for r in runs {
+                    println!("  - {} (Skill: {}, Status: {:?})", r.execution_id, r.skill_name, r.status);
+                }
+            }
+        }
+        "run-show" => {
+            let id = arg.ok_or_else(|| anyhow::anyhow!("Expected run ID"))?;
+            let runner = crate::skill_runner::SkillRunner::new(&paths.data_dir);
+            if let Some(run) = runner.get_execution(id)? {
+                println!("Execution ID: {}", run.execution_id);
+                println!("Skill: {}", run.skill_name);
+                println!("Status: {:?}", run.status);
+                println!("Steps: {} / {}", run.current_step, run.total_steps);
+            } else {
+                println!("Run '{}' not found", id);
+            }
+        }
+        "recommend" => {
+            // naive recommendation based on stack/goals (which could be the arg)
+            let query = arg.unwrap_or("");
+            let results = skill_manager.search_skills(query);
+            println!("Recommended skills for '{}':", query);
+            for s in results.iter().take(5) {
+                println!("  - {name:<20} {desc}", name = s.name, desc = s.description);
+            }
+        }
+        "curate" => {
+            let runner = crate::skill_runner::SkillRunner::new(&paths.data_dir);
+            let runs = runner.list_executions();
+            println!("Skill Curator Report");
+            println!("====================");
+            println!("Total runs recorded: {}", runs.len());
+            // compute some stats
+            let mut completed = 0;
+            let mut failed = 0;
+            for r in runs {
+                match r.status {
+                    crate::skill_runner::SkillExecutionStatus::Completed => completed += 1,
+                    crate::skill_runner::SkillExecutionStatus::Failed => failed += 1,
+                    _ => {}
+                }
+            }
+            println!("Completed runs: {}", completed);
+            println!("Failed runs: {}", failed);
+        }
         "create-from-mission" => {
             let mission_id = arg.ok_or_else(|| anyhow::anyhow!("Expected mission ID"))?;
             let mission_manager = crate::mission_control::MissionControlManager::new();
@@ -2573,16 +2619,18 @@ async fn handle_ask_agent_command(
 
 // ── External Agent Commands ───────────────────────────────────────────────────
 
-fn handle_external_agents_command(
+fn handle_agent_command(
     mut rt: crate::runtime::GoatRuntime,
     action: &str,
     arg: Option<&str>,
+    prompt: Option<&str>,
+    mission: Option<&str>,
 ) {
     let mut ext_mgr = rt.external_agent_manager;
     ext_mgr.detect_all(&rt.config);
 
     match action {
-        "list" => {
+        "list" | "agents" => {
             let agents = ext_mgr.registry.list_all();
             println!("GOAT External Agent Registry ({} adapters)", agents.len());
             for agent in agents {
@@ -2604,7 +2652,7 @@ fn handle_external_agents_command(
                 println!("Name: {}", agent.name);
                 println!("Command: {}", agent.command_name);
                 println!("Status: {}", agent.status);
-                println!("Risk: {}", agent.risk_level);
+                println!("Risk: {:?}", agent.risk_level);
                 println!("Workspace Behavior: {}", agent.workspace_behavior);
                 if let Some(ref path) = agent.detected_path {
                     println!("Detected Path: {}", path.display());
@@ -2625,7 +2673,53 @@ fn handle_external_agents_command(
             }
         }
         "doctor" => {
-            let checks = crate::paths::run_doctor(&rt.paths, &rt.config, false);
+            let mut checks = Vec::new();
+            use crate::paths::{DoctorCheck, DoctorStatus};
+
+            checks.push(DoctorCheck {
+                status: DoctorStatus::Info,
+                label: "External Agents global config".to_string(),
+                detail: if rt.config.external_agents.enabled { "Enabled".to_string() } else { "Disabled".to_string() },
+            });
+
+            for agent in ext_mgr.registry.list_all() {
+                let status = match agent.status {
+                    crate::external_agents::ExternalAgentStatus::Detected => DoctorStatus::Ok,
+                    crate::external_agents::ExternalAgentStatus::Missing => DoctorStatus::Warn,
+                    crate::external_agents::ExternalAgentStatus::Disabled => DoctorStatus::Info,
+                    crate::external_agents::ExternalAgentStatus::NeedsConfig => DoctorStatus::Warn,
+                    crate::external_agents::ExternalAgentStatus::Unsupported => DoctorStatus::Warn,
+                };
+                let detail = match agent.status {
+                    crate::external_agents::ExternalAgentStatus::Detected => {
+                        format!("Found at {}", agent.detected_path.as_ref().unwrap().display())
+                    }
+                    crate::external_agents::ExternalAgentStatus::Missing => "Command not found in PATH".to_string(),
+                    crate::external_agents::ExternalAgentStatus::Disabled => "Disabled by configuration".to_string(),
+                    crate::external_agents::ExternalAgentStatus::NeedsConfig => "Needs configuration (API key, etc)".to_string(),
+                    crate::external_agents::ExternalAgentStatus::Unsupported => "Unsupported environment or version".to_string(),
+                };
+                checks.push(DoctorCheck {
+                    status,
+                    label: format!("Adapter: {}", agent.name),
+                    detail,
+                });
+            }
+
+            let audit_log = &rt.paths.external_agent_audit_log_file;
+            checks.push(DoctorCheck {
+                status: if audit_log.exists() { DoctorStatus::Ok } else { DoctorStatus::Info },
+                label: "Audit Log".to_string(),
+                detail: if audit_log.exists() { audit_log.display().to_string() } else { "Not created yet".to_string() },
+            });
+
+            let runs_file = rt.paths.data_dir.join("external-agent-runs.jsonl");
+            checks.push(DoctorCheck {
+                status: if runs_file.exists() { DoctorStatus::Ok } else { DoctorStatus::Info },
+                label: "Runs storage".to_string(),
+                detail: if runs_file.exists() { runs_file.display().to_string() } else { "Not created yet".to_string() },
+            });
+
             crate::paths::print_doctor_results(&checks);
         }
         "runs" => {
@@ -2638,11 +2732,11 @@ fn handle_external_agents_command(
                             serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line)
                         {
                             println!(
-                                "  {} | Agent: {:<12} | Mode: {:<15} | Status: {}",
-                                run.id,
+                                "  {} | Agent: {:<12} | Profile: {:<15} | Status: {}",
+                                run.run_id,
                                 run.agent_name,
-                                run.mode,
-                                if run.success { "Success" } else { "Failed" }
+                                run.permission_profile,
+                                run.status
                             );
                         }
                     }
@@ -2651,7 +2745,7 @@ fn handle_external_agents_command(
                 println!("No runs recorded yet.");
             }
         }
-        "run" => {
+        "run-show" => {
             if let Some(run_id) = arg {
                 let jsonl_path = rt.paths.data_dir.join("external-agent-runs.jsonl");
                 let mut found = false;
@@ -2662,15 +2756,17 @@ fn handle_external_agents_command(
                                 crate::external_agents::ExternalAgentRun,
                             >(line)
                             {
-                                if run.id == run_id {
-                                    println!("Run ID: {}", run.id);
+                                if run.run_id == run_id {
+                                    println!("Run ID: {}", run.run_id);
                                     println!("Agent: {}", run.agent_name);
-                                    println!("Timestamp: {}", run.timestamp);
-                                    println!("Mode: {}", run.mode);
-                                    println!("Workspace: {}", run.workspace_path.display());
-                                    println!("Task: {}", run.task);
-                                    println!("Success: {}", run.success);
-                                    println!("Duration: {:?}", run.duration);
+                                    println!("Timestamp: {}", run.started_at);
+                                    println!("Profile: {}", run.permission_profile);
+                                    println!("Workspace: {}", run.working_directory.display());
+                                    println!("Task: {}", run.task_summary);
+                                    println!("Status: {}", run.status);
+                                    if let Some(finished_at) = run.finished_at {
+                                        println!("Duration: {:?}", finished_at.signed_duration_since(run.started_at));
+                                    }
                                     found = true;
                                     break;
                                 }
@@ -2682,64 +2778,67 @@ fn handle_external_agents_command(
                     println!("Run ID '{}' not found.", run_id);
                 }
             } else {
-                println!("Usage: goat external-agents run <id>");
+                println!("Usage: goat agent run-show <id>");
             }
         }
-        _ => {
-            println!("Unknown external-agents action: {}", action);
-            println!("Valid actions: list, detect, show <name>, audit, doctor, runs, run <id>");
-        }
-    }
-}
+        "run" => {
+            let name = arg.unwrap_or("");
+            let task = prompt.unwrap_or("Test run");
+            println!("Delegating task to external agent '{}'...", name);
 
-async fn handle_delegate_external_command(
-    mut rt: crate::runtime::GoatRuntime,
-    name: &str,
-    task: &str,
-) {
-    println!("Delegating task to external agent '{}'...", name);
-    rt.external_agent_manager.detect_all(&rt.config);
+            let action_res = rt
+                .tool_registry
+                .evaluate_action("delegate_external_agent", &rt.config.tools);
+            if let crate::tool_registry::ToolAction::Deny(reason) = action_res {
+                println!("Delegation denied by tool registry: {}", reason);
+                return;
+            }
 
-    let action = rt
-        .tool_registry
-        .evaluate_action("delegate_external_agent", &rt.config.tools);
-    if let crate::tool_registry::ToolAction::Deny(reason) = action {
-        println!("Delegation denied by tool registry: {}", reason);
-        return;
-    }
+            let req = crate::approval::ApprovalRequest {
+                tool_name: "delegate_external_agent".to_string(),
+                action_summary: format!("agent: {}, task: {}", name, task),
+                risk_level: crate::approval::RiskLevel::High,
+                explanation: Some("Running external agent command".into()),
+                working_directory: None,
+            };
 
-    let req = crate::approval::ApprovalRequest {
-        tool_name: "delegate_external_agent".to_string(),
-        action_summary: format!("agent: {}, task: {}", name, task),
-        risk_level: crate::approval::RiskLevel::High,
-        explanation: None,
-        working_directory: None,
-    };
+            let decision = if let Some(decision) = rt.approval_gate.check_policy(&req) {
+                decision
+            } else {
+                let mut lines = req.display_lines();
+                for line in lines {
+                    println!("{}", line);
+                }
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                let char_in = input.trim().chars().next().unwrap_or('n');
+                rt.approval_gate.resolve(&req, char_in)
+            };
 
-    if let Some(crate::approval::ApprovalDecision::Denied(msg)) =
-        rt.approval_gate.check_policy(&req)
-    {
-        match rt.external_agent_manager.delegate(name, task, &rt.config) {
-            Ok(res) => {
-                println!("Execution finished. Success: {}", res.success);
-                println!("Stdout:\n{}", res.stdout);
-                if !res.stderr.is_empty() {
-                    println!("Stderr:\n{}", res.stderr);
+            match ext_mgr.delegate(name, task, &rt.config, decision.clone(), mission.map(|s| s.to_string())) {
+                Ok(res) => {
+                    println!("Execution finished. Success: {}", res.success);
+                    println!("Stdout:\n{}", res.stdout);
+                    if !res.stderr.is_empty() {
+                        println!("Stderr:\n{}", res.stderr);
+                    }
+                }
+                Err(e) => {
+                    if let crate::approval::ApprovalDecision::Approved = decision {
+                        println!("Error: {}", e);
+                    } else {
+                        println!("Execution denied.");
+                    }
                 }
             }
-            Err(e) => println!("Error: {}", e),
         }
-    }
-
-    match rt.external_agent_manager.delegate(name, task, &rt.config) {
-        Ok(res) => {
-            println!("Execution finished. Success: {}", res.success);
-            println!("Stdout:\n{}", res.stdout);
-            if !res.stderr.is_empty() {
-                println!("Stderr:\n{}", res.stderr);
-            }
+        "compare" => {
+            println!("Compare feature is planned for Phase 8.9.");
         }
-        Err(e) => println!("Error: {}", e),
+        _ => {
+            println!("Unknown agent action: {}", action);
+            println!("Valid actions: list, doctor, runs, run-show <id>, run <name> --prompt <...>, compare");
+        }
     }
 }
 

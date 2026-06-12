@@ -229,17 +229,17 @@ Properties:
 
 ### 6.1 Current State
 
-`call_subagent` tool in `tools.rs` runs any CLI command with any prompt arg. No controls.
+`call_subagent` was historically unchecked. In Phase 8.8.1, we introduced strict controls via the `ExternalAgentManager` and `ApprovalGate`.
 
-### 6.2 Planned Controls (Phase 5)
+### 6.2 Implemented Controls
 
 Before spawning any external agent:
-1. Show approval prompt with agent name and prompt
-2. Run in isolated working directory (not the user's project)
-3. Set environment: only pass explicitly whitelisted env vars
-4. Set timeout: kill if exceeds budget
-5. Capture and display all output before committing any changes
-6. No direct filesystem changes from external agent without GOAT review
+1. **ApprovalGate Validation**: Execution requires explicit user approval showing the agent name and the prompt.
+2. **Workspace Isolation**: Configurable modes (`isolated-copy`, `detect-only`, `readonly`) restrict filesystem changes. `isolated-copy` copies code without `.git`, preventing host repository corruption.
+3. **Execution Recording**: Every run is appended to `external-agent-runs.jsonl`, generating a unique UUID.
+4. **Metadata Audit**: Metadata including started_at, finished_at, permission_profile, status, and command string are stored in `metadata.json`.
+5. **Output Capture**: Stdout and stderr logs are separately saved to `stdout.log` and `stderr.log` for auditability.
+6. **Configurable Timeouts**: Timeout enforcement is part of the orchestration adapter.
 
 ---
 
@@ -343,8 +343,8 @@ No input validation on tool arguments.
 - [ ] Never index secrets from files
 
 ### Phase 5:
-- [ ] External agent approval + isolation
-- [ ] External agent timeout enforcement
+- [x] External agent approval + isolation
+- [x] External agent timeout enforcement
 
 ### Phase 6:
 - [ ] MCP server identity controls

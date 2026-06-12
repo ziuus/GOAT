@@ -23,6 +23,9 @@ pub enum ExternalAgentKind {
     JCode,
     Goose,
     OpenHands,
+    Generic,
+    OpenClaw,
+    Littlebird,
     Custom(String),
 }
 
@@ -39,6 +42,9 @@ impl fmt::Display for ExternalAgentKind {
             Self::JCode => write!(f, "jcode"),
             Self::Goose => write!(f, "goose"),
             Self::OpenHands => write!(f, "openhands"),
+            Self::Generic => write!(f, "generic"),
+            Self::OpenClaw => write!(f, "openclaw"),
+            Self::Littlebird => write!(f, "littlebird"),
             Self::Custom(name) => write!(f, "{}", name),
         }
     }
@@ -102,17 +108,21 @@ pub struct ExternalAgentResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExternalAgentRun {
-    pub id: String,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub run_id: String,
     pub agent_name: String,
-    pub command_path: PathBuf,
-    pub task: String,
-    pub mode: String,
-    pub workspace_path: PathBuf,
-    pub duration: Duration,
+    pub command: String,
+    pub task_summary: String,
+    pub working_directory: PathBuf,
+    pub permission_profile: String,
+    pub status: String,
+    pub approval_decision: String,
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
     pub exit_code: Option<i32>,
-    pub success: bool,
-    pub changed_files_count: Option<usize>,
+    pub stdout_log_path: Option<PathBuf>,
+    pub stderr_log_path: Option<PathBuf>,
+    pub mission_id: Option<String>,
+    pub project_id: Option<String>,
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -310,6 +320,60 @@ impl ExternalAgentRegistry {
             license_note: "Open source".to_string(),
             status: ExternalAgentStatus::Missing,
         });
+
+        self.register(ExternalAgentAdapter {
+            name: "generic".to_string(),
+            kind: ExternalAgentKind::Generic,
+            command_name: "bash".to_string(),
+            detected_path: None,
+            version: None,
+            capabilities: ExternalAgentCapabilities {
+                supports_non_interactive: true,
+                supports_json_output: false,
+                supports_file_edits: true,
+                supports_approval_internally: false,
+            },
+            risk_level: crate::approval::RiskLevel::High,
+            workspace_behavior: "runs in current terminal".to_string(),
+            license_note: "System".to_string(),
+            status: ExternalAgentStatus::Missing,
+        });
+
+        self.register(ExternalAgentAdapter {
+            name: "openclaw".to_string(),
+            kind: ExternalAgentKind::OpenClaw,
+            command_name: "openclaw".to_string(),
+            detected_path: None,
+            version: None,
+            capabilities: ExternalAgentCapabilities {
+                supports_non_interactive: true,
+                supports_json_output: true,
+                supports_file_edits: true,
+                supports_approval_internally: false,
+            },
+            risk_level: crate::approval::RiskLevel::High,
+            workspace_behavior: "modifies files directly".to_string(),
+            license_note: "Open source".to_string(),
+            status: ExternalAgentStatus::Missing,
+        });
+
+        self.register(ExternalAgentAdapter {
+            name: "littlebird".to_string(),
+            kind: ExternalAgentKind::Littlebird,
+            command_name: "littlebird".to_string(),
+            detected_path: None,
+            version: None,
+            capabilities: ExternalAgentCapabilities {
+                supports_non_interactive: true,
+                supports_json_output: true,
+                supports_file_edits: true,
+                supports_approval_internally: false,
+            },
+            risk_level: crate::approval::RiskLevel::High,
+            workspace_behavior: "modifies files directly".to_string(),
+            license_note: "Open source".to_string(),
+            status: ExternalAgentStatus::Missing,
+        });
     }
 
     pub fn register(&mut self, adapter: ExternalAgentAdapter) {
@@ -387,6 +451,8 @@ impl ExternalAgentManager {
         name: &str,
         task: &str,
         config: &Config,
+        approval_decision: crate::approval::ApprovalDecision,
+        mission_id: Option<String>,
     ) -> Result<ExternalAgentResponse> {
         let adapter = self
             .registry
@@ -413,8 +479,7 @@ impl ExternalAgentManager {
 
         if !config.external_agents.allow_execution {
             return Err(anyhow!(
-                "External agent execution is disabled globally (allow_execution = false). Detected path: {:?}",
-                adapter.detected_path
+                "External agent execution is disabled globally (allow_execution = false)."
             ));
         }
 
@@ -438,34 +503,33 @@ impl ExternalAgentManager {
             ));
         }
 
-        // For Phase 2.8, we implement a safe dry-run / minimal launch
-        // In real execution, we would stream stdout/stderr, but for now we capture.
-
         let binary_path = adapter.detected_path.as_ref().unwrap();
-
         let timeout_secs = config.external_agents.default_timeout_secs;
-
         let start = Instant::now();
 
-        // This is a placeholder for actual argument mapping per agent.
-        // In Phase 2.8 we are just verifying the subprocess architecture.
-        // We will pass the task as an argument.
-
         let mut cmd = Command::new(binary_path);
+        let mut cmd_str = binary_path.to_string_lossy().to_string();
 
-        // Custom argument formats per agent:
         match adapter.kind {
             ExternalAgentKind::OpenCode | ExternalAgentKind::JCode => {
                 cmd.arg(task);
+                cmd_str = format!("{} {}", cmd_str, task);
             }
             ExternalAgentKind::Aider => {
                 cmd.arg("--message").arg(task);
+                cmd_str = format!("{} --message {}", cmd_str, task);
             }
             ExternalAgentKind::ClaudeCode => {
                 cmd.arg("-p").arg(task);
+                cmd_str = format!("{} -p {}", cmd_str, task);
+            }
+            ExternalAgentKind::Generic => {
+                cmd.arg("-c").arg(task);
+                cmd_str = format!("{} -c \"{}\"", cmd_str, task);
             }
             _ => {
                 cmd.arg(task);
+                cmd_str = format!("{} {}", cmd_str, task);
             }
         }
 
@@ -486,86 +550,91 @@ impl ExternalAgentManager {
             ));
         }
 
-        // Log execution start
-        self.log_execution(&ExternalAgentRun {
-            id: run_id.clone(),
-            timestamp: chrono::Utc::now(),
+        let permission_profile = config.external_agents.workspace_mode.to_string();
+
+        let mut run_record = ExternalAgentRun {
+            run_id: run_id.clone(),
             agent_name: adapter.name.clone(),
-            command_path: binary_path.clone(),
-            task: task.to_string(),
-            mode: run_mode.to_string(),
-            workspace_path: workspace_path.clone(),
-            duration: Duration::from_secs(0),
+            command: cmd_str,
+            task_summary: task.to_string(),
+            working_directory: workspace_path.clone(),
+            permission_profile,
+            status: "pending".to_string(),
+            approval_decision: format!("{:?}", approval_decision),
+            started_at: chrono::Utc::now(),
+            finished_at: None,
             exit_code: None,
-            success: false, // not done yet
-            changed_files_count: None,
-        });
-
-        // Normally we'd use tokio timeout here, but since this is sync/blocking for now or we spawn:
-        // We will just do standard process for Phase 2.8.
-        let output = cmd
-            .output()
-            .map_err(|e| anyhow!("Failed to spawn external agent: {}", e))?;
-
-        let duration = start.elapsed();
-        let success = output.status.success();
-
-        let run_record = ExternalAgentRun {
-            id: run_id.clone(),
-            timestamp: chrono::Utc::now(),
-            agent_name: adapter.name.clone(),
-            command_path: binary_path.clone(),
-            task: task.to_string(),
-            mode: run_mode.to_string(),
-            workspace_path: workspace_path.clone(),
-            duration,
-            exit_code: output.status.code(),
-            success,
-            changed_files_count: None,
+            stdout_log_path: None,
+            stderr_log_path: None,
+            mission_id,
+            project_id: None,
         };
 
-        self.log_execution(&run_record);
+        if let crate::approval::ApprovalDecision::Approved = approval_decision {
+            run_record.status = "running".to_string();
+            self.record_run(&run_record, None, None);
 
-        Ok(ExternalAgentResponse {
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            exit_code: output.status.code(),
-            success,
-        })
+            let output = cmd
+                .output()
+                .map_err(|e| anyhow!("Failed to spawn external agent: {}", e))?;
+
+            let success = output.status.success();
+            let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+
+            run_record.status = if success { "success".to_string() } else { "failed".to_string() };
+            run_record.finished_at = Some(chrono::Utc::now());
+            run_record.exit_code = output.status.code();
+
+            self.record_run(&run_record, Some(&stdout_str), Some(&stderr_str));
+
+            Ok(ExternalAgentResponse {
+                stdout: stdout_str,
+                stderr: stderr_str,
+                exit_code: output.status.code(),
+                success,
+            })
+        } else {
+            run_record.status = "denied".to_string();
+            run_record.finished_at = Some(chrono::Utc::now());
+            self.record_run(&run_record, None, None);
+            Err(anyhow!("Execution denied by ApprovalGate."))
+        }
     }
 
-    fn log_execution(&self, run: &ExternalAgentRun) {
-        use std::fs::OpenOptions;
+    pub fn record_run(&self, run: &ExternalAgentRun, stdout: Option<&str>, stderr: Option<&str>) {
+        use std::fs::{self, OpenOptions};
         use std::io::Write;
 
-        if let Ok(mut file) = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.audit_log_path)
-        {
-            let log_entry = format!(
-                "[{}] Agent: {} | Path: {} | Mode: {} | Task: {} | Duration: {}s | ExitCode: {:?} | Success: {}\n",
-                run.timestamp.to_rfc3339(),
-                run.agent_name,
-                run.command_path.display(),
-                run.mode,
-                crate::approval::redact_secrets(&run.task),
-                run.duration.as_secs(),
-                run.exit_code,
-                run.success,
-            );
-            let _ = file.write_all(log_entry.as_bytes());
+        let run_dir = self.data_dir.join("external-agent-runs").join(&run.run_id);
+        if !run_dir.exists() {
+            let _ = fs::create_dir_all(&run_dir);
+        }
 
-            // Also write JSONL
-            let jsonl_path = self.data_dir.join("external-agent-runs.jsonl");
-            if let Ok(mut json_file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&jsonl_path)
-            {
-                if let Ok(json_str) = serde_json::to_string(run) {
-                    let _ = writeln!(json_file, "{}", json_str);
-                }
+        let mut run_to_save = run.clone();
+
+        if let Some(out) = stdout {
+            let stdout_path = run_dir.join("stdout.log");
+            let _ = fs::write(&stdout_path, out);
+            run_to_save.stdout_log_path = Some(stdout_path);
+        }
+
+        if let Some(err) = stderr {
+            let stderr_path = run_dir.join("stderr.log");
+            let _ = fs::write(&stderr_path, err);
+            run_to_save.stderr_log_path = Some(stderr_path);
+        }
+
+        let meta_path = run_dir.join("metadata.json");
+        if let Ok(json_str) = serde_json::to_string_pretty(&run_to_save) {
+            let _ = fs::write(&meta_path, json_str);
+        }
+
+        // Also append to the JSONL global log
+        let jsonl_path = self.data_dir.join("external-agent-runs.jsonl");
+        if let Ok(mut json_file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
+            if let Ok(json_str) = serde_json::to_string(&run_to_save) {
+                let _ = writeln!(json_file, "{}", json_str);
             }
         }
     }

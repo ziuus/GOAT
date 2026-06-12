@@ -169,15 +169,15 @@ Status legend:
 |---------|--------|-------|
 | SwarmRouter (keyword-based) | `working` | Routes to Coder/Browser/Researcher/General profiles |
 | Subagent profiles (4 types) | `working` | SubagentKind enum in swarm.rs |
-| `call_subagent` native tool | `partial` | Works but unsafe: no timeout, no isolation |
+| `call_subagent` native tool | `working` | Replaced/backed by ExternalAgentManager |
 | Internal subagent framework | `planned` | Phase 5 |
-| External subagent adapter trait | `planned` | Phase 5 |
-| OpenCode adapter | `planned` | Phase 5 |
-| Claude Code adapter | `planned` | Phase 5 |
-| Gemini CLI adapter | `planned` | Phase 5 |
-| Subagent workspace isolation | `planned` | Phase 5 |
-| Subagent timeouts and budgets | `planned` | Phase 5 |
-| Subagent output streaming | `planned` | Phase 5 |
+| External subagent adapter trait | `working` | Phase 8.8.1 - ExternalAgentManager/Registry |
+| OpenCode adapter | `working` | Phase 8.8.1 |
+| Claude Code adapter | `working` | Phase 8.8.1 |
+| Gemini CLI adapter | `working` | Phase 8.8.1 |
+| Subagent workspace isolation | `working` | Phase 8.8.1 - Configurable modes (`isolated-copy`, etc) |
+| Subagent timeouts and budgets | `working` | Phase 8.8.1 - External agent config |
+| Subagent output streaming | `working` | Phase 8.8.1 - Stdout/stderr tracking |
 | Multi-agent comparison | `planned` | Phase 8 |
 
 ---

@@ -158,10 +158,10 @@ GOAT/                              # Cargo workspace root
 - Depends on: `tokio`
 
 #### `goat-subagents`
-- `SubagentAdapter` trait for internal and external agents
-- Internal agents: Coder, Reviewer, Researcher, Planner, Tester, Debugger
-- External adapters: OpenCode, Claude Code, Gemini CLI, Codex, Cline, etc.
-- External agents run via `goat-harness` with isolation, timeout, and budget
+- `ExternalAgentManager` handles detection, orchestration, and persistence of external agents (like OpenCode, Claude Code, Aider, Cline).
+- Internal agents: Coder, Reviewer, Researcher, Planner, Tester, Debugger (handled via subagent system).
+- External agents execute via `ApprovalGate` validation, with configurable workspace modes (`isolated-copy`, `detect-only`).
+- Run metrics, metadata, and logs are persisted locally under `~/.local/share/goat/external-agent-runs/`.
 
 #### `goat-skills`
 - Skill manifest format (TOML)
