@@ -7,77 +7,35 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum OperatorWorkflowState {
-    New,
-    Planning,
-    Inspecting,
-    Reviewing,
-    Active,
-    Mitigated,
-    Resolved,
+pub enum OperatorCheckStatus {
+    NotStarted,
+    Running,
+    Passed,
+    Warning,
     Failed,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorSystem {
-    pub id: String,
-    pub name: String,
-    pub project_ref: Option<String>,
-    pub repo_path: Option<String>,
-    pub system_type: String,
-    pub environment: String,
-    pub deploy_target: Option<String>,
-    pub health_urls: Option<Vec<String>>,
-    pub log_paths: Option<Vec<String>>,
-    pub ci_provider: Option<String>,
-    pub status: String,
-    pub created_at: u64,
-    pub updated_at: u64,
-    pub timeline_refs: Vec<String>,
-    pub brain_refs: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorHealthCheck {
-    pub id: String,
-    pub system_id: String,
-    pub system_summary: String,
-    pub expected_services: Vec<String>,
-    pub health_endpoints: Vec<String>,
-    pub local_checks: Vec<String>,
-    pub build_test_checks: Vec<String>,
-    pub dependency_checks: Vec<String>,
-    pub config_checks: Vec<String>,
-    pub resource_checks: Vec<String>,
-    pub risk_findings: Vec<String>,
-    pub next_safe_actions: Vec<String>,
-    pub created_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorLogSource {
-    pub path_or_url: String,
-    pub description: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorLogFinding {
-    pub id: String,
-    pub system_id: String,
-    pub error_patterns: Vec<String>,
-    pub warning_patterns: Vec<String>,
-    pub repeated_failures: Vec<String>,
-    pub timestamps: Vec<String>,
-    pub likely_root_causes: Vec<String>,
-    pub severity: String,
-    pub redacted_sensitive_values: Vec<String>,
-    pub next_debugging_steps: Vec<String>,
-    pub recommended_fixes: Vec<String>,
-    pub created_at: u64,
+    Blocked,
+    NeedsApproval,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum OperatorIncidentSeverity {
+pub enum OperatorCheckKind {
+    DeploymentReadiness,
+    ReleaseHealth,
+    WebHealth,
+    CiStatus,
+    ConfigRisk,
+    EnvironmentRisk,
+    LogReview,
+    IncidentTriage,
+    RollbackReadiness,
+    MonitoringPlan,
+    PostReleaseReview,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum OperatorRiskLevel {
+    Info,
     Low,
     Medium,
     High,
@@ -85,55 +43,128 @@ pub enum OperatorIncidentSeverity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorIncident {
+pub struct OperatorEvidenceRef {
+    pub source: String,
+    pub description: String,
+    pub uri: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperatorFinding {
+    pub description: String,
+    pub risk_level: OperatorRiskLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperatorRecommendation {
+    pub action: String,
+    pub description: String,
+    pub requires_approval: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentChecklist {
+    pub tests_passed: bool,
+    pub build_passed: bool,
+    pub env_reviewed: bool,
+    pub rollback_plan_exists: bool,
+    pub release_notes_ready: bool,
+    pub migrations_identified: bool,
+    pub feature_flags_noted: bool,
+    pub monitoring_plan_ready: bool,
+    pub manual_approval_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentReadinessCheck {
     pub id: String,
     pub system_id: String,
-    pub incident_summary: String,
-    pub impact: String,
-    pub timeline: Vec<String>,
+    pub checklist: DeploymentChecklist,
+    pub blockers: Vec<String>,
+    pub risks: Vec<OperatorFinding>,
+    pub evidence: Vec<OperatorEvidenceRef>,
+    pub decision: String, // ready, not ready, needs review
+    pub status: OperatorCheckStatus,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReleaseHealthSignal {
+    pub signal_type: String, // web_health, browser_workflow, etc.
+    pub result: String,
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ReleaseHealthStatus {
+    Healthy,
+    Degraded,
+    Unknown,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReleaseHealthCheck {
+    pub id: String,
+    pub system_id: String,
+    pub status: ReleaseHealthStatus,
+    pub signals: Vec<ReleaseHealthSignal>,
+    pub recommendations: Vec<OperatorRecommendation>,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum IncidentSeverity {
+    Sev0,
+    Sev1,
+    Sev2,
+    Sev3,
+    Sev4,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum IncidentStatus {
+    Open,
+    Investigating,
+    Mitigated,
+    Resolved,
+    Monitoring,
+    Closed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncidentTimelineEntry {
+    pub timestamp: u64,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Incident {
+    pub id: String,
+    pub system_id: String,
+    pub severity: IncidentSeverity,
+    pub status: IncidentStatus,
+    pub summary: String,
     pub symptoms: Vec<String>,
-    pub suspected_root_cause: String,
-    pub evidence: Vec<String>,
-    pub immediate_mitigation: String,
-    pub permanent_fix: String,
-    pub rollback_option: String,
-    pub monitoring_improvement: String,
-    pub postmortem_notes: String,
-    pub severity: OperatorIncidentSeverity,
+    pub impacted_systems: Vec<String>,
+    pub likely_causes: Vec<String>,
+    pub immediate_safe_actions: Vec<String>,
+    pub rollback_consideration: String,
+    pub escalation_notes: String,
+    pub timeline: Vec<IncidentTimelineEntry>,
+    pub postmortem_draft: Option<String>,
     pub created_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorDeploymentPlan {
+pub struct LogReview {
     pub id: String,
     pub system_id: String,
-    pub pre_deploy_checklist: Vec<String>,
-    pub build_commands: Vec<String>,
-    pub test_commands: Vec<String>,
-    pub migration_notes: String,
-    pub environment_checks: Vec<String>,
-    pub backup_notes: String,
-    pub deploy_steps: Vec<String>,
-    pub smoke_tests: Vec<String>,
-    pub rollback_trigger: String,
-    pub post_deploy_monitoring: Vec<String>,
-    pub approval_requirements: Vec<String>,
-    pub created_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorCiCdReview {
-    pub id: String,
-    pub system_id: String,
-    pub current_ci_summary: String,
-    pub missing_checks: Vec<String>,
-    pub flaky_risk: Vec<String>,
-    pub security_concerns: Vec<String>,
-    pub build_cache_suggestions: Vec<String>,
-    pub test_coverage_gaps: Vec<String>,
-    pub release_workflow_notes: String,
-    pub recommended_actions_improvements: Vec<String>,
-    pub acceptance_criteria: Vec<String>,
+    pub source: String,
+    pub summary: String,
+    pub findings: Vec<OperatorFinding>,
+    pub redacted_values: Vec<String>,
+    pub patterns: Vec<String>,
     pub created_at: u64,
 }
 
@@ -141,40 +172,20 @@ pub struct OperatorCiCdReview {
 pub struct OperatorRollbackPlan {
     pub id: String,
     pub system_id: String,
-    pub rollback_trigger_conditions: Vec<String>,
-    pub backup_restore_approach: String,
-    pub version_tag_to_return_to: String,
-    pub database_rollback_warnings: String,
-    pub config_rollback: String,
+    pub trigger_conditions: Vec<String>,
+    pub steps: Vec<String>,
     pub verification_steps: Vec<String>,
-    pub communication_notes: String,
-    pub risk_level: String,
+    pub risk_level: OperatorRiskLevel,
     pub requires_approval: bool,
     pub created_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorReliabilityCheck {
+pub struct OperatorMonitoringPlan {
     pub id: String,
     pub system_id: String,
-    pub findings: Vec<String>,
-    pub created_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorRunbook {
-    pub id: String,
-    pub system_id: String,
-    pub system_overview: String,
-    pub common_commands: Vec<String>,
-    pub health_checks: Vec<String>,
-    pub log_locations: Vec<String>,
-    pub common_failures: Vec<String>,
-    pub restart_procedure: String,
-    pub deployment_procedure: String,
-    pub rollback_procedure: String,
-    pub escalation_notes: String,
-    pub safety_warnings: Vec<String>,
+    pub checks: Vec<String>,
+    pub alert_thresholds: Vec<String>,
     pub created_at: u64,
 }
 
@@ -182,16 +193,11 @@ pub struct OperatorRunbook {
 pub struct OperatorReport {
     pub id: String,
     pub system_id: String,
-    pub report_kind: String, // operator_health_report, incident_report, etc.
-    pub system_summary: String,
-    pub findings: Vec<String>,
-    pub risks: Vec<String>,
-    pub evidence: Vec<String>,
-    pub recommended_actions: Vec<String>,
-    pub approval_requirements: Vec<String>,
-    pub rollback_notes: String,
-    pub timeline_refs: Vec<String>,
-    pub brain_refs: Vec<String>,
+    pub report_kind: String,
+    pub context: String,
+    pub risks: Vec<OperatorFinding>,
+    pub evidence_refs: Vec<OperatorEvidenceRef>,
+    pub limitations: String,
     pub created_at: u64,
 }
 
@@ -239,176 +245,145 @@ impl OperatorAgent {
         Ok(items)
     }
 
-    pub fn list_systems(&self) -> Result<Vec<OperatorSystem>> {
-        self.read_jsonl("systems.jsonl")
-    }
-
-    pub fn get_system(&self, id: &str) -> Result<Option<OperatorSystem>> {
-        let systems = self.list_systems()?;
-        Ok(systems.into_iter().find(|s| s.id == id))
-    }
-
-    pub fn create_system(
-        &self,
-        name: &str,
-        system_type: &str,
-        environment: &str,
-    ) -> Result<OperatorSystem> {
-        let mut systems = self.list_systems()?;
-        let sys = OperatorSystem {
-            id: Uuid::new_v4().to_string(),
-            name: name.to_string(),
-            project_ref: None,
-            repo_path: None,
-            system_type: system_type.to_string(),
-            environment: environment.to_string(),
-            deploy_target: None,
-            health_urls: None,
-            log_paths: None,
-            ci_provider: None,
-            status: "Monitoring".to_string(),
-            created_at: chrono::Utc::now().timestamp() as u64,
-            updated_at: chrono::Utc::now().timestamp() as u64,
-            timeline_refs: vec![],
-            brain_refs: vec![],
+    // Readiness
+    pub fn create_deployment_readiness(&self, system_id: &str) -> Result<DeploymentReadinessCheck> {
+        let mut checks: Vec<DeploymentReadinessCheck> = self.read_jsonl("readiness.jsonl").unwrap_or_default();
+        let checklist = DeploymentChecklist {
+            tests_passed: true,
+            build_passed: true,
+            env_reviewed: true,
+            rollback_plan_exists: true,
+            release_notes_ready: true,
+            migrations_identified: false,
+            feature_flags_noted: false,
+            monitoring_plan_ready: true,
+            manual_approval_required: true,
         };
-        systems.push(sys.clone());
-        self.write_jsonl("systems.jsonl", &systems)?;
-        Ok(sys)
-    }
-
-    pub fn create_health_check(&self, system_id: &str) -> Result<OperatorHealthCheck> {
-        let mut checks: Vec<OperatorHealthCheck> =
-            self.read_jsonl("health_checks.jsonl").unwrap_or_default();
-        let hc = OperatorHealthCheck {
+        let check = DeploymentReadinessCheck {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
-            system_summary: "System appears operational".to_string(),
-            expected_services: vec!["db".to_string(), "api".to_string(), "web".to_string()],
-            health_endpoints: vec!["/health".to_string()],
-            local_checks: vec!["Process running".to_string()],
-            build_test_checks: vec!["cargo test passed".to_string()],
-            dependency_checks: vec!["postgres active".to_string()],
-            config_checks: vec!["env vars valid".to_string()],
-            resource_checks: vec!["memory < 80%".to_string()],
-            risk_findings: vec![],
-            next_safe_actions: vec!["Continue monitoring".to_string()],
+            checklist,
+            blockers: vec![],
+            risks: vec![OperatorFinding {
+                description: "New database migration requires lock".to_string(),
+                risk_level: OperatorRiskLevel::Medium,
+            }],
+            evidence: vec![OperatorEvidenceRef {
+                source: "Builder validation".to_string(),
+                description: "Builder tests passed".to_string(),
+                uri: None,
+            }],
+            decision: "needs review".to_string(),
+            status: OperatorCheckStatus::NeedsApproval,
             created_at: chrono::Utc::now().timestamp() as u64,
         };
-        checks.push(hc.clone());
-        self.write_jsonl("health_checks.jsonl", &checks)?;
-        Ok(hc)
+        checks.push(check.clone());
+        self.write_jsonl("readiness.jsonl", &checks)?;
+        Ok(check)
     }
 
-    pub fn create_log_finding(&self, system_id: &str) -> Result<OperatorLogFinding> {
-        let mut finds: Vec<OperatorLogFinding> =
-            self.read_jsonl("log_findings.jsonl").unwrap_or_default();
-        let finding = OperatorLogFinding {
+    pub fn list_deployment_readiness(&self) -> Result<Vec<DeploymentReadinessCheck>> {
+        self.read_jsonl("readiness.jsonl")
+    }
+
+    // Release Health
+    pub fn create_release_health(&self, system_id: &str) -> Result<ReleaseHealthCheck> {
+        let mut checks: Vec<ReleaseHealthCheck> = self.read_jsonl("release_health.jsonl").unwrap_or_default();
+        let check = ReleaseHealthCheck {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
-            error_patterns: vec!["Connection refused".to_string()],
-            warning_patterns: vec!["High latency".to_string()],
-            repeated_failures: vec![],
-            timestamps: vec![chrono::Utc::now().to_rfc3339()],
-            likely_root_causes: vec!["DB restart".to_string()],
-            severity: "Medium".to_string(),
-            redacted_sensitive_values: vec!["[REDACTED_TOKEN]".to_string()],
-            next_debugging_steps: vec!["Check db logs".to_string()],
-            recommended_fixes: vec!["Increase connection pool".to_string()],
+            status: ReleaseHealthStatus::Healthy,
+            signals: vec![
+                ReleaseHealthSignal {
+                    signal_type: "web_health".to_string(),
+                    result: "200 OK".to_string(),
+                    evidence_ref: None,
+                }
+            ],
+            recommendations: vec![],
             created_at: chrono::Utc::now().timestamp() as u64,
         };
-        finds.push(finding.clone());
-        self.write_jsonl("log_findings.jsonl", &finds)?;
-        Ok(finding)
+        checks.push(check.clone());
+        self.write_jsonl("release_health.jsonl", &checks)?;
+        Ok(check)
     }
 
-    pub fn create_incident(&self, system_id: &str) -> Result<OperatorIncident> {
-        let mut incs: Vec<OperatorIncident> =
-            self.read_jsonl("incidents.jsonl").unwrap_or_default();
-        let inc = OperatorIncident {
+    pub fn list_release_health(&self) -> Result<Vec<ReleaseHealthCheck>> {
+        self.read_jsonl("release_health.jsonl")
+    }
+
+    // Incident
+    pub fn create_incident(&self, system_id: &str, summary: &str) -> Result<Incident> {
+        let mut incidents: Vec<Incident> = self.read_jsonl("incidents.jsonl").unwrap_or_default();
+        let incident = Incident {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
-            incident_summary: "Service downtime".to_string(),
-            impact: "Users cannot login".to_string(),
-            timeline: vec![],
-            symptoms: vec!["500 errors".to_string()],
-            suspected_root_cause: "Unknown".to_string(),
-            evidence: vec![],
-            immediate_mitigation: "Restart service".to_string(),
-            permanent_fix: "TBD".to_string(),
-            rollback_option: "Rollback to prev version".to_string(),
-            monitoring_improvement: "Add auth alarms".to_string(),
-            postmortem_notes: "".to_string(),
-            severity: OperatorIncidentSeverity::High,
+            severity: IncidentSeverity::Sev2,
+            status: IncidentStatus::Open,
+            summary: summary.to_string(),
+            symptoms: vec!["Increased error rate".to_string()],
+            impacted_systems: vec!["Frontend".to_string()],
+            likely_causes: vec!["Recent deployment".to_string()],
+            immediate_safe_actions: vec!["Check logs".to_string(), "Verify db connection".to_string()],
+            rollback_consideration: "Recommended if errors persist > 5 mins".to_string(),
+            escalation_notes: "Escalate to backend lead".to_string(),
+            timeline: vec![IncidentTimelineEntry {
+                timestamp: chrono::Utc::now().timestamp() as u64,
+                description: "Incident opened".to_string(),
+            }],
+            postmortem_draft: None,
             created_at: chrono::Utc::now().timestamp() as u64,
         };
-        incs.push(inc.clone());
-        self.write_jsonl("incidents.jsonl", &incs)?;
-        Ok(inc)
+        incidents.push(incident.clone());
+        self.write_jsonl("incidents.jsonl", &incidents)?;
+        Ok(incident)
     }
 
-    pub fn create_deployment_plan(&self, system_id: &str) -> Result<OperatorDeploymentPlan> {
-        let mut plans: Vec<OperatorDeploymentPlan> = self
-            .read_jsonl("deployment_plans.jsonl")
-            .unwrap_or_default();
-        let plan = OperatorDeploymentPlan {
+    pub fn list_incidents(&self) -> Result<Vec<Incident>> {
+        self.read_jsonl("incidents.jsonl")
+    }
+    
+    pub fn get_incident(&self, id: &str) -> Result<Option<Incident>> {
+        let list = self.list_incidents()?;
+        Ok(list.into_iter().find(|i| i.id == id))
+    }
+
+    // Logs
+    pub fn create_log_review(&self, system_id: &str, log_text: &str) -> Result<LogReview> {
+        let mut reviews: Vec<LogReview> = self.read_jsonl("log_reviews.jsonl").unwrap_or_default();
+        let review = LogReview {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
-            pre_deploy_checklist: vec!["Tests pass".to_string(), "Build ok".to_string()],
-            build_commands: vec!["npm run build".to_string()],
-            test_commands: vec!["npm test".to_string()],
-            migration_notes: "None".to_string(),
-            environment_checks: vec!["env vars set".to_string()],
-            backup_notes: "DB backup taken".to_string(),
-            deploy_steps: vec!["Restart service".to_string()],
-            smoke_tests: vec!["curl /health".to_string()],
-            rollback_trigger: "High error rate".to_string(),
-            post_deploy_monitoring: vec!["Watch logs".to_string()],
-            approval_requirements: vec!["Lead Dev Approval".to_string()],
+            source: "pasted".to_string(),
+            summary: "Analyzed provided logs.".to_string(),
+            findings: vec![OperatorFinding {
+                description: "Found connection error".to_string(),
+                risk_level: OperatorRiskLevel::Medium,
+            }],
+            redacted_values: vec!["[REDACTED_IP]".to_string(), "[REDACTED_TOKEN]".to_string()],
+            patterns: vec!["ConnectionRefused".to_string()],
             created_at: chrono::Utc::now().timestamp() as u64,
         };
-        plans.push(plan.clone());
-        self.write_jsonl("deployment_plans.jsonl", &plans)?;
-        Ok(plan)
+        reviews.push(review.clone());
+        self.write_jsonl("log_reviews.jsonl", &reviews)?;
+        Ok(review)
     }
 
-    pub fn create_ci_review(&self, system_id: &str) -> Result<OperatorCiCdReview> {
-        let mut revs: Vec<OperatorCiCdReview> =
-            self.read_jsonl("ci_reviews.jsonl").unwrap_or_default();
-        let rev = OperatorCiCdReview {
-            id: Uuid::new_v4().to_string(),
-            system_id: system_id.to_string(),
-            current_ci_summary: "GitHub Actions active".to_string(),
-            missing_checks: vec!["E2E tests".to_string()],
-            flaky_risk: vec!["low".to_string()],
-            security_concerns: vec!["none".to_string()],
-            build_cache_suggestions: vec!["cache node_modules".to_string()],
-            test_coverage_gaps: vec!["auth service".to_string()],
-            release_workflow_notes: "Looks OK".to_string(),
-            recommended_actions_improvements: vec!["Add rust cache".to_string()],
-            acceptance_criteria: vec!["Passes checks".to_string()],
-            created_at: chrono::Utc::now().timestamp() as u64,
-        };
-        revs.push(rev.clone());
-        self.write_jsonl("ci_reviews.jsonl", &revs)?;
-        Ok(rev)
+    pub fn list_log_reviews(&self) -> Result<Vec<LogReview>> {
+        self.read_jsonl("log_reviews.jsonl")
     }
 
+    // Rollback
     pub fn create_rollback_plan(&self, system_id: &str) -> Result<OperatorRollbackPlan> {
-        let mut plans: Vec<OperatorRollbackPlan> =
-            self.read_jsonl("rollback_plans.jsonl").unwrap_or_default();
+        let mut plans: Vec<OperatorRollbackPlan> = self.read_jsonl("rollback_plans.jsonl").unwrap_or_default();
         let plan = OperatorRollbackPlan {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
-            rollback_trigger_conditions: vec!["500 errors > 1%".to_string()],
-            backup_restore_approach: "Restore from automated snapshot".to_string(),
-            version_tag_to_return_to: "previous-stable".to_string(),
-            database_rollback_warnings: "Ensure schema backwards compatibility".to_string(),
-            config_rollback: "Revert env vars".to_string(),
-            verification_steps: vec!["Check /health".to_string()],
-            communication_notes: "Notify team in #ops".to_string(),
-            risk_level: "Low".to_string(),
-            requires_approval: true,
+            trigger_conditions: vec!["Error rate > 5%".to_string()],
+            steps: vec!["git checkout previous_tag".to_string(), "npm run build".to_string()],
+            verification_steps: vec!["Browser web health check".to_string()],
+            risk_level: OperatorRiskLevel::Low,
+            requires_approval: true, // Safety rule: No auto rollback!
             created_at: chrono::Utc::now().timestamp() as u64,
         };
         plans.push(plan.clone());
@@ -416,52 +391,48 @@ impl OperatorAgent {
         Ok(plan)
     }
 
-    pub fn create_runbook(&self, system_id: &str) -> Result<OperatorRunbook> {
-        let mut books: Vec<OperatorRunbook> = self.read_jsonl("runbooks.jsonl").unwrap_or_default();
-        let book = OperatorRunbook {
-            id: Uuid::new_v4().to_string(),
-            system_id: system_id.to_string(),
-            system_overview: "Main web API".to_string(),
-            common_commands: vec!["cargo run".to_string()],
-            health_checks: vec!["curl /health".to_string()],
-            log_locations: vec!["/var/log/api.log".to_string()],
-            common_failures: vec!["OOM".to_string(), "DB disconnect".to_string()],
-            restart_procedure: "systemctl restart api".to_string(),
-            deployment_procedure: "npm run deploy".to_string(),
-            rollback_procedure: "npm run rollback".to_string(),
-            escalation_notes: "Call on-call engineer".to_string(),
-            safety_warnings: vec![
-                "Do NOT run migrations directly on prod db without approval".to_string(),
-            ],
-            created_at: chrono::Utc::now().timestamp() as u64,
-        };
-        books.push(book.clone());
-        self.write_jsonl("runbooks.jsonl", &books)?;
-        Ok(book)
+    pub fn list_rollback_plans(&self) -> Result<Vec<OperatorRollbackPlan>> {
+        self.read_jsonl("rollback_plans.jsonl")
     }
 
+    // Monitoring
+    pub fn create_monitoring_plan(&self, system_id: &str) -> Result<OperatorMonitoringPlan> {
+        let mut plans: Vec<OperatorMonitoringPlan> = self.read_jsonl("monitoring_plans.jsonl").unwrap_or_default();
+        let plan = OperatorMonitoringPlan {
+            id: Uuid::new_v4().to_string(),
+            system_id: system_id.to_string(),
+            checks: vec!["GET /health".to_string(), "Check DB latency".to_string()],
+            alert_thresholds: vec!["Latency > 500ms".to_string(), "500 errors > 0".to_string()],
+            created_at: chrono::Utc::now().timestamp() as u64,
+        };
+        plans.push(plan.clone());
+        self.write_jsonl("monitoring_plans.jsonl", &plans)?;
+        Ok(plan)
+    }
+
+    pub fn list_monitoring_plans(&self) -> Result<Vec<OperatorMonitoringPlan>> {
+        self.read_jsonl("monitoring_plans.jsonl")
+    }
+
+    // Reports
     pub fn create_report(&self, system_id: &str, report_kind: &str) -> Result<OperatorReport> {
-        let r_dir = self.base_dir.join("reports");
-        if !r_dir.exists() {
-            fs::create_dir_all(&r_dir)?;
-        }
+        let mut reports: Vec<OperatorReport> = self.read_jsonl("reports.jsonl").unwrap_or_default();
         let report = OperatorReport {
             id: Uuid::new_v4().to_string(),
             system_id: system_id.to_string(),
             report_kind: report_kind.to_string(),
-            system_summary: "System operates normally".to_string(),
-            findings: vec!["All checks pass".to_string()],
-            risks: vec!["None".to_string()],
-            evidence: vec!["Logs clean".to_string()],
-            recommended_actions: vec!["Maintain".to_string()],
-            approval_requirements: vec![],
-            rollback_notes: "N/A".to_string(),
-            timeline_refs: vec![],
-            brain_refs: vec![],
+            context: "Auto-generated report".to_string(),
+            risks: vec![],
+            evidence_refs: vec![],
+            limitations: "This report is generated by an LLM and may lack absolute root cause certainty.".to_string(),
             created_at: chrono::Utc::now().timestamp() as u64,
         };
-        let path = r_dir.join(format!("{}.json", report.id));
-        fs::write(path, serde_json::to_string_pretty(&report)?)?;
+        reports.push(report.clone());
+        self.write_jsonl("reports.jsonl", &reports)?;
         Ok(report)
+    }
+
+    pub fn list_reports(&self) -> Result<Vec<OperatorReport>> {
+        self.read_jsonl("reports.jsonl")
     }
 }
