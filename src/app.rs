@@ -630,6 +630,22 @@ impl App {
                         mrs.state = crate::mcp_runtime::McpServerState::Stopped;
                     }
                     format!("MCP Server '{}' stopped.", srv_name)
+                } else if deferred.name == "delegate_external_agent" {
+                    let agent_name = deferred.args.get("agent").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let task = deferred.args.get("task").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    match self.external_agent_manager.delegate(&agent_name, &task, &self.config) {
+                        Ok(res) => {
+                            self.push_log(format!(
+                                "[EXTERNAL] Execution finished. Success: {}",
+                                res.success
+                            ));
+                            format!("External agent '{}' finished. Success: {}", agent_name, res.success)
+                        }
+                        Err(e) => {
+                            self.push_log(format!("[EXTERNAL] Error: {}", e));
+                            format!("External agent '{}' failed: {}", agent_name, e)
+                        }
+                    }
                 } else {
                     if let Some(native_result) =
                         crate::tools::NativeTools::execute(&deferred.name, deferred.args.clone())
@@ -2340,124 +2356,23 @@ impl App {
                 );
                 true
             }
-            cmd if cmd.starts_with("/external-agents") => {
-                let subcommand = parts.get(1).copied().unwrap_or("list");
-                match subcommand {
-                    "audit" => {
-                        if self.paths.external_agent_audit_log_file.exists() {
-                            if let Ok(content) =
-                                std::fs::read_to_string(&self.paths.external_agent_audit_log_file)
-                            {
-                                for line in content.lines() {
-                                    self.push_log(line.to_string());
-                                }
-                            }
-                        } else {
-                            self.push_log("[EXTERNAL] No audit log found.");
-                        }
-                    }
-                    "detect" => {
-                        self.push_log("[EXTERNAL] Detecting external agents...");
-                        self.external_agent_manager.detect_all(&self.config);
-                        let messages: Vec<_> = self
-                            .external_agent_manager
-                            .registry
-                            .list_all()
-                            .into_iter()
-                            .map(|a| format!("[EXTERNAL]   {:<15} - {}", a.name, a.status))
-                            .collect();
-                        for msg in messages {
-                            self.push_log(msg);
-                        }
-                    }
-                    "runs" => {
-                        let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
-                        if jsonl_path.exists() {
-                            if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
-                                self.push_log("[EXTERNAL] External Agent Runs:");
-                                for line in content.lines() {
-                                    if let Ok(run) = serde_json::from_str::<
-                                        crate::external_agents::ExternalAgentRun,
-                                    >(line)
-                                    {
-                                        self.push_log(format!("[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}", run.id, run.agent_name, run.mode, if run.success { "Success" } else { "Failed" }));
-                                    }
-                                }
-                            }
-                        } else {
-                            self.push_log("[EXTERNAL] No runs recorded yet.");
-                        }
-                    }
-                    _ => {
-                        let messages: Vec<_> = self
-                            .external_agent_manager
-                            .registry
-                            .list_all()
-                            .into_iter()
-                            .map(|a| {
-                                format!(
-                                    "[EXTERNAL]   {:<15} [{}] - {}",
-                                    a.name, a.command_name, a.status
-                                )
-                            })
-                            .collect();
-                        self.push_log(format!(
-                            "[EXTERNAL] GOAT External Agent Registry ({} adapters)",
-                            messages.len()
-                        ));
-                        for msg in messages {
-                            self.push_log(msg);
-                        }
-                    }
+            cmd if cmd == "/agent-doctor" => {
+                let checks = crate::paths::run_doctor(&self.paths, &self.config, false);
+                for c in checks {
+                    self.push_log(format!("[DOCTOR] {} - {:?}", c.label, c.status));
                 }
                 true
             }
 
-            cmd if cmd.starts_with("/external-run ") => {
-                let run_id = parts.get(1).copied().unwrap_or("").trim();
-                let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
-                let mut found = false;
-                if jsonl_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
-                        for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<
-                                crate::external_agents::ExternalAgentRun,
-                            >(line)
-                            {
-                                if run.id == run_id {
-                                    self.push_log(format!("[EXTERNAL] Run ID: {}", run.id));
-                                    self.push_log(format!("[EXTERNAL] Agent: {}", run.agent_name));
-                                    self.push_log(format!("[EXTERNAL] Mode: {}", run.mode));
-                                    self.push_log(format!(
-                                        "[EXTERNAL] Workspace: {}",
-                                        run.workspace_path.display()
-                                    ));
-                                    self.push_log(format!("[EXTERNAL] Task: {}", run.task));
-                                    self.push_log(format!("[EXTERNAL] Success: {}", run.success));
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if !found {
-                    self.push_log(format!("[EXTERNAL] Run ID '{}' not found.", run_id));
-                }
-                true
-            }
-            cmd if cmd == "/external-runs" => {
+            cmd if cmd == "/agent-runs" => {
                 let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
                 if jsonl_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
-                        self.push_log("[EXTERNAL] External Agent Runs:");
+                        self.push_log("[AGENTS] External Agent Runs:");
                         for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<
-                                crate::external_agents::ExternalAgentRun,
-                            >(line)
-                            {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
                                 self.push_log(format!(
-                                    "[EXTERNAL]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}",
+                                    "[AGENTS]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}",
                                     run.id,
                                     run.agent_name,
                                     run.mode,
@@ -2467,57 +2382,51 @@ impl App {
                         }
                     }
                 } else {
-                    self.push_log("[EXTERNAL] No runs recorded yet.");
+                    self.push_log("[AGENTS] No runs recorded yet.");
                 }
                 true
             }
 
-            cmd if cmd.starts_with("/external-agent ") => {
-                let name = parts.get(1).copied().unwrap_or("").trim();
-                if let Some(agent) = self.external_agent_manager.registry.get(name).cloned() {
-                    self.push_log(format!("[EXTERNAL] Name: {}", agent.name));
-                    self.push_log(format!("[EXTERNAL] Command: {}", agent.command_name));
-                    self.push_log(format!("[EXTERNAL] Status: {}", agent.status));
-                    self.push_log(format!("[EXTERNAL] Risk: {}", agent.risk_level));
-                    self.push_log(format!(
-                        "[EXTERNAL] Workspace Behavior: {}",
-                        agent.workspace_behavior
-                    ));
-                    if let Some(ref path) = agent.detected_path {
-                        self.push_log(format!("[EXTERNAL] Detected Path: {}", path.display()));
+            cmd if cmd.starts_with("/agent-run ") => {
+                let run_id = parts.get(1).copied().unwrap_or("").trim();
+                let jsonl_path = self.paths.data_dir.join("external-agent-runs.jsonl");
+                let mut found = false;
+                if jsonl_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
+                        for line in content.lines() {
+                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                                if run.id == run_id {
+                                    self.push_log(format!("[AGENTS] Run ID: {}", run.id));
+                                    self.push_log(format!("[AGENTS] Agent: {}", run.agent_name));
+                                    self.push_log(format!("[AGENTS] Task: {}", run.task));
+                                    self.push_log(format!("[AGENTS] Success: {}", run.success));
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
                     }
-                } else {
-                    self.push_log(format!("[EXTERNAL] External agent '{}' not found.", name));
+                }
+                if !found {
+                    self.push_log(format!("[AGENTS] Run ID '{}' not found.", run_id));
                 }
                 true
             }
 
-            cmd if cmd.starts_with("/delegate-external ") => {
-                let args_str = parts.get(1).copied().unwrap_or("");
-                let subparts: Vec<&str> = args_str.splitn(2, ' ').collect();
-                if subparts.len() < 2 {
-                    self.push_log("[EXTERNAL] Usage: /delegate-external <name> <task>");
+            cmd if cmd.starts_with("/run-agent ") => {
+                let agent_name = parts.get(1).copied().unwrap_or("").trim();
+                let prompt = parts.get(2..).unwrap_or(&[]).join(" ");
+                self.push_log(format!("[AGENTS] Delegating task to '{}'...", agent_name));
+                
+                let action_res = self.tool_registry.evaluate_action("delegate_external_agent", &self.config.tools);
+                if let crate::tool_registry::ToolAction::Deny(reason) = action_res {
+                    self.push_log(format!("[AGENTS] Delegation denied: {}", reason));
                 } else {
-                    let name = subparts[0];
-                    let task = subparts[1];
-                    self.push_log(format!("[EXTERNAL] Delegating to '{}'...", name));
-
-                    let action = self
-                        .tool_registry
-                        .evaluate_action("delegate_external_agent", &self.config.tools);
-                    if let crate::tool_registry::ToolAction::Deny(reason) = action {
-                        self.push_log(format!(
-                            "[EXTERNAL] Delegation denied by tool registry: {}",
-                            reason
-                        ));
-                        return true;
-                    }
-
                     let req = crate::approval::ApprovalRequest {
                         tool_name: "delegate_external_agent".to_string(),
-                        action_summary: format!("agent: {}, task: {}", name, task),
+                        action_summary: format!("agent: {}, task: {}", agent_name, prompt),
                         risk_level: crate::approval::RiskLevel::High,
-                        explanation: None,
+                        explanation: Some("Run external agent".into()),
                         working_directory: None,
                     };
 
@@ -2525,30 +2434,27 @@ impl App {
                         self.approval_gate.check_policy(&req)
                     {
                         self.push_log(format!("[EXTERNAL] Delegation denied via policy: {}", msg));
-                        return true;
-                    }
-
-                    match self
-                        .external_agent_manager
-                        .delegate(name, task, &self.config)
-                    {
-                        Ok(res) => {
-                            self.push_log(format!(
-                                "[EXTERNAL] Execution finished. Success: {}",
-                                res.success
-                            ));
-                            for line in res.stdout.lines() {
-                                self.push_log(format!("[EXTERNAL] Stdout: {}", line));
-                            }
-                            if !res.stderr.is_empty() {
-                                for line in res.stderr.lines() {
-                                    self.push_log(format!("[EXTERNAL] Stderr: {}", line));
-                                }
-                            }
-                        }
-                        Err(e) => self.push_log(format!("[EXTERNAL] Error: {}", e)),
+                    } else {
+                        self.pending_approval = Some(DeferredToolCall {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            name: "delegate_external_agent".to_string(),
+                            args: serde_json::json!({
+                                "agent": agent_name,
+                                "task": prompt,
+                            }),
+                            request: req,
+                            patch_id: None,
+                        });
+                        // The TUI main loop will detect `self.pending_approval.is_some()` 
+                        // and render the approval modal. The execution happens in `resolve_approval`.
+                        self.push_log(format!("[AGENTS] External agent '{}' queued for approval.", agent_name));
                     }
                 }
+                true
+            }
+
+            cmd if cmd.starts_with("/external-agents") || cmd.starts_with("/external-agent ") || cmd.starts_with("/delegate-external ") => {
+                self.push_log("[EXTERNAL] Command deprecated. Please use /agents, /agent-doctor, /run-agent, /agent-runs, /agent-run instead.");
                 true
             }
 
