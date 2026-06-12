@@ -1,66 +1,28 @@
-# GOAT Documentation Index
+# GOAT Documentation
 
-Welcome to the GOAT documentation.
+Welcome to the GOAT local-first agent OS documentation. Use this index to navigate the architecture, workflows, and operations of the system.
 
-## Getting Started
-* [Installation Guide](INSTALL.md)
-* [Building from Source](BUILD_FROM_SOURCE.md)
-* [Setup & Troubleshooting](GOAT_SETUP_AND_TROUBLESHOOTING.md)
-* [GitHub Repo Setup](GITHUB_REPO_SETUP.md)
+## 🚀 Getting Started
+* [Implementation Roadmap](GOAT_IMPLEMENTATION_ROADMAP.md) - High-level goals and phase tracking
+* [Feature Matrix](GOAT_FEATURE_MATRIX.md) - Honest status of all features
+* [Public Alpha Readiness](GOAT_PUBLIC_ALPHA_READINESS_AUDIT.md) - Current state of the Alpha release
+* [Known Limitations](GOAT_KNOWN_LIMITATIONS.md) - Honest constraints of the Alpha
+* [Manual QA Checklist](GOAT_ALPHA_MANUAL_QA_CHECKLIST.md) - Safety testing requirements
 
-## Architecture & Design
-* [Architecture Overview](GOAT_ARCHITECTURE.md)
-* [Architecture Patterns](GOAT_ARCHITECTURE_PATTERNS.md)
-* [Multi-Frontend Architecture](GOAT_MULTI_FRONTEND_ARCHITECTURE.md)
-* [Daemon & Local API](GOAT_DAEMON_AND_LOCAL_API.md)
-* [Desktop Daemon Lifecycle](GOAT_DESKTOP_DAEMON_LIFECYCLE.md)
-* [Web Dashboard](GOAT_WEB_DASHBOARD.md)
-* [Tauri Desktop App](GOAT_TAURI_DESKTOP.md)
+## 🛡️ Core Concepts
+* [Security Model](GOAT_SECURITY_MODEL.md) - Deep dive into ApprovalGate and local-first protections
+* [Agent Architecture](GOAT_AGENT_ARCHITECTURE.md) - How agents run, plan, and execute tasks
 
-## Security
-* [Security Model](GOAT_SECURITY_MODEL.md)
-* [Security Policy](../SECURITY.md)
+## 🤖 Agents
+* [Prime Agents](GOAT_PRIME_AGENTS.md) - Overview of Cofounder, Researcher, Socializer, Designer, Operator, and Builder
+* [PromptForge Integration](GOAT_PROMPTFORGE_INTEGRATION.md) - Automated prompt refinement
 
-## Features & Subsystems
-* [Agent Architecture](GOAT_AGENT_ARCHITECTURE.md)
-* [Prime Agents](GOAT_PRIME_AGENTS.md)
-* [Specialist Agents](GOAT_SPECIALIST_AGENTS.md)
-* [Agent Safety & Ethics](GOAT_AGENT_SAFETY_AND_ETHICS.md)
-* [Report System](GOAT_REPORT_SYSTEM.md)
-* [Cofounder Agent Phase 1](GOAT_COFUNDER_AGENT.md)
-* [Cofounder Workflows](GOAT_COFUNDER_WORKFLOWS.md)
-* [Cofounder Reports](GOAT_COFUNDER_REPORTS.md)
-* [Cofounder Safety](GOAT_COFUNDER_SAFETY.md)
-* [Socializer Agent Plan](GOAT_SOCIALIZER_AGENT_PLAN.md)
-* [Feature Matrix](GOAT_FEATURE_MATRIX.md)
-* [Command System](GOAT_COMMAND_SYSTEM.md)
-* [Context System](GOAT_CONTEXT_SYSTEM.md)
-* [Dashboard Agent Chat](GOAT_DASHBOARD_AGENT_CHAT.md)
-* [Dashboard Chat Repo Diff](GOAT_DASHBOARD_CHAT_REPO_DIFF.md)
-* [GitHub Workflow](GOAT_GITHUB_WORKFLOW.md)
-* [Subagents](GOAT_SUBAGENTS.md)
-* [External Agent Adapters](GOAT_EXTERNAL_AGENT_ADAPTERS.md)
-* [Browser Adapter](GOAT_BROWSER_ADAPTER.md)
-* [Transports](GOAT_TRANSPORTS.md)
-* [Voice Transport](GOAT_VOICE_TRANSPORT.md)
-* [Agent Mode Profiles](GOAT_AGENT_MODE_PROFILES.md)
-* [Project Profiles](GOAT_PROJECT_PROFILES.md)
-* [Onboarding Wizard](GOAT_ONBOARDING_WIZARD.md)
-* [Brain Learning Loop](GOAT_BRAIN_LEARNING_LOOP.md)
-* [Learning Privacy](GOAT_LEARNING_PRIVACY.md)
+## 📂 Core Subsystems
+* [Report System](GOAT_REPORT_SYSTEM.md) - Structured markdown reporting
+* [Timeline System](GOAT_PROJECT_TIMELINE.md) - Chronological event histories
 
-## Developer & Release
-* [Development Guide](DEVELOPMENT.md)
-* [Implementation Roadmap](GOAT_IMPLEMENTATION_ROADMAP.md)
-* [Release Process](RELEASE_PROCESS.md)
-* [Packaging Plan](PACKAGING.md)
-* [Contributing Guide](../CONTRIBUTING.md)
+## 🤝 Community
+* [Contributing](CONTRIBUTING.md) - Guidelines for helping out
+* [Code of Conduct](CODE_OF_CONDUCT.md)
 
-## Research & Audits
-* [Codebase Audit](GOAT_CODEBASE_AUDIT.md)
-* [Dashboard Commands Audit](GOAT_DASHBOARD_COMMANDS_AUDIT.md)
-* [Dashboard UX Audit](GOAT_DASHBOARD_UX_AUDIT.md)
-* [UI UX Audit](GOAT_UI_UX_AUDIT.md)
-* [Product Health Audit](GOAT_PRODUCT_HEALTH_AUDIT.md)
-* [Feature Parity Review (v4.7)](GOAT_FEATURE_PARITY_REVIEW_4_7.md)
-* [Deep Research Agent Landscape](research/GOAT_DEEP_RESEARCH_AGENT_LANDSCAPE.md)
+*Note: For the quickest way to get started, please see the root [README.md](../README.md).*

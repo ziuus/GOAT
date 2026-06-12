@@ -15,6 +15,7 @@ interface Toast {
 
 export default function EventStreamProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [connected, setConnected] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -24,6 +25,8 @@ export default function EventStreamProvider({ children }: { children: React.Reac
     const eventSourceUrl = `${config.baseUrl}/v1/events/stream`;
     const urlWithToken = `${eventSourceUrl}?token=${config.token}`;
     const sse = new EventSource(urlWithToken);
+    
+    sse.onopen = () => setConnected(true);
 
     sse.onmessage = async (event) => {
       try {
@@ -76,6 +79,7 @@ export default function EventStreamProvider({ children }: { children: React.Reac
 
     sse.onerror = (err) => {
       console.error('EventSource failed:', err);
+      setConnected(false);
     };
 
     return () => {
@@ -97,16 +101,34 @@ export default function EventStreamProvider({ children }: { children: React.Reac
 
   return (
     <>
+      {!connected && (
+        <div className="bg-red-500/10 border-b border-red-500/20 text-red-400 px-4 py-2 flex items-center justify-center gap-2 text-sm z-[100] relative">
+          <AlertTriangle className="w-4 h-4" />
+          <span><strong>Daemon Disconnected:</strong> GOAT requires the local daemon to be running. Run <code className="bg-black/20 px-1 rounded">cargo run --release -- daemon start</code> in your terminal, then refresh this page.</span>
+          <button onClick={() => window.location.reload()} className="ml-4 px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 rounded text-xs">Retry</button>
+        </div>
+      )}
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none w-80">
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(toast => (
-          <div key={toast.id} className="pointer-events-auto flex items-start gap-3 bg-card border border-border p-4 rounded-lg shadow-lg animate-in slide-in-from-right relative group">
+          <div key={toast.id} className="bg-slate-900 border border-slate-800 rounded-lg shadow-xl p-4 w-80 flex items-start gap-3 transform transition-all animate-in slide-in-from-right-4">
             {getIcon(toast.type)}
-            <div className="flex-1 min-w-0" onClick={() => { if(toast.link) { router.push(toast.link); removeToast(toast.id); } }} style={{ cursor: toast.link ? 'pointer' : 'default' }}>
-              <h4 className="text-sm font-semibold truncate hover:underline">{toast.title}</h4>
-              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{toast.message}</p>
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-white">{toast.title}</h4>
+              <p className="text-sm text-slate-400 mt-1">{toast.message}</p>
+              {toast.link && (
+                <button 
+                  onClick={() => router.push(toast.link!)}
+                  className="mt-2 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  View Details &rarr;
+                </button>
+              )}
             </div>
-            <button onClick={() => removeToast(toast.id)} className="text-muted-foreground hover:text-foreground">
+            <button 
+              onClick={() => removeToast(toast.id)}
+              className="text-slate-500 hover:text-white transition-colors"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>

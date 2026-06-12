@@ -879,62 +879,67 @@ async fn handle_seed_demo_command(
 
     if clear {
         println!("Clearing existing demo data...");
-        let _ = fs::remove_file(&cofounder_file);
-        let _ = fs::remove_file(&learner_goals);
-        let _ = fs::remove_file(&learner_roadmaps);
-        let _ = fs::remove_file(&promptforge_hist);
-        if reports_dir.exists() {
-            let _ = fs::remove_dir_all(&reports_dir);
+        let clear_jsonl = |path: &std::path::PathBuf| {
+            if path.exists() {
+                if let Ok(content) = fs::read_to_string(path) {
+                    let filtered: Vec<&str> = content.lines().filter(|l| !l.contains("[DEMO]")).collect();
+                    let _ = fs::write(path, filtered.join("\n"));
+                }
+            }
+        };
+        clear_jsonl(&cofounder_file);
+        clear_jsonl(&learner_goals);
+        clear_jsonl(&learner_roadmaps);
+        clear_jsonl(&promptforge_hist);
+    } else {
+        // Seed Cofounder
+        println!("Seeding Cofounder ideas...");
+        if let Ok(mut cofounder) = crate::agents::cofounder::CofounderManager::new() {
+            let _ = cofounder.add_idea(
+                "[DEMO] AI Developer CLI".to_string(),
+                "A terminal-native AI agent platform written in Rust".to_string(),
+                "Developers".to_string(),
+            );
+            let _ = cofounder.add_idea(
+                "[DEMO] HyperFrames Video Studio".to_string(),
+                "Create programmatic videos using React and HTML".to_string(),
+                "Creators".to_string(),
+            );
         }
-    }
 
-    // Seed Cofounder
-    println!("Seeding Cofounder ideas...");
-    if let Ok(mut cofounder) = crate::agents::cofounder::CofounderManager::new() {
-        let _ = cofounder.add_idea(
-            "AI Developer CLI".to_string(),
-            "A terminal-native AI agent platform written in Rust".to_string(),
-            "Developers".to_string(),
-        );
-        let _ = cofounder.add_idea(
-            "HyperFrames Video Studio".to_string(),
-            "Create programmatic videos using React and HTML".to_string(),
-            "Creators".to_string(),
-        );
-    }
-
-    // Seed Learner
-    println!("Seeding Learner goals...");
-    if let Ok(learner) = crate::agents::learner::LearnerAgent::new() {
-        if let Ok(goal) = learner.create_goal(
-            "Master Rust Concurrency",
-            crate::agents::learner::LearningDomain::Rust,
-        ) {
-            let _ = learner.create_roadmap(&goal.id);
+        // Seed Learner
+        println!("Seeding Learner goals...");
+        if let Ok(learner) = crate::agents::learner::LearnerAgent::new() {
+            if let Ok(goal) = learner.create_goal(
+                "[DEMO] Master Rust Concurrency",
+                crate::agents::learner::LearningDomain::Rust,
+            ) {
+                let _ = learner.create_roadmap(&goal.id);
+            }
         }
+
+        // Seed Reports
+        println!("Seeding Reports...");
+        let report_mgr = crate::reports::ReportManager::new();
+        let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
+            kind: crate::reports::ReportKind::Research,
+            title: "[DEMO] Rust Async Ecosystem".into(),
+            sections: vec![crate::reports::ReportSection {
+                heading: "Overview".into(),
+                body: "Tokio remains the dominant runtime for async Rust.".into(),
+            }],
+        });
+        let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
+            kind: crate::reports::ReportKind::CodeReview,
+            title: "[DEMO] Phase 6.5 Audit".into(),
+            sections: vec![crate::reports::ReportSection {
+                heading: "Security".into(),
+                body: "Passed all automated checks.".into(),
+            }],
+        });
     }
 
-    // Seed Reports
-    println!("Seeding Reports...");
-    let report_mgr = crate::reports::ReportManager::new();
-    let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
-        kind: crate::reports::ReportKind::Research,
-        title: "Rust Async Ecosystem".into(),
-        sections: vec![crate::reports::ReportSection {
-            heading: "Overview".into(),
-            body: "Tokio remains the dominant runtime for async Rust.".into(),
-        }],
-    });
-    let _ = report_mgr.generate_report(crate::reports::ReportTemplate {
-        kind: crate::reports::ReportKind::CodeReview,
-        title: "Phase 6.5 Audit".into(),
-        sections: vec![crate::reports::ReportSection {
-            heading: "Security".into(),
-            body: "Passed all automated checks.".into(),
-        }],
-    });
-
-    println!("Demo seed complete! Run `goat dashboard` to see the changes.");
+    println!("Demo seed/clear complete! Run `goat dashboard` to see the changes.");
     Ok(())
 }
 

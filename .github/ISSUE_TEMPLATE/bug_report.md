@@ -13,19 +13,16 @@ A clear and concise description of what the bug is.
 **To Reproduce**
 Steps to reproduce the behavior:
 1. Run command '...'
-2. Click on '....'
+2. Navigate to '....'
 3. See error
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
-**Environment details:**
+**Environment (please complete the following information):**
  - OS: [e.g. Ubuntu, macOS, Windows]
- - Version of GOAT: [e.g. 0.1.0-alpha.1]
- - Installation method: [Source / Binary]
+ - GOAT Version: [e.g. v0.14.0-alpha.1]
+ - Interface: [e.g. TUI, Dashboard, CLI]
 
 **Additional context**
-Add any other context about the problem here.
+Add any other context about the problem here (logs, terminal output, etc.).

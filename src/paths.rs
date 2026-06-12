@@ -834,6 +834,88 @@ pub fn run_doctor(
         });
     }
 
+    // ── Extensions ────────────────────────────────────────────────────────────
+    if paths.config_file.parent().map(|p| p.join("extensions").exists()).unwrap_or(false) {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "ExtensionRegistry".to_string(),
+            detail: "Enabled".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "ExtensionRegistry".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Brain Index ───────────────────────────────────────────────────────────
+    if paths.data_dir.join("brain_index.json").exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Brain Index".to_string(),
+            detail: "Found".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Brain Index".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Reports Directory ─────────────────────────────────────────────────────
+    if paths.data_dir.join("reports").exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Reports Directory".to_string(),
+            detail: "Exists".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Reports Directory".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Timeline Directory ────────────────────────────────────────────────────
+    if paths.data_dir.join("timeline").exists() {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Timeline Directory".to_string(),
+            detail: "Exists".to_string(),
+        });
+    } else {
+        checks.push(DoctorCheck {
+            status: DoctorStatus::Info,
+            label: "Timeline Directory".to_string(),
+            detail: "Not yet created".to_string(),
+        });
+    }
+
+    // ── Browser Workflows ─────────────────────────────────────────────────────
+    checks.push(DoctorCheck {
+        status: DoctorStatus::Info,
+        label: "Browser Workflows".to_string(),
+        detail: "Requires external browser environment".to_string(),
+    });
+
+    // ── Git Availability ──────────────────────────────────────────────────────
+    let git_status = std::process::Command::new("git").arg("--version").output();
+    match git_status {
+        Ok(_) => checks.push(DoctorCheck {
+            status: DoctorStatus::Ok,
+            label: "Git Availability".to_string(),
+            detail: "Available".to_string(),
+        }),
+        Err(_) => checks.push(DoctorCheck {
+            status: DoctorStatus::Warn,
+            label: "Git Availability".to_string(),
+            detail: "Not found (some workflows may degrade)".to_string(),
+        }),
+    }
+
     checks
 }
 
