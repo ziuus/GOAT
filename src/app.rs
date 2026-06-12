@@ -4589,7 +4589,11 @@ impl App {
 
                 match subcmd {
                     "readiness" => {
-                        match agent.create_deployment_readiness(if target.is_empty() { "default" } else { target }) {
+                        match agent.create_deployment_readiness(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
                             Ok(hc) => self.push_log(format!(
                                 "[OPERATOR] Readiness check generated: {} risk findings.",
                                 hc.risks.len()
@@ -4598,7 +4602,11 @@ impl App {
                         }
                     }
                     "release-health" => {
-                        match agent.create_release_health(if target.is_empty() { "default" } else { target }) {
+                        match agent.create_release_health(if target.is_empty() {
+                            "default"
+                        } else {
+                            target
+                        }) {
                             Ok(rh) => self.push_log(format!(
                                 "[OPERATOR] Release health checked: status is {:?}.",
                                 rh.status
@@ -4607,17 +4615,22 @@ impl App {
                         }
                     }
                     "logs" => {
-                        match agent.create_log_review(if target.is_empty() { "default" } else { target }, "sample log text") {
-                            Ok(lf) => self.push_log(format!("[OPERATOR] Logs reviewed: {} error patterns.", lf.patterns.len())),
+                        match agent.create_log_review(
+                            if target.is_empty() { "default" } else { target },
+                            "sample log text",
+                        ) {
+                            Ok(lf) => self.push_log(format!(
+                                "[OPERATOR] Logs reviewed: {} error patterns.",
+                                lf.patterns.len()
+                            )),
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }
                     "incident" => {
-                        match agent.create_incident(if target.is_empty() {
-                            "default"
-                        } else {
-                            target
-                        }, "CLI generated incident") {
+                        match agent.create_incident(
+                            if target.is_empty() { "default" } else { target },
+                            "CLI generated incident",
+                        ) {
                             Ok(inc) => self.push_log(format!(
                                 "[OPERATOR] Incident analysis generated. Severity: {:?}",
                                 inc.severity
@@ -4644,7 +4657,9 @@ impl App {
                         } else {
                             target
                         }) {
-                            Ok(_) => self.push_log(format!("[OPERATOR] Monitoring plan generated.")),
+                            Ok(_) => {
+                                self.push_log(format!("[OPERATOR] Monitoring plan generated."))
+                            }
                             Err(e) => self.push_log(format!("[OPERATOR] Error: {}", e)),
                         }
                     }

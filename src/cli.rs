@@ -882,7 +882,8 @@ async fn handle_seed_demo_command(
         let clear_jsonl = |path: &std::path::PathBuf| {
             if path.exists() {
                 if let Ok(content) = fs::read_to_string(path) {
-                    let filtered: Vec<&str> = content.lines().filter(|l| !l.contains("[DEMO]")).collect();
+                    let filtered: Vec<&str> =
+                        content.lines().filter(|l| !l.contains("[DEMO]")).collect();
                     let _ = fs::write(path, filtered.join("\n"));
                 }
             }

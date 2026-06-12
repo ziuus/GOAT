@@ -122,13 +122,28 @@ pub async fn start_server(
         )
         .route("/v1/operator/status", get(operator_status_handler))
         .route("/v1/operator/readiness", post(operator_readiness_handler))
-        .route("/v1/operator/release-health", post(operator_release_health_handler))
+        .route(
+            "/v1/operator/release-health",
+            post(operator_release_health_handler),
+        )
         .route("/v1/operator/incident", post(operator_incident_handler))
-        .route("/v1/operator/incidents", get(operator_list_incidents_handler))
-        .route("/v1/operator/incidents/:id", get(operator_get_incident_handler))
+        .route(
+            "/v1/operator/incidents",
+            get(operator_list_incidents_handler),
+        )
+        .route(
+            "/v1/operator/incidents/:id",
+            get(operator_get_incident_handler),
+        )
         .route("/v1/operator/logs", post(operator_logs_handler))
-        .route("/v1/operator/rollback-plan", post(operator_rollback_handler))
-        .route("/v1/operator/monitoring-plan", post(operator_monitoring_handler))
+        .route(
+            "/v1/operator/rollback-plan",
+            post(operator_rollback_handler),
+        )
+        .route(
+            "/v1/operator/monitoring-plan",
+            post(operator_monitoring_handler),
+        )
         .route("/v1/operator/report", post(operator_report_handler))
         .route("/v1/operator/reports", get(operator_list_reports_handler))
         .route("/v1/learner/status", get(learner_status_handler))
@@ -4783,7 +4798,8 @@ async fn operator_incident_handler(
     Ok(axum::Json(serde_json::json!({ "incident": inc })))
 }
 
-async fn operator_list_incidents_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+async fn operator_list_incidents_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     let agent = crate::agents::operator::OperatorAgent::new()
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let incs = agent
@@ -4869,7 +4885,8 @@ async fn operator_report_handler(
     Ok(axum::Json(serde_json::json!({ "report": r })))
 }
 
-async fn operator_list_reports_handler() -> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
+async fn operator_list_reports_handler()
+-> Result<impl axum::response::IntoResponse, axum::http::StatusCode> {
     let agent = crate::agents::operator::OperatorAgent::new()
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
     let reps = agent

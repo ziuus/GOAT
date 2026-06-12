@@ -835,7 +835,12 @@ pub fn run_doctor(
     }
 
     // ── Extensions ────────────────────────────────────────────────────────────
-    if paths.config_file.parent().map(|p| p.join("extensions").exists()).unwrap_or(false) {
+    if paths
+        .config_file
+        .parent()
+        .map(|p| p.join("extensions").exists())
+        .unwrap_or(false)
+    {
         checks.push(DoctorCheck {
             status: DoctorStatus::Ok,
             label: "ExtensionRegistry".to_string(),
