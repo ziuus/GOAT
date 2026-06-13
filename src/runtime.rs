@@ -300,7 +300,7 @@ impl GoatRuntime {
             llm_router,
             profile_registry,
             swarm_router: SwarmRouter::default(),
-            approval_gate: ApprovalGate::new(),
+            approval_gate: ApprovalGate::with_profile(config.approval.profile.clone()),
             mcp_manager: McpManager::new(),
             mcp_runtime: {
                 let mut mgr = crate::mcp_runtime::McpRuntimeManager::new();

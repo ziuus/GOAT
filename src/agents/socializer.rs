@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::brain_index::BrainIndexManager;
 use crate::llm::LlmRouter;
 use crate::models::ModelChain;

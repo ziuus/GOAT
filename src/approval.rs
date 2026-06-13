@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Approval gate for dangerous tool operations.
 //!
 //! This module implements the security approval layer that must be consulted
@@ -974,5 +975,35 @@ mod tests {
 
         // Next time, same command should be auto-approved by validation-fast
         assert_eq!(gate.check_policy(&req), Some(ApprovalDecision::Approved));
+    }
+
+    #[test]
+    fn test_validation_fast_does_not_approve_arbitrary_shell() {
+        let mut gate = ApprovalGate::with_profile(crate::config::ApprovalProfile::ValidationFast);
+        let req = ApprovalRequest {
+            tool_name: "bash".to_string(),
+            action_summary: "ls -la".to_string(),
+            risk_level: RiskLevel::Low,
+            explanation: None,
+            working_directory: None,
+        };
+
+        gate.resolve(&req, 'y');
+        assert_eq!(gate.check_policy(&req), None);
+    }
+
+    #[test]
+    fn test_validation_fast_does_not_approve_file_writes() {
+        let mut gate = ApprovalGate::with_profile(crate::config::ApprovalProfile::ValidationFast);
+        let req = ApprovalRequest {
+            tool_name: "write_file".to_string(),
+            action_summary: "/tmp/foo".to_string(),
+            risk_level: RiskLevel::Medium,
+            explanation: None,
+            working_directory: None,
+        };
+
+        gate.resolve(&req, 'y');
+        assert_eq!(gate.check_policy(&req), None);
     }
 }

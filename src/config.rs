@@ -80,6 +80,9 @@ pub struct Config {
     /// Tools and permissions config.
     #[serde(default)]
     pub tools: ToolsConfig,
+    /// Approval gate profile config.
+    #[serde(default)]
+    pub approval: ApprovalConfig,
     /// External agent adapters config.
     #[serde(default)]
     pub external_agents: ExternalAgentsConfig,
@@ -1392,6 +1395,61 @@ impl Default for VoiceConfig {
             wake_word: false,
             store_audio: false,
             max_audio_seconds: 120,
+        }
+    }
+}
+
+// ── Approval Config ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ApprovalProfile {
+    Strict,
+    Balanced,
+    ValidationFast,
+    AuditOnly,
+}
+
+impl Default for ApprovalProfile {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
+
+impl std::str::FromStr for ApprovalProfile {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "strict" => Ok(Self::Strict),
+            "balanced" => Ok(Self::Balanced),
+            "validation-fast" => Ok(Self::ValidationFast),
+            "audit-only" => Ok(Self::AuditOnly),
+            _ => Err(format!("Unknown approval profile '{}'", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for ApprovalProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Strict => write!(f, "strict"),
+            Self::Balanced => write!(f, "balanced"),
+            Self::ValidationFast => write!(f, "validation-fast"),
+            Self::AuditOnly => write!(f, "audit-only"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ApprovalConfig {
+    pub profile: ApprovalProfile,
+}
+
+impl Default for ApprovalConfig {
+    fn default() -> Self {
+        Self {
+            profile: ApprovalProfile::Strict,
         }
     }
 }

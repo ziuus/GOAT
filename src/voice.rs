@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::config::VoiceConfig;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! CLI argument parsing for GOAT using `clap`.
 //!
 //! Defines the top-level CLI structure and handles all non-TUI subcommands.
@@ -544,9 +545,7 @@ pub enum Command {
 
     /// Help for users migrating from other AI coding tools.
     #[command(name = "migrate-from")]
-    MigrateFrom {
-        tool: String,
-    },
+    MigrateFrom { tool: String },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -580,44 +579,42 @@ pub async fn handle_subcommand(
 
         Command::Quickstart => {
             let version = env!("CARGO_PKG_VERSION");
-            let quickstart_text = format!(r#"
+            let quickstart_text = format!(
+                r#"
 ============================================================
-              🐐 GOAT ALPHA 1 QUICKSTART 🐐                 
+              🐐 GOAT ALPHA QUICKSTART 🐐                 
 ============================================================
 
 Version: {}
+GOAT Identity: A local-first, agentic OS focusing on safety and deterministic checkpoints.
 
-Welcome to GOAT (General Objective Agentic Task-engine)!
-If you are migrating from Claude Code, OpenCode, Aider, Cline, etc.,
-here is how GOAT works.
+⚠️ SAFETY REMINDER ⚠️
+GOAT requires explicit approvals for high-risk actions. No commands or file changes happen silently.
 
-1. START HERE
-   $ goat commands
-   (Shows all available commands grouped by workflow)
+✨ GOLDEN PATH WORKFLOW ✨
+1. goat learn .
+2. goat mission create "build my feature"
+3. goat patch propose
+4. goat validate
 
-   $ goat doctor alpha
-   (Checks system health and workspace readiness)
+🚀 NEXT RECOMMENDED COMMAND:
+$ goat doctor alpha
 
-2. COMMON WORKFLOWS
-   • Learn a project:    $ goat learn
-   • Create a mission:   $ goat mission create "add login page"
-   • Inspect tools:      $ goat tools list
-   • Propose edit:       $ goat patch propose
-   • Use approvals:      $ goat approval profile set ValidationFast
+COMMON JOURNEYS:
+• Learn project:         $ goat learn .
+• Create mission:        $ goat mission create "<prompt>"
+• Inspect tools:         $ goat tools list
+• Propose/review patch:  $ goat patch propose
+• Run validation:        $ goat validate
+• Change approval:       $ goat approval profile set ValidationFast
+• Open TUI/Dashboard:    $ goat
 
-3. MIGRATING?
-   Try our migration help:
-   $ goat migrate-from claude-code
-   $ goat migrate-from aider
-
-4. INTERACTIVE TUI
-   $ goat
-   (Launches the full interactive terminal UI)
-
-Safety First: GOAT requires approvals for high-risk actions by default.
-Read docs/GOAT_MIGRATION_GUIDE.md for detailed migration tips.
+Need Migration Help?
+Try: $ goat migrate-from claude-code
 ============================================================
-"#, version);
+"#,
+                version
+            );
             println!("{}", quickstart_text);
             Ok(true)
         }
@@ -665,14 +662,14 @@ Read docs/GOAT_MIGRATION_GUIDE.md for detailed migration tips.
                         detail: "Capability registry file not found. Run 'goat extension install' or manually register.".to_string(),
                     });
                 }
-                
+
                 // Current approval profile
                 checks.push(crate::paths::DoctorCheck {
                     status: crate::paths::DoctorStatus::Info,
                     label: "Alpha: Approval Profile".to_string(),
                     detail: config.approval.profile.to_string(),
                 });
-                
+
                 // Workspace readiness
                 let is_git = std::path::Path::new(".git").exists();
                 let has_src = std::path::Path::new("src").exists();
@@ -681,26 +678,30 @@ Read docs/GOAT_MIGRATION_GUIDE.md for detailed migration tips.
                     checks.push(crate::paths::DoctorCheck {
                         status: crate::paths::DoctorStatus::Ok,
                         label: "Alpha: Workspace".to_string(),
-                        detail: "Workspace appears ready for GOAT (Git repo with code).".to_string(),
+                        detail: "Workspace appears ready for GOAT (Git repo with code)."
+                            .to_string(),
                     });
                 } else {
                     checks.push(crate::paths::DoctorCheck {
                         status: crate::paths::DoctorStatus::Warn,
                         label: "Alpha: Workspace".to_string(),
-                        detail: "Workspace might not be ready. Run GOAT in a Git repository.".to_string(),
+                        detail: "Workspace might not be ready. Run GOAT in a Git repository."
+                            .to_string(),
                     });
                 }
-                
+
                 // Smoke test and docs hint
                 checks.push(crate::paths::DoctorCheck {
                     status: crate::paths::DoctorStatus::Info,
                     label: "Alpha: Smoke Tests".to_string(),
-                    detail: "Run 'scripts/smoke-test-alpha.sh' to verify core components.".to_string(),
+                    detail: "Run 'scripts/smoke-test-alpha.sh' to verify core components."
+                        .to_string(),
                 });
                 checks.push(crate::paths::DoctorCheck {
                     status: crate::paths::DoctorStatus::Info,
                     label: "Alpha: Docs".to_string(),
-                    detail: "Run 'goat quickstart' or read docs/GOAT_ALPHA_QUICKSTART.md".to_string(),
+                    detail: "Run 'goat quickstart' or read docs/GOAT_ALPHA_QUICKSTART.md"
+                        .to_string(),
                 });
             }
             crate::paths::print_doctor_results(&checks);
@@ -708,14 +709,14 @@ Read docs/GOAT_MIGRATION_GUIDE.md for detailed migration tips.
         }
 
         Command::Commands => {
-            println!(r#"
+            println!(
+                r#"
 🐐 GOAT Commands by Workflow
 
 START HERE:
   quickstart     Show the interactive quickstart guide
   commands       Show this grouped command list
   migrate-from   Help for migrating from other tools
-  doctor         Check system health and readiness
 
 PROJECTS:
   learn          Analyze repository and build context map
@@ -724,33 +725,42 @@ PROJECTS:
 MISSIONS:
   mission        Create, list, and resume missions
 
-PATCHES & EDITS:
+PATCHES/CHECKPOINTS:
   patch          Generate, review, and apply code changes
   checkpoint     Manage Git-based safety checkpoints
 
 VALIDATION:
   validate       Run workspace verification (tests/build)
 
-AGENTS & SKILLS:
-  agents         Manage AI agents (Builder, Designer, etc.)
+SKILLS:
   skills         Manage reusable workflow skills
-  tools          Execute specific tools or recipes
-
-APPROVAL & SAFETY:
-  approval       Manage safety profiles (e.g., ValidationFast)
-  capability     List available capabilities and permissions
 
 MEMORY:
   sessions       List session history
   memory         Curate specific memories for the brain
 
+AGENTS:
+  agents         Manage AI agents (Builder, Designer, etc.)
+
+EXTENSIONS/TOOLS:
+  tools          Execute specific tools or recipes
+  extension      Manage MCP extensions
+
+APPROVAL/SAFETY:
+  approval       Manage safety profiles (e.g., ValidationFast)
+  capability     List available capabilities and permissions
+
+DIAGNOSTICS:
+  doctor         Check system health and readiness
+
 Run `goat <command> --help` for details on any command.
-"#);
+"#
+            );
             Ok(true)
         }
 
         Command::MigrateFrom { tool } => {
-            handle_migrate_from(tool);
+            handle_migrate_from(tool)?;
             Ok(true)
         }
 
@@ -4614,7 +4624,7 @@ fn handle_approval_command(
     Ok(())
 }
 
-fn handle_migrate_from(tool: &str) {
+fn handle_migrate_from(tool: &str) -> anyhow::Result<()> {
     let lower = tool.to_lowercase();
     match lower.as_str() {
         "claude-code" | "opencode" | "openclaw" => {
@@ -4635,12 +4645,15 @@ fn handle_migrate_from(tool: &str) {
             println!("What you expect: Instant file editing, chat in terminal, /add files.");
             println!("How GOAT works: ");
             println!("  - TUI has slash commands (e.g. /commands, /help).");
-            println!("  - File context is handled via 'goat learn' (AST Map) instead of manual /add.");
+            println!(
+                "  - File context is handled via 'goat learn' (AST Map) instead of manual /add."
+            );
             println!("  - Editing uses Patch Proposals instead of direct file mutation.");
             println!("Ready now: Multi-file intelligence, test-driven validation.");
             println!("Not ready: Direct chat-to-code instant mutation (GOAT is safer by design).");
         }
-        "cline" | "continue" | "cursor" | "windsurf" | "hermes" | "codex" | "gemini" | "little-bird" => {
+        "cline" | "continue" | "cursor" | "windsurf" | "hermes" | "codex" | "gemini"
+        | "little-bird" => {
             println!("🐐 Migrating from GUI/IDE-first Assistants ({})", tool);
             println!("--------------------------------------------------");
             println!("What you expect: Sidebars, inline diffs, IDE tab context.");
@@ -4652,12 +4665,8 @@ fn handle_migrate_from(tool: &str) {
             println!("Not ready: Full IDE synchronization (coming in Beta).");
         }
         _ => {
-            println!("🐐 Migrating from {}", tool);
-            println!("--------------------------------------------------");
-            println!("GOAT is a terminal-first, agentic coding assistant.");
-            println!("Unlike older tools, GOAT emphasizes safe, explicit approvals");
-            println!("for executing commands and editing files.");
-            println!("\nRun 'goat quickstart' to see the GOAT workflow.");
+            anyhow::bail!("Unknown tool '{}'. Supported tools: claude-code, opencode, openclaw, aider, cline, continue, cursor, windsurf, codex, gemini, hermes, little-bird.", tool);
         }
     }
+    Ok(())
 }

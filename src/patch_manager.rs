@@ -148,9 +148,9 @@ impl PatchManager {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let mut risk_score = 0;
         let diff_lines = diff_preview.lines().count();
-        let (risk_score, risk_level, estimated_impact) = assess_patch_risk(&target_file, original_content.is_empty(), diff_lines);
+        let (_risk_score, risk_level, estimated_impact) =
+            assess_patch_risk(&target_file, original_content.is_empty(), diff_lines);
 
         let suggested_validation = suggest_validation_command(&target_file, &project);
 
@@ -250,13 +250,13 @@ impl PatchManager {
 fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, String, String) {
     let mut risk_score = 0;
     let path_lower = path.to_lowercase();
-    
+
     // Impact assessment
     let mut impact = Vec::new();
     if is_new {
         impact.push("New file creation");
     }
-    
+
     // Check for build/config files
     if path_lower.ends_with("cargo.toml")
         || path_lower.ends_with("package.json")
@@ -277,9 +277,9 @@ fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, Strin
         risk_score += 2;
         impact.push("Core entry point modified");
     }
-    
+
     // Security/Auth files
-    if path_lower.contains("auth") 
+    if path_lower.contains("auth")
         || path_lower.contains("security")
         || path_lower.contains("crypto")
         || path_lower.contains("login")
@@ -289,7 +289,10 @@ fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, Strin
     }
 
     // Database / Schema
-    if path_lower.contains("schema") || path_lower.contains("migration") || path_lower.contains("model") {
+    if path_lower.contains("schema")
+        || path_lower.contains("migration")
+        || path_lower.contains("model")
+    {
         risk_score += 2;
         impact.push("Database schema/model modified");
     }
@@ -314,7 +317,7 @@ fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, Strin
     } else {
         "low".to_string()
     };
-    
+
     let estimated_impact = if impact.is_empty() {
         "Minimal".to_string()
     } else {
@@ -324,9 +327,12 @@ fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, Strin
     (risk_score, risk_level, estimated_impact)
 }
 
-fn suggest_validation_command(path: &str, project: &crate::project_intelligence::ProjectIntelligence) -> Option<String> {
+fn suggest_validation_command(
+    path: &str,
+    project: &crate::project_intelligence::ProjectIntelligence,
+) -> Option<String> {
     let path_lower = path.to_lowercase();
-    
+
     if path_lower.ends_with(".rs") {
         return Some("cargo check && cargo test".to_string());
     } else if path_lower.ends_with(".ts") || path_lower.ends_with(".tsx") {
@@ -334,7 +340,7 @@ fn suggest_validation_command(path: &str, project: &crate::project_intelligence:
     } else if path_lower.ends_with(".go") {
         return Some("go build ./... && go test ./...".to_string());
     }
-    
+
     // Fallback to project defaults
     project
         .test_commands
@@ -342,4 +348,68 @@ fn suggest_validation_command(path: &str, project: &crate::project_intelligence:
         .cloned()
         .or_else(|| project.build_commands.first().cloned())
         .or_else(|| Some("Manual review required".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_assess_patch_risk() {
+        let (score, level, impact) = assess_patch_risk("src/main.rs", false, 60);
+        assert!(score >= 3);
+        assert_eq!(level, "high");
+        assert!(impact.contains("Core entry point modified"));
+        assert!(impact.contains("Large modification"));
+
+        let (score2, level2, impact2) = assess_patch_risk("package.json", true, 10);
+        assert!(score2 >= 3);
+        assert_eq!(level2, "high");
+        assert!(impact2.contains("Build/Config file modification"));
+        assert!(impact2.contains("New file creation"));
+
+        let (score3, level3, impact3) = assess_patch_risk("src/utils/helpers.rs", false, 5);
+        assert_eq!(score3, 0);
+        assert_eq!(level3, "low");
+        assert_eq!(impact3, "Minor modification");
+    }
+
+    #[test]
+    fn test_suggest_validation_command() {
+        let pi = crate::project_intelligence::ProjectIntelligence {
+            project_id: "test".to_string(),
+            name: "test".to_string(),
+            root_path: std::path::PathBuf::from("."),
+            detected_stack: vec![],
+            languages: vec![],
+            frameworks: vec![],
+            package_managers: vec![],
+            important_files: vec![],
+            available_commands: vec![],
+            test_commands: vec!["cargo test".to_string()],
+            build_commands: vec!["cargo build".to_string()],
+            dev_commands: vec![],
+            lint_commands: vec![],
+            deploy_commands: vec![],
+            readme_summary: String::new(),
+            architecture_summary: String::new(),
+            last_scanned_at: 0,
+            scan_status: "done".to_string(),
+            risk_notes: vec![],
+            ignored_paths: vec![],
+            linked_missions: vec![],
+        };
+
+        let cmd1 = suggest_validation_command("src/main.rs", &pi).unwrap();
+        assert_eq!(cmd1, "cargo check && cargo test");
+
+        let cmd2 = suggest_validation_command("src/app.tsx", &pi).unwrap();
+        assert_eq!(cmd2, "npm run build && npm run test");
+
+        let cmd3 = suggest_validation_command("main.go", &pi).unwrap();
+        assert_eq!(cmd3, "go build ./... && go test ./...");
+
+        let cmd4 = suggest_validation_command("README.md", &pi).unwrap();
+        assert_eq!(cmd4, "cargo test"); // Fallback to project.test_commands
+    }
 }

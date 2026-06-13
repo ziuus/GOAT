@@ -346,15 +346,39 @@ impl CodeExecutionManager {
             if let Some(content) = &step.new_content {
                 let target_path = working_dir.join(&step.target_file);
 
+                // Ensure path containment
+                let canonical_root = working_dir.canonicalize()?;
+                let parent_dir = target_path.parent().unwrap_or(working_dir);
+                if !parent_dir.exists() {
+                    fs::create_dir_all(parent_dir)?;
+                }
+                let canonical_parent = parent_dir.canonicalize()?;
+                if !canonical_parent.starts_with(&canonical_root) {
+                    anyhow::bail!("Path traversal attempt blocked: {}", step.target_file);
+                }
+
                 // Block risky paths
-                if step.target_file.contains("package-lock.json")
-                    || step.target_file.contains("Cargo.lock")
+                let path_str = step.target_file.to_lowercase();
+                if path_str.contains("package-lock.json")
+                    || path_str.contains("cargo.lock")
+                    || path_str.contains("poetry.lock")
                 {
                     anyhow::bail!("Modification of lockfiles is blocked.");
                 }
 
-                if let Some(parent) = target_path.parent() {
-                    fs::create_dir_all(parent)?;
+                if crate::repo_map::looks_like_secret_file(&target_path) {
+                    anyhow::bail!("Refusing to patch sensitive file: {}", step.target_file);
+                }
+
+                if path_str.contains("node_modules/")
+                    || path_str.contains("target/")
+                    || path_str.contains("vendor/")
+                    || path_str.contains(".git/")
+                {
+                    anyhow::bail!(
+                        "Refusing to patch vendor/generated directory: {}",
+                        step.target_file
+                    );
                 }
 
                 fs::write(&target_path, content)?;

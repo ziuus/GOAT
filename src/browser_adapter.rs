@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::config::BrowserConfig;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};

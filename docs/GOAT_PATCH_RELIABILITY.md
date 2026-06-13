@@ -1,31 +1,58 @@
 # GOAT Patch Reliability & Safety
 
-This document describes the safety mechanisms enforced by GOAT during patch generation and application to ensure enterprise-grade reliability and prevent accidental corruption of workspaces.
+Phase 10.2 hardens the repository editing and patch application workflows, providing migration-grade reliability for users transitioning from other agentic coding tools like Claude Code, Aider, or Cline.
 
-## Preflight Checks
+## Core Reliability Guarantees
 
-Before any patch is applied, GOAT performs the following preflight checks:
+1. **Path Containment (No Traversal)**
+   - All proposed file changes are strictly canonicalized.
+   - Any attempt to write or patch files outside the project's root directory is blocked at the patch application layer.
 
-1. **Path Containment:** Ensures all target files are within the project root. Traversal attempts (e.g., `../`, absolute paths outside root) are strictly blocked.
-2. **Secret File Protection:** Modifications to known secret files (like `.env`, `credentials.json`, `id_rsa`) are automatically denied.
-3. **Protected Directories:** GOAT refuses to modify files within critical build/dependency directories like `node_modules`, `target`, `vendor`, and `.git`.
-4. **Lockfile Protection:** Prevents modifications to dependency lockfiles (e.g., `Cargo.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) since these should only be managed by package managers.
+2. **Immutable Dependency & Generated Directories**
+   - GOAT refuses to modify critical locked directories:
+     - `node_modules/`
+     - `target/`
+     - `vendor/`
+     - `.git/`
+   - Lockfiles (`package-lock.json`, `Cargo.lock`, `poetry.lock`) are also protected from manual agent patches.
 
-## Mandatory Checkpointing
+3. **Secret Protection**
+   - `.env`, `.pem`, and other heuristic-based secret files are blacklisted. The agent cannot propose edits to them.
 
-GOAT enforces a mandatory checkpointing system. Before a patch is applied, a `git`-based checkpoint of the current workspace state is automatically created. If checkpointing fails, the patch application is aborted.
+4. **Mandatory Checkpoints Before Apply**
+   - Patches configured with `checkpoint_required = true` force the creation of a Git-based checkpoint *before* the patch is written to disk.
+   - Rollbacks (`goat code rollback <session_id>`) leverage these checkpoints, restoring only the affected files via `git checkout HEAD -- <file>`.
 
-## Patch Quality & Risk Scoring
+## Patch Quality Scoring (Risk Assessment)
 
-GOAT calculates a deterministic risk score for every proposed patch. 
-- **Risk Level:** Evaluated as `low`, `medium`, or `high` based on the files being modified and the size of the diff. (e.g., changes to `Cargo.toml` or `package.json` increase risk).
-- **Estimated Impact:** GOAT provides an English description of the impact, such as "Minor modification", "Large modification", or "New file creation".
+GOAT deterministically evaluates patch risk using `assess_patch_risk()`. Risk levels are classified as **Low**, **Medium**, or **High** based on:
+- **File Type**: Modifications to build config files (`Cargo.toml`, `package.json`, `vite.config`) heavily increase the score.
+- **File Core Role**: Changes to entry points (`main.rs`, `index.ts`, `app.tsx`), database schemas, or authentication components elevate risk.
+- **Diff Size**: Modifications exceeding 50 lines flag as "Large modification", and over 200 lines flag as "Massive modification".
 
-## Validation Recommendations
+*When reviewing a patch, the user is presented with the explicit Risk Level and the Estimated Impact reasoning (e.g., "Build/Config file modification, Large modification").*
 
-After a patch is successfully applied, GOAT intelligently recommends validation commands based on the project's detected framework and toolchain.
-- For Rust projects, it might recommend `cargo test` or `cargo check`.
-- For Node.js projects, it might recommend `npm test` or `npm run build`.
-- If no automated commands are detected, it falls back to recommending "Manual review required".
+## Post-Patch Validation Recommendations
 
-During the interactive CLI patch flow, users are prompted to run these validation commands directly from the prompt.
+When an agent proposes a patch, `suggest_validation_command()` dynamically recommends a post-patch verification command based on the file extension and the `ProjectIntelligence` metadata.
+- **Rust (`.rs`)**: `cargo check && cargo test`
+- **TypeScript (`.ts`, `.tsx`)**: `npm run build && npm run test`
+- **Go (`.go`)**: `go build ./... && go test ./...`
+- **Fallback**: Inherits directly from the detected `test_commands` or `build_commands` in `ProjectIntelligence`.
+
+## CLI Workflows for Patch Review
+
+The CLI provides a polished interface for inspecting and applying patches proposed by the agent:
+
+```bash
+# List all generated patches in the session
+goat patch list
+
+# Show detailed patch diff, risk level, and suggested validation command
+goat patch show <patch_id>
+
+# Interactively apply a proposed patch
+goat patch apply <patch_id>
+```
+
+When applying, the CLI summarizes the impact and requests explicit user confirmation `[y/N]`. If approved, a checkpoint is cut, the files are written, and the patch status changes to `applied`.

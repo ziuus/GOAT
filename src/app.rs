@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::approval::{
     ApprovalDecision, ApprovalGate, ApprovalRequest, bash_approval_request,
     call_subagent_approval_request,
@@ -1148,6 +1149,152 @@ impl App {
                 self.push_log("[SYSTEM] ─────────────────────────────────────────────────────────");
                 self.push_log("[HELP] Type any command in the input below to run it.");
                 self.push_log("[HELP] Use Tab to auto-complete slash commands.");
+                true
+            }
+            "/quickstart" | "/qs" => {
+                let ver = env!("CARGO_PKG_VERSION");
+                self.push_log(format!("[GOAT] 🐐 GOAT ALPHA 1 QUICKSTART (v{})", ver));
+                self.push_log(
+                    "[GOAT] ============================================================",
+                );
+                self.push_log("[GOAT] Welcome to GOAT (General Objective Agentic Task-engine)!");
+                self.push_log("[GOAT] ");
+                self.push_log("[GOAT] 1. START HERE");
+                self.push_log(
+                    "[GOAT]    /commands        (Shows all commands grouped by workflow)",
+                );
+                self.push_log("[GOAT]    /doctor          (Checks system health and workspace)");
+                self.push_log("[GOAT] ");
+                self.push_log("[GOAT] 2. COMMON WORKFLOWS");
+                self.push_log("[GOAT]    • Learn project: /repo-map");
+                self.push_log("[GOAT]    • Inspect tools: /tools list");
+                self.push_log("[GOAT]    • Review patches: /patch list");
+                self.push_log("[GOAT]    • Run validation: /check or /test");
+                self.push_log("[GOAT] ");
+                self.push_log("[GOAT] 3. MIGRATING?");
+                self.push_log(
+                    "[GOAT]    Try: /migrate-from aider (or claude-code, cline, cursor, etc)",
+                );
+                self.push_log("[GOAT] ");
+                self.push_log(
+                    "[GOAT] Safety First: GOAT requires approvals for high-risk actions.",
+                );
+                self.push_log(
+                    "[GOAT] ============================================================",
+                );
+                true
+            }
+            "/doctor" => {
+                self.push_log("[GOAT] 🩺 Running GOAT Doctor...");
+                self.push_log(format!("[GOAT] Version: {}", env!("CARGO_PKG_VERSION")));
+                self.push_log(format!(
+                    "[GOAT] Approval Profile: {}",
+                    self.config.approval.profile
+                ));
+                self.push_log("[GOAT] TUI Extension Registry: Loading...");
+                let is_git = std::path::Path::new(".git").exists();
+                let has_src = std::path::Path::new("src").exists();
+                let has_package = std::path::Path::new("package.json").exists();
+                if is_git && (has_src || has_package) {
+                    self.push_log("[GOAT] ✅ Workspace: Ready (Git repo with code detected)");
+                } else {
+                    self.push_log(
+                        "[GOAT] ⚠️ Workspace: Might not be ready. Run in a Git repository.",
+                    );
+                }
+                self.push_log("[GOAT] 💡 Hint: Run 'scripts/smoke-test-alpha.sh' to verify core.");
+                self.push_log("[GOAT] 💡 Hint: Run '/quickstart' for a brief tutorial.");
+                true
+            }
+            "/migrate-from" => {
+                if _args.is_empty() {
+                    self.push_log(
+                        "[GOAT] Please provide a tool name. Example: /migrate-from aider",
+                    );
+                } else {
+                    let tool = _args.to_lowercase();
+                    match tool.as_str() {
+                        "claude-code" | "opencode" | "openclaw" => {
+                            self.push_log(
+                                "[GOAT] 🐐 Migrating from Claude Code / OpenCode / OpenClaw",
+                            );
+                            self.push_log(
+                                "[GOAT] --------------------------------------------------",
+                            );
+                            self.push_log("[GOAT] What you expect: 'claude' starts a CLI loop, auto-commits, edits directly.");
+                            self.push_log("[GOAT] How GOAT works: ");
+                            self.push_log("[GOAT]   - You are in the TUI now.");
+                            self.push_log(
+                                "[GOAT]   - Edits require explicit patches ('/patch propose').",
+                            );
+                            self.push_log("[GOAT]   - GOAT uses strict Approval Gates. Nothing runs silently.");
+                            self.push_log(
+                                "[GOAT]   - Auto-commit is replaced by safe Checkpoints.",
+                            );
+                            self.push_log("[GOAT] Ready now: AST context, safe patch workflow, terminal commands.");
+                            self.push_log(
+                                "[GOAT] Not ready: Silent file editing without patch review.",
+                            );
+                        }
+                        "aider" => {
+                            self.push_log("[GOAT] 🐐 Migrating from Aider");
+                            self.push_log(
+                                "[GOAT] --------------------------------------------------",
+                            );
+                            self.push_log("[GOAT] What you expect: Instant file editing, chat in terminal, /add files.");
+                            self.push_log("[GOAT] How GOAT works: ");
+                            self.push_log(
+                                "[GOAT]   - TUI has slash commands (you are using one!).",
+                            );
+                            self.push_log("[GOAT]   - File context is handled via '/repo-map' (AST Map) instead of manual /add.");
+                            self.push_log("[GOAT]   - Editing uses Patch Proposals instead of direct file mutation.");
+                            self.push_log("[GOAT] Ready now: Multi-file intelligence, test-driven validation.");
+                            self.push_log(
+                                "[GOAT] Not ready: Direct chat-to-code instant mutation.",
+                            );
+                        }
+                        "cline" | "continue" | "cursor" | "windsurf" | "hermes" | "codex"
+                        | "gemini" | "little-bird" => {
+                            self.push_log(format!(
+                                "[GOAT] 🐐 Migrating from GUI/IDE-first Assistants ({})",
+                                tool
+                            ));
+                            self.push_log(
+                                "[GOAT] --------------------------------------------------",
+                            );
+                            self.push_log(
+                                "[GOAT] What you expect: Sidebars, inline diffs, IDE tab context.",
+                            );
+                            self.push_log("[GOAT] How GOAT works: ");
+                            self.push_log(
+                                "[GOAT]   - GOAT is terminal-native but supports MCP extensions.",
+                            );
+                            self.push_log("[GOAT]   - To sync with your IDE, use '/repo-map' to map the repo.");
+                            self.push_log(
+                                "[GOAT]   - Diffs are shown in the terminal via '/patch list'.",
+                            );
+                            self.push_log(
+                                "[GOAT] Ready now: Terminal workflows, CLI validation loops.",
+                            );
+                            self.push_log(
+                                "[GOAT] Not ready: Full IDE synchronization (coming in Beta).",
+                            );
+                        }
+                        _ => {
+                            self.push_log(format!("[GOAT] 🐐 Migrating from {}", tool));
+                            self.push_log(
+                                "[GOAT] --------------------------------------------------",
+                            );
+                            self.push_log(
+                                "[GOAT] GOAT is a terminal-first, agentic coding assistant.",
+                            );
+                            self.push_log("[GOAT] Unlike older tools, GOAT emphasizes safe, explicit approvals");
+                            self.push_log("[GOAT] for executing commands and editing files.");
+                            self.push_log("[GOAT] ");
+                            self.push_log("[GOAT] Run '/quickstart' to see the GOAT workflow.");
+                        }
+                    }
+                }
                 true
             }
             "/help" => {
