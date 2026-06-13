@@ -731,12 +731,11 @@ We are turning GOAT into a headless backend that *other* editors and agents can 
 *   [x] MCP Server Base: Add the rust-mcp crate and build an MCP server running on stdio. Expose GOAT’s basic memory and repo commands as MCP tools.
 *   [x] VS Code Extension Prototype: Write a minimal TypeScript extension for VS Code that starts the GOAT MCP server in the background and surfaces "Project Memory" inside the editor sidebar.
 
-## Phase 9.1: Extension Manifest + Local Plugin Registry (PENDING)
-We will add a local extension registry allowing users to install, manage, and validate MCP manifests or skill packs inside GOAT.
+### Phase 9.1: Extension Manifest + Local Plugin Registry (✅ COMPLETED)
+- Definition of `GOAT_EXTENSION.toml` format and validation limits.
+- Core CLI commands: `extension validate`, `install`, `enable`, `disable`, `remove`, `list`, `show`, `doctor`.
+- Secure local plugin registry (`~/.local/share/goat/extensions/`) isolating extension files.
+- Safe integration enforcing `untrusted by default`, rejecting path traversals, and enforcing explicit opt-in for high-risk capabilities.
+- Metadata aggregation for skills, validations, MCP packs, and agent adapters (Active loading partial/pending).
 
-*   [ ] Ecosystem Extension Manifest (`GOAT_EXTENSION.toml`)
-*   [ ] CLI Commands: `goat extension install <path>`, `goat extension list`, `goat extension show <id>`, `goat extension enable/disable <id>`, `goat extension validate <path>`
-*   [ ] Local Plugin Registry (`~/.local/share/goat/extensions/`)
-*   [ ] Extension Permission Model
-*   [ ] Extension Doctor
-*   [ ] Metadata Discovery: skill-pack, validation-pack, agent-adapter, MCP-pack discovery
+### Phase 9.2: Future Integrations (PENDING)

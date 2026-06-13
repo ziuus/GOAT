@@ -311,3 +311,15 @@ Status legend:
 | Prime Agent Recommendations | `working` | Maps goals to Builder/Operator/etc. |
 | Actual Agent Orchestration | `partial` | UI and backend state exist, execution bindings planned |
 
+---
+
+## Extension System
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Extension Manifest (`GOAT_EXTENSION.toml`) | `working` | Local manifest parsing and capabilities definition. |
+| Local Plugin Registry | `working` | `~/.local/share/goat/extensions/` |
+| CLI Extension Manager | `working` | `goat extension list / validate / install / enable / remove / doctor` |
+| Extension Permission Model | `working` | Permissions and risk levels explicitly surfaced during install/enable. |
+| Skill/MCP Metadata Discovery | `partial` | Manifests parsed; dynamic injection into running memory is queued. |
+| Remote Marketplace | `planned` | Deferred (Local only for now). |

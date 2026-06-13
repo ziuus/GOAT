@@ -156,7 +156,7 @@ pub enum Command {
     },
 
     /// Manage Safe Extensions and Plugin Marketplace (Phase 6.8)
-    #[command(name = "extensions")]
+    #[command(name = "extensions", alias = "extension")]
     Extensions {
         /// Action to perform: list, discover, audit, install, enable, disable, remove
         #[arg(default_value = "list")]
@@ -1757,9 +1757,20 @@ fn handle_extensions_command(
                 Err(e) => println!("Error removing: {}", e),
             }
         }
+        "doctor" => match manager.doctor() {
+            Ok(findings) => {
+                println!("--- Extension Doctor ---");
+                for f in findings {
+                    println!("{}", f);
+                }
+            }
+            Err(e) => println!("Error running doctor: {}", e),
+        },
         _ => {
             println!("Unknown action: {}", action);
-            println!("Supported actions: list, discover, audit, install, enable, disable, remove");
+            println!(
+                "Supported actions: list, show, validate, install, enable, disable, remove, doctor"
+            );
         }
     }
 

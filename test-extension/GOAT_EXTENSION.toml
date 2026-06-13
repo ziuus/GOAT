@@ -1,0 +1,30 @@
+[extension]
+id = "goat-rust-workflow-pack"
+name = "Rust Workflow Pack"
+version = "0.1.0"
+description = "Common Rust project workflows for GOAT."
+author = "Local User"
+license = "MIT"
+type = "workflow_pack"
+risk_level = "medium"
+
+[capabilities]
+skills = true
+validation_recipes = true
+commands = false
+mcp_servers = false
+external_agents = false
+dashboard_widgets = false
+
+[permissions]
+read_project = true
+write_project = false
+run_commands = false
+network = false
+access_memory = false
+
+[entrypoints]
+skills = ["skills/demo/SKILL.md"]
+validation_recipes = []
+mcp_servers = []
+external_agents = []
