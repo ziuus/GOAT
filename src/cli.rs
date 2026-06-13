@@ -1786,6 +1786,15 @@ fn handle_tools_command(
     let registry = crate::tool_registry::ToolRegistry::new();
 
     match action {
+        "refresh" => {
+            let ext_mgr = crate::extensions::ExtensionManager::new(&paths.data_dir)?;
+            let mut cap_reg = crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)?;
+            cap_reg.refresh(&ext_mgr)?;
+            println!(
+                "Capability registry refreshed. Discovered {} capabilities.",
+                cap_reg.list().len()
+            );
+        }
         "list" => {
             println!("GOAT Tool Registry ({} tools)", registry.list_all().len());
             println!("{:-<80}", "");
@@ -1811,6 +1820,42 @@ fn handle_tools_command(
                     perm
                 );
             }
+
+            if let Ok(cap_reg) =
+                crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)
+            {
+                let caps = cap_reg.list();
+                if !caps.is_empty() {
+                    println!(
+                        "\nExtension & Ext-Discovered Capabilities ({} capabilities)",
+                        caps.len()
+                    );
+                    println!("{:-<80}", "");
+                    println!(
+                        "{:<30} | {:<15} | {:<15} | {:<10}",
+                        "ID", "Name", "Type", "Risk"
+                    );
+                    println!("{:-<80}", "");
+                    for cap in caps {
+                        let c_type = format!("{:?}", cap.capability_type);
+                        println!(
+                            "{:<30} | {:<15} | {:<15} | {:<10}",
+                            if cap.id.len() > 30 {
+                                format!("{}…", &cap.id[..29])
+                            } else {
+                                cap.id.clone()
+                            },
+                            if cap.name.len() > 15 {
+                                format!("{}…", &cap.name[..14])
+                            } else {
+                                cap.name.clone()
+                            },
+                            c_type,
+                            cap.risk_level,
+                        );
+                    }
+                }
+            }
         }
         "show" => {
             if let Some(name) = arg {
@@ -1831,7 +1876,30 @@ fn handle_tools_command(
                         registry.evaluate_action(&tool.name, &config.tools)
                     );
                 } else {
-                    println!("Tool '{}' not found.", name);
+                    let mut found = false;
+                    if let Ok(cap_reg) =
+                        crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)
+                    {
+                        if let Some(cap) = cap_reg.get(name) {
+                            println!("Capability ID: {}", cap.id);
+                            println!("Name: {}", cap.name);
+                            println!("Type: {:?}", cap.capability_type);
+                            println!("Source: {:?}", cap.source);
+                            println!("Risk Level: {}", cap.risk_level);
+                            println!("Enabled: {}", cap.enabled);
+                            println!("Discovered At: {}", cap.discovered_at);
+                            println!("Description: {}", cap.description);
+                            println!("Required Permissions: {:?}", cap.required_permissions);
+                            println!(
+                                "Metadata:\n{}",
+                                serde_json::to_string_pretty(&cap.metadata).unwrap_or_default()
+                            );
+                            found = true;
+                        }
+                    }
+                    if !found {
+                        println!("Tool or Capability '{}' not found.", name);
+                    }
                 }
             } else {
                 println!("Please provide a tool name. Example: goat tools show bash");
@@ -1865,6 +1933,17 @@ fn handle_tools_command(
                 "  Permission configuration enabled: {}",
                 config.tools.enabled
             );
+
+            if let Ok(cap_reg) =
+                crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)
+            {
+                if let Ok(findings) = cap_reg.doctor() {
+                    println!("\nCapability Registry Doctor:");
+                    for finding in findings {
+                        println!("- {}", finding);
+                    }
+                }
+            }
         }
         "audit" => {
             if paths.tool_audit_log_file.exists() {
@@ -1915,9 +1994,144 @@ fn handle_tools_command(
                 println!("Target: {}", a);
             }
         }
+        "prepare" => {
+            // Pre-flight checks for a capability — never executes anything
+            let id = match arg {
+                Some(id) => id,
+                None => {
+                    println!("Usage: goat tools prepare <capability-id>");
+                    println!("Example: goat tools prepare my-ext:tool:my-tool");
+                    return Ok(());
+                }
+            };
+            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+            match adapter.prepare(id) {
+                Ok(result) => {
+                    println!("Capability Prepare: {}", result.capability_id);
+                    println!("  Name       : {}", result.capability_name);
+                    println!("  Type       : {}", result.capability_type);
+                    if let Some(ref ext) = result.source_extension {
+                        println!("  Extension  : {}", ext);
+                    }
+                    println!("  Risk Level : {:?}", result.risk_level);
+                    println!("  Status     : {}", result.status);
+                    println!(
+                        "  Approval   : {}",
+                        if result.approval_required {
+                            "REQUIRED"
+                        } else {
+                            "Not required"
+                        }
+                    );
+                    if let Some(ref reason) = result.approval_reason {
+                        println!("  Approval reason: {}", reason);
+                    }
+                    println!();
+                    println!("Pre-flight Checks:");
+                    for check in &result.checks {
+                        let icon = if check.passed { "✓" } else { "✗" };
+                        println!("  {} {} — {}", icon, check.label, check.message);
+                    }
+                    println!();
+                    if result.safe_to_invoke {
+                        println!(
+                            "Result: READY. Run 'goat tools invoke {}' to execute (requires approval).",
+                            id
+                        );
+                    } else {
+                        println!("Result: NOT READY. Fix the failed checks above before invoking.");
+                    }
+                }
+                Err(e) => {
+                    println!("Prepare failed: {}", e);
+                }
+            }
+        }
+        "invoke" => {
+            // Invoke a Command-type capability with ApprovalGate
+            let id = match arg {
+                Some(id) => id,
+                None => {
+                    println!("Usage: goat tools invoke <capability-id>");
+                    println!("Example: goat tools invoke my-ext:tool:my-tool");
+                    println!("Note: Only Command-type capabilities can be invoked.");
+                    println!(
+                        "      MCP servers, Skills, and Validation Recipes have dedicated commands."
+                    );
+                    return Ok(());
+                }
+            };
+            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+            let mut gate = crate::approval::ApprovalGate::new();
+            let session_id = format!(
+                "cli-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            );
+            match adapter.invoke_sync(id, &mut gate, &session_id) {
+                Ok(status) => match &status {
+                    crate::capability_runtime::CapabilityStatus::Executed => {
+                        println!("\n✓ Capability '{}' executed successfully.", id);
+                    }
+                    crate::capability_runtime::CapabilityStatus::Blocked(reason) => {
+                        println!("\n✗ Capability '{}' blocked: {}", id, reason);
+                    }
+                    crate::capability_runtime::CapabilityStatus::Failed(msg) => {
+                        println!("\n✗ Capability '{}' failed: {}", id, msg);
+                    }
+                    other => {
+                        println!("\nCapability '{}' status: {}", id, other);
+                    }
+                },
+                Err(e) => {
+                    println!("Invoke error: {}", e);
+                }
+            }
+        }
+        "runtime" => {
+            // Show runtime status of all discovered capabilities
+            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+            match adapter.list_all() {
+                Ok(caps) => {
+                    if caps.is_empty() {
+                        println!("No capabilities in runtime. Run: goat tools refresh");
+                    } else {
+                        println!("Capability Runtime Status ({} capabilities):", caps.len());
+                        println!("{:-<80}", "");
+                        println!(
+                            "{:<35} | {:<18} | {:<10} | {}",
+                            "ID", "Type", "Risk", "Status"
+                        );
+                        println!("{:-<80}", "");
+                        for rc in &caps {
+                            let id_display = if rc.capability.id.len() > 35 {
+                                format!("{}…", &rc.capability.id[..34])
+                            } else {
+                                rc.capability.id.clone()
+                            };
+                            let type_str = format!("{:?}", rc.capability.capability_type);
+                            println!(
+                                "{:<35} | {:<18} | {:<10} | {}",
+                                id_display, type_str, rc.capability.risk_level, rc.status
+                            );
+                        }
+                        println!();
+                        println!(
+                            "Log: {}",
+                            paths.data_dir.join("capability-runtime.log").display()
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("Failed to load capability runtime: {}", e);
+                }
+            }
+        }
         _ => {
             println!(
-                "Unknown action '{}'. Expected: list, show, categories, doctor, audit, catalog, install, enable, disable.",
+                "Unknown action '{}'. Expected: list, show, categories, doctor, audit, catalog, refresh, prepare, invoke, runtime, install, enable, disable.",
                 action
             );
         }

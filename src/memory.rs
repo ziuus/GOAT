@@ -63,7 +63,7 @@ pub struct MemoryItem {
 }
 
 pub fn redact_secrets(content: &str) -> String {
-    let mut redacted = content.to_string();
+    let redacted = content.to_string();
     let patterns = [
         "api_key",
         "apikey",

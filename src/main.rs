@@ -13,6 +13,8 @@ pub mod brain_learning;
 pub mod brain_models;
 pub mod browser_adapter;
 pub mod browser_workflows;
+pub mod capability_registry;
+pub mod capability_runtime;
 pub mod checkpoint;
 mod cli;
 pub mod code_execution;

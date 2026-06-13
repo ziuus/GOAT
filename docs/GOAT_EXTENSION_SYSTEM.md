@@ -74,3 +74,19 @@ The `goat extensions` (or `goat extension`) CLI allows local management.
 GOAT stores installed extensions locally inside the data directory (typically `~/.local/share/goat/extensions/` on Linux).
 - `installed/`: Contains deep-copied extension content.
 - `registry.jsonl`: The local database mapping extension IDs to their status, install paths, and metadata.
+
+---
+
+## Phase 9.3 Update: Runtime Wiring
+
+Extension capabilities discovered by `CapabilityRegistry` can now be prepared and invoked via the `CapabilityRuntimeAdapter`.
+
+Key additions:
+- `goat tools prepare <id>` — pre-flight checks, no execution
+- `goat tools invoke <id>` — Command-type only, requires ApprovalGate
+- `goat tools runtime` — runtime status of all capabilities
+- Invocation lifecycle: `Available → RequiresApproval → ApprovedForThisRun → Executed | Failed | Blocked`
+
+**Extension capabilities are metadata first. No extension code runs without explicit user approval.**
+
+For full details, see [GOAT_RUNTIME_WIRING.md](./GOAT_RUNTIME_WIRING.md).
