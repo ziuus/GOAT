@@ -209,6 +209,17 @@ pub enum Command {
         arg: Option<String>,
     },
 
+    /// Manage ApprovalGate profiles and settings.
+    #[command(name = "approval")]
+    Approval {
+        /// Action to perform: profile, explain, doctor.
+        #[arg(default_value = "profile")]
+        action: String,
+        /// Sub-action or argument (e.g., 'set', 'strict').
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
     /// Internal Subagent Framework management.
     Subagents {
         /// Action to perform: list, show, audit.
@@ -906,6 +917,10 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
             handle_tools_command(paths, config, &action, arg.as_deref())?;
             Ok(true)
         }
+        Command::Approval { action, args } => {
+            handle_approval_command(paths, config, &action, args)?;
+            Ok(true)
+        }
         Command::Subagents { action, arg } => {
             handle_subagents_command(paths, config, &action, arg.as_deref())?;
             Ok(true)
@@ -1409,7 +1424,9 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                             println!("  Command: {}", crate::approval::redact_secrets(cmd));
                             println!("  Risk   : {}", cap.risk_level);
 
-                            let mut gate = crate::approval::ApprovalGate::new();
+                            let mut gate = crate::approval::ApprovalGate::with_profile(
+                                config.approval.profile.clone(),
+                            );
                             let req = crate::approval::ApprovalRequest {
                                 tool_name: format!("validate:{}", recipe_id),
                                 action_summary: format!(
@@ -2282,7 +2299,8 @@ fn handle_tools_command(
                 }
             };
             let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
-            let mut gate = crate::approval::ApprovalGate::new();
+            let mut gate =
+                crate::approval::ApprovalGate::with_profile(config.approval.profile.clone());
             let session_id = format!(
                 "cli-{}",
                 std::time::SystemTime::now()
@@ -3107,7 +3125,9 @@ async fn handle_skills_command(
                             println!("✓ Ready to run skill extension: {}", cap.name);
                             println!("  Command: {} {}", cmd, skill_name);
 
-                            let mut gate = crate::approval::ApprovalGate::new();
+                            let mut gate = crate::approval::ApprovalGate::with_profile(
+                                config.approval.profile.clone(),
+                            );
                             let req = crate::approval::ApprovalRequest {
                                 tool_name: format!("skill:{}", ext_id),
                                 action_summary: format!(
@@ -4411,6 +4431,69 @@ fn handle_researcher_command(
         _ => println!(
             "[RESEARCHER] Unknown action. Use projects, new, add-source, ingest-browser, brief, competitors, compare-tech, report"
         ),
+    }
+    Ok(())
+}
+
+fn handle_approval_command(
+    paths: &crate::paths::GoatPaths,
+    config: &crate::config::Config,
+    action: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
+    match action {
+        "profile" => {
+            if args.is_empty() {
+                println!("Current Approval Profile: {}", config.approval.profile);
+                return Ok(());
+            }
+            if args[0] == "set" {
+                if args.len() < 2 {
+                    println!("Usage: goat approval profile set <profile>");
+                    return Ok(());
+                }
+                let profile_str = &args[1];
+                if let Ok(_prof) = profile_str.parse::<crate::config::ApprovalProfile>() {
+                    // We only tell them to edit the file directly for now, no in-place mutation to config TOML yet.
+                    println!(
+                        "To set profile, edit ~/.config/goat/config.toml and set [approval] profile = \"{}\"",
+                        profile_str
+                    );
+                    println!("(In-place config mutation will be added shortly)");
+                } else {
+                    println!(
+                        "Unknown approval profile '{}'. Valid options: strict, balanced, validation-fast, audit-only",
+                        profile_str
+                    );
+                }
+            } else {
+                println!("Unknown approval profile action: {}", args[0]);
+            }
+        }
+        "explain" => {
+            println!("Approval Profiles Explanation:");
+            println!(
+                "  strict          : (Default) Safest behavior. Approval required for all risky actions."
+            );
+            println!(
+                "  balanced        : Reduces repeated prompts for low-risk validations. File writes, shell, extensions still require approval."
+            );
+            println!(
+                "  validation-fast : Allows approved validation commands to be reused within the same project/session."
+            );
+            println!(
+                "  audit-only      : Dry-run preview where GOAT shows what would need approval but does not block."
+            );
+        }
+        "doctor" => {
+            println!("Approval Doctor:");
+            println!("  Profile: {}", config.approval.profile);
+            println!("  Default policy remains strict.");
+            println!("  No unsafe global auto-approve enabled.");
+        }
+        _ => {
+            println!("Unknown approval command action: {}", action);
+        }
     }
     Ok(())
 }

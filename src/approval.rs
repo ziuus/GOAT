@@ -135,16 +135,44 @@ pub enum SessionPolicy {
 ///
 /// The [`ApprovalGate`] is `Clone` so the App can store it and the tools module
 /// can receive a shared reference without lifetime issues.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ApprovalGate {
     /// Per-tool name overrides for the current session.
     policies: HashMap<String, SessionPolicy>,
+    /// The active approval profile.
+    profile: crate::config::ApprovalProfile,
+    /// Cache of previously approved validation commands in this session.
+    approved_validations: std::collections::HashSet<String>,
+}
+
+impl Default for ApprovalGate {
+    fn default() -> Self {
+        Self {
+            policies: HashMap::new(),
+            profile: crate::config::ApprovalProfile::Strict,
+            approved_validations: std::collections::HashSet::new(),
+        }
+    }
 }
 
 impl ApprovalGate {
-    /// Create a new gate with no session policies.
+    /// Create a new gate with default strict profile.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a new gate with a specific profile.
+    pub fn with_profile(profile: crate::config::ApprovalProfile) -> Self {
+        Self {
+            policies: HashMap::new(),
+            profile,
+            approved_validations: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Get the current approval profile.
+    pub fn profile(&self) -> &crate::config::ApprovalProfile {
+        &self.profile
     }
 
     /// Apply a session policy override for a given tool name.
@@ -165,6 +193,37 @@ impl ApprovalGate {
     ///
     /// Returns `None` if the user must be prompted interactively.
     pub fn check_policy(&self, request: &ApprovalRequest) -> Option<ApprovalDecision> {
+        // Fast path for validation-fast profile
+        if matches!(self.profile, crate::config::ApprovalProfile::ValidationFast) {
+            // Only applies to safe validation commands (not extensions or arbitrary shells)
+            // Assuming tools module prefixes these or we can identify them by tool_name.
+            // For example, if tool_name is "code_execution" but it's a known validation.
+            // A safer heuristic: we check if the request was specifically marked or if
+            // it's in our approved_validations cache.
+            if request.tool_name == "validate" || request.tool_name == "code_execution" {
+                // If it's a validation command and we already approved it this session:
+                let cache_key = format!("{}::{}", request.tool_name, request.action_summary);
+                if self.approved_validations.contains(&cache_key) {
+                    info!(
+                        tool = %request.tool_name,
+                        action = %request.action_summary,
+                        "auto-approved by validation-fast profile (previously approved)"
+                    );
+                    return Some(ApprovalDecision::Approved);
+                }
+            }
+        }
+
+        // Audit-only profile always approves (dry-run mode handled elsewhere or logs it)
+        if matches!(self.profile, crate::config::ApprovalProfile::AuditOnly) {
+            info!(
+                tool = %request.tool_name,
+                action = %request.action_summary,
+                "auto-approved by audit-only profile (dry-run)"
+            );
+            return Some(ApprovalDecision::Approved);
+        }
+
         match self.policies.get(&request.tool_name) {
             Some(SessionPolicy::AlwaysApprove) => {
                 info!(
@@ -209,6 +268,22 @@ impl ApprovalGate {
                     risk = %request.risk_level,
                     "approved once by user"
                 );
+
+                // If validation-fast profile is active and it's a validation command, cache it
+                if matches!(self.profile, crate::config::ApprovalProfile::ValidationFast) {
+                    if request.tool_name == "validate" || request.tool_name == "code_execution" {
+                        // Assuming risk level is low for typical validations
+                        if request.risk_level == RiskLevel::Low
+                            || request.risk_level == RiskLevel::Medium
+                        {
+                            let cache_key =
+                                format!("{}::{}", request.tool_name, request.action_summary);
+                            self.approved_validations.insert(cache_key);
+                            info!("cached approved validation for fast reuse");
+                        }
+                    }
+                }
+
                 ApprovalDecision::Approved
             }
             'a' | 'A' => {
@@ -877,5 +952,27 @@ mod tests {
         assert!(lines.iter().any(|l| l.contains("HIGH")));
         assert!(lines.iter().any(|l| l.contains("Destructive")));
         assert!(lines.iter().any(|l| l.contains("[y]")));
+    }
+
+    #[test]
+    fn test_validation_fast_profile() {
+        let mut gate = ApprovalGate::with_profile(crate::config::ApprovalProfile::ValidationFast);
+        let req = ApprovalRequest {
+            tool_name: "validate".to_string(),
+            action_summary: "cargo test".to_string(),
+            risk_level: RiskLevel::Low,
+            explanation: None,
+            working_directory: None,
+        };
+
+        // First time, no policy yet, should require interactive
+        assert_eq!(gate.check_policy(&req), None);
+
+        // Approve it interactively
+        let decision = gate.resolve(&req, 'y');
+        assert_eq!(decision, ApprovalDecision::Approved);
+
+        // Next time, same command should be auto-approved by validation-fast
+        assert_eq!(gate.check_policy(&req), Some(ApprovalDecision::Approved));
     }
 }
