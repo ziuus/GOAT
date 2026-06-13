@@ -10,6 +10,8 @@ pub struct PatchEdit {
     pub new_content: String,
 }
 
+use uuid::Uuid;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchProposal {
     pub patch_id: String,
@@ -20,6 +22,9 @@ pub struct PatchProposal {
     pub edits: Vec<PatchEdit>,
     pub diff_preview: String,
     pub risk_level: String,
+    pub estimated_impact: String,
+    pub checkpoint_required: bool,
+    pub suggested_validation: Option<String>,
     pub status: String,
     pub created_at: u64,
     pub applied_at: Option<u64>,
@@ -143,6 +148,11 @@ impl PatchManager {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
+        let mut risk_score = 0;
+        let diff_lines = diff_preview.lines().count();
+        let (risk_score, risk_level, estimated_impact) = assess_patch_risk(&target_file, original_content.is_empty(), diff_lines);
+
+        let suggested_validation = suggest_validation_command(&target_file, &project);
 
         let patch = PatchProposal {
             patch_id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
@@ -155,7 +165,10 @@ impl PatchManager {
             ),
             edits: vec![edit],
             diff_preview,
-            risk_level: "low".to_string(),
+            risk_level,
+            estimated_impact,
+            checkpoint_required: true,
+            suggested_validation,
             status: "proposed".to_string(),
             created_at: now,
             applied_at: None,
@@ -169,13 +182,14 @@ impl PatchManager {
         &self,
         patch: &mut PatchProposal,
         project_root: &std::path::Path,
+        cp_mgr: Option<&crate::checkpoint::CheckpointManager>,
     ) -> Result<()> {
+        // Preflight checks
         for edit in &patch.edits {
             let file_path = project_root.join(&edit.path);
 
             // Re-verify path containment
             let canonical_root = project_root.canonicalize()?;
-            // Allow creating new files by checking parent
             let parent_dir = file_path.parent().unwrap_or(project_root);
             if !parent_dir.exists() {
                 fs::create_dir_all(parent_dir)?;
@@ -184,10 +198,37 @@ impl PatchManager {
             if !canonical_parent.starts_with(&canonical_root) {
                 anyhow::bail!("Path traversal attempt blocked: {}", edit.path);
             }
+
+            // Block sensitive and generated files
             if crate::repo_map::looks_like_secret_file(&file_path) {
                 anyhow::bail!("Refusing to patch sensitive file: {}", edit.path);
             }
+            let path_str = edit.path.to_lowercase();
+            if path_str.contains("node_modules/")
+                || path_str.contains("target/")
+                || path_str.contains("vendor/")
+                || path_str.contains(".git/")
+            {
+                anyhow::bail!(
+                    "Refusing to patch vendor/generated directory: {}",
+                    edit.path
+                );
+            }
+        }
 
+        // Checkpoint before apply if required
+        if patch.checkpoint_required {
+            if let Some(mgr) = cp_mgr {
+                let cp = mgr
+                    .create_checkpoint(project_root, &format!("Before patch {}", patch.patch_id))
+                    .context("Failed to create pre-patch checkpoint")?;
+                patch.checkpoint_id = Some(cp.id);
+            }
+        }
+
+        // Apply
+        for edit in &patch.edits {
+            let file_path = project_root.join(&edit.path);
             fs::write(&file_path, &edit.new_content).context("Failed to write patched file")?;
         }
 
@@ -203,4 +244,102 @@ impl PatchManager {
 
         Ok(())
     }
+}
+
+// Helper functions for Patch Quality Scoring and Validation
+fn assess_patch_risk(path: &str, is_new: bool, diff_lines: usize) -> (u32, String, String) {
+    let mut risk_score = 0;
+    let path_lower = path.to_lowercase();
+    
+    // Impact assessment
+    let mut impact = Vec::new();
+    if is_new {
+        impact.push("New file creation");
+    }
+    
+    // Check for build/config files
+    if path_lower.ends_with("cargo.toml")
+        || path_lower.ends_with("package.json")
+        || path_lower.contains("webpack")
+        || path_lower.contains("vite.config")
+        || path_lower.ends_with("tsconfig.json")
+    {
+        risk_score += 3;
+        impact.push("Build/Config file modification");
+    }
+
+    // Core application files
+    if path_lower.contains("src/main.")
+        || path_lower.contains("src/lib.")
+        || path_lower.contains("src/index.")
+        || path_lower.contains("src/app.")
+    {
+        risk_score += 2;
+        impact.push("Core entry point modified");
+    }
+    
+    // Security/Auth files
+    if path_lower.contains("auth") 
+        || path_lower.contains("security")
+        || path_lower.contains("crypto")
+        || path_lower.contains("login")
+    {
+        risk_score += 3;
+        impact.push("Security/Auth component modified");
+    }
+
+    // Database / Schema
+    if path_lower.contains("schema") || path_lower.contains("migration") || path_lower.contains("model") {
+        risk_score += 2;
+        impact.push("Database schema/model modified");
+    }
+
+    // Size assessment
+    if !is_new {
+        if diff_lines > 200 {
+            risk_score += 3;
+            impact.push("Massive modification");
+        } else if diff_lines > 50 {
+            risk_score += 1;
+            impact.push("Large modification");
+        } else {
+            impact.push("Minor modification");
+        }
+    }
+
+    let risk_level = if risk_score >= 3 {
+        "high".to_string()
+    } else if risk_score >= 1 {
+        "medium".to_string()
+    } else {
+        "low".to_string()
+    };
+    
+    let estimated_impact = if impact.is_empty() {
+        "Minimal".to_string()
+    } else {
+        impact.join(", ")
+    };
+
+    (risk_score, risk_level, estimated_impact)
+}
+
+fn suggest_validation_command(path: &str, project: &crate::project_intelligence::ProjectIntelligence) -> Option<String> {
+    let path_lower = path.to_lowercase();
+    
+    if path_lower.ends_with(".rs") {
+        return Some("cargo check && cargo test".to_string());
+    } else if path_lower.ends_with(".ts") || path_lower.ends_with(".tsx") {
+        return Some("npm run build && npm run test".to_string());
+    } else if path_lower.ends_with(".go") {
+        return Some("go build ./... && go test ./...".to_string());
+    }
+    
+    // Fallback to project defaults
+    project
+        .test_commands
+        .first()
+        .cloned()
+        .or_else(|| project.build_commands.first().cloned())
+        .or_else(|| Some("Manual review required".to_string()))
 }

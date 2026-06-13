@@ -537,6 +537,16 @@ pub enum Command {
     /// Print a quickstart guide for Alpha 1.
     #[command(name = "quickstart")]
     Quickstart,
+
+    /// Show grouped commands by workflow.
+    #[command(name = "commands")]
+    Commands,
+
+    /// Help for users migrating from other AI coding tools.
+    #[command(name = "migrate-from")]
+    MigrateFrom {
+        tool: String,
+    },
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -569,42 +579,45 @@ pub async fn handle_subcommand(
         }
 
         Command::Quickstart => {
-            let quickstart_text = r#"
+            let version = env!("CARGO_PKG_VERSION");
+            let quickstart_text = format!(r#"
 ============================================================
               🐐 GOAT ALPHA 1 QUICKSTART 🐐                 
 ============================================================
 
+Version: {}
+
 Welcome to GOAT (General Objective Agentic Task-engine)!
+If you are migrating from Claude Code, OpenCode, Aider, Cline, etc.,
+here is how GOAT works.
 
-As an Alpha tester migrating from other AI coding assistants,
-here is your "Golden Path" to success:
+1. START HERE
+   $ goat commands
+   (Shows all available commands grouped by workflow)
 
-1. Check System Health
    $ goat doctor alpha
-   (Verifies extensions, keys, and DB are ready)
+   (Checks system health and workspace readiness)
 
-2. Learn Your Project
-   $ cd /your/project
-   $ goat learn
-   (Builds the AST repo-map for intelligent context)
+2. COMMON WORKFLOWS
+   • Learn a project:    $ goat learn
+   • Create a mission:   $ goat mission create "add login page"
+   • Inspect tools:      $ goat tools list
+   • Propose edit:       $ goat patch propose
+   • Use approvals:      $ goat approval profile set ValidationFast
 
-3. Start the Interactive TUI
+3. MIGRATING?
+   Try our migration help:
+   $ goat migrate-from claude-code
+   $ goat migrate-from aider
+
+4. INTERACTIVE TUI
    $ goat
-   (Or use CLI directly for all commands)
+   (Launches the full interactive terminal UI)
 
-4. Run a Pre-defined Capability (Skill or Recipe)
-   $ goat tools prepare <id>
-   $ goat validate --recipe <id>
-
-5. Propose & Apply Safe Edits
-   $ goat patch propose --mission <id>
-   $ goat patch list
-   $ goat patch apply <patch-id>
-
-Type 'goat help' to see all 40+ commands.
-For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
+Safety First: GOAT requires approvals for high-risk actions by default.
+Read docs/GOAT_MIGRATION_GUIDE.md for detailed migration tips.
 ============================================================
-"#;
+"#, version);
             println!("{}", quickstart_text);
             Ok(true)
         }
@@ -652,8 +665,92 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                         detail: "Capability registry file not found. Run 'goat extension install' or manually register.".to_string(),
                     });
                 }
+                
+                // Current approval profile
+                checks.push(crate::paths::DoctorCheck {
+                    status: crate::paths::DoctorStatus::Info,
+                    label: "Alpha: Approval Profile".to_string(),
+                    detail: config.approval.profile.to_string(),
+                });
+                
+                // Workspace readiness
+                let is_git = std::path::Path::new(".git").exists();
+                let has_src = std::path::Path::new("src").exists();
+                let has_package = std::path::Path::new("package.json").exists();
+                if is_git && (has_src || has_package) {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Ok,
+                        label: "Alpha: Workspace".to_string(),
+                        detail: "Workspace appears ready for GOAT (Git repo with code).".to_string(),
+                    });
+                } else {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Warn,
+                        label: "Alpha: Workspace".to_string(),
+                        detail: "Workspace might not be ready. Run GOAT in a Git repository.".to_string(),
+                    });
+                }
+                
+                // Smoke test and docs hint
+                checks.push(crate::paths::DoctorCheck {
+                    status: crate::paths::DoctorStatus::Info,
+                    label: "Alpha: Smoke Tests".to_string(),
+                    detail: "Run 'scripts/smoke-test-alpha.sh' to verify core components.".to_string(),
+                });
+                checks.push(crate::paths::DoctorCheck {
+                    status: crate::paths::DoctorStatus::Info,
+                    label: "Alpha: Docs".to_string(),
+                    detail: "Run 'goat quickstart' or read docs/GOAT_ALPHA_QUICKSTART.md".to_string(),
+                });
             }
             crate::paths::print_doctor_results(&checks);
+            Ok(true)
+        }
+
+        Command::Commands => {
+            println!(r#"
+🐐 GOAT Commands by Workflow
+
+START HERE:
+  quickstart     Show the interactive quickstart guide
+  commands       Show this grouped command list
+  migrate-from   Help for migrating from other tools
+  doctor         Check system health and readiness
+
+PROJECTS:
+  learn          Analyze repository and build context map
+  project        Manage project settings and structure
+
+MISSIONS:
+  mission        Create, list, and resume missions
+
+PATCHES & EDITS:
+  patch          Generate, review, and apply code changes
+  checkpoint     Manage Git-based safety checkpoints
+
+VALIDATION:
+  validate       Run workspace verification (tests/build)
+
+AGENTS & SKILLS:
+  agents         Manage AI agents (Builder, Designer, etc.)
+  skills         Manage reusable workflow skills
+  tools          Execute specific tools or recipes
+
+APPROVAL & SAFETY:
+  approval       Manage safety profiles (e.g., ValidationFast)
+  capability     List available capabilities and permissions
+
+MEMORY:
+  sessions       List session history
+  memory         Curate specific memories for the brain
+
+Run `goat <command> --help` for details on any command.
+"#);
+            Ok(true)
+        }
+
+        Command::MigrateFrom { tool } => {
+            handle_migrate_from(tool);
             Ok(true)
         }
 
@@ -1188,6 +1285,11 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                         println!("Title: {}", p.title);
                         println!("Project ID: {}", p.project_id);
                         println!("Mission ID: {}", p.mission_id);
+                        println!("Risk Level: {}", p.risk_level);
+                        println!("Impact: {}", p.estimated_impact);
+                        if let Some(sv) = &p.suggested_validation {
+                            println!("Suggested Validation: {}", sv);
+                        }
                         println!("Diff Preview:\n{}", p.diff_preview);
                     } else {
                         println!("Patch not found.");
@@ -1254,6 +1356,12 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                                 "You are about to apply patch '{}' to project '{}'.",
                                 patch.patch_id, project.name
                             );
+                            println!("\nApplying Patch: {} - {}", patch.patch_id, patch.title);
+                            println!("Risk Level: {}", patch.risk_level);
+                            println!("Impact: {}", patch.estimated_impact);
+                            if let Some(sv) = &patch.suggested_validation {
+                                println!("Suggested Validation: {}", sv);
+                            }
                             println!("Diff Preview:\n{}", patch.diff_preview);
 
                             use std::io::Write;
@@ -1282,7 +1390,11 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                                     }
                                 }
 
-                                match patch_manager.apply_patch(&mut patch, &project.root_path) {
+                                match patch_manager.apply_patch(
+                                    &mut patch,
+                                    &project.root_path,
+                                    Some(&cp_mgr),
+                                ) {
                                     Ok(_) => {
                                         println!("Patch applied successfully.");
 
@@ -1316,6 +1428,10 @@ For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
                                                         }
                                                     }
                                                 }
+                                            }
+                                        } else {
+                                            if let Some(sv) = &patch.suggested_validation {
+                                                println!("Suggested Validation: {}", sv);
                                             }
                                         }
                                     }
@@ -4496,4 +4612,52 @@ fn handle_approval_command(
         }
     }
     Ok(())
+}
+
+fn handle_migrate_from(tool: &str) {
+    let lower = tool.to_lowercase();
+    match lower.as_str() {
+        "claude-code" | "opencode" | "openclaw" => {
+            println!("🐐 Migrating from Claude Code / OpenCode / OpenClaw");
+            println!("--------------------------------------------------");
+            println!("What you expect: 'claude' starts a CLI loop, auto-commits, edits directly.");
+            println!("How GOAT works: ");
+            println!("  - 'goat' starts an interactive TUI.");
+            println!("  - Edits require explicit patches ('goat patch propose').");
+            println!("  - GOAT uses strict Approval Gates. Nothing runs silently.");
+            println!("  - Auto-commit is replaced by safe Checkpoints.");
+            println!("Ready now: AST context, safe patch workflow, terminal commands.");
+            println!("Not ready: Silent file editing without patch review.");
+        }
+        "aider" => {
+            println!("🐐 Migrating from Aider");
+            println!("--------------------------------------------------");
+            println!("What you expect: Instant file editing, chat in terminal, /add files.");
+            println!("How GOAT works: ");
+            println!("  - TUI has slash commands (e.g. /commands, /help).");
+            println!("  - File context is handled via 'goat learn' (AST Map) instead of manual /add.");
+            println!("  - Editing uses Patch Proposals instead of direct file mutation.");
+            println!("Ready now: Multi-file intelligence, test-driven validation.");
+            println!("Not ready: Direct chat-to-code instant mutation (GOAT is safer by design).");
+        }
+        "cline" | "continue" | "cursor" | "windsurf" | "hermes" | "codex" | "gemini" | "little-bird" => {
+            println!("🐐 Migrating from GUI/IDE-first Assistants ({})", tool);
+            println!("--------------------------------------------------");
+            println!("What you expect: Sidebars, inline diffs, IDE tab context.");
+            println!("How GOAT works: ");
+            println!("  - GOAT is terminal-native but supports MCP extensions.");
+            println!("  - To sync with your IDE, use 'goat learn' to map the repo.");
+            println!("  - Diffs are shown in the terminal via 'goat patch list'.");
+            println!("Ready now: Terminal workflows, CLI validation loops.");
+            println!("Not ready: Full IDE synchronization (coming in Beta).");
+        }
+        _ => {
+            println!("🐐 Migrating from {}", tool);
+            println!("--------------------------------------------------");
+            println!("GOAT is a terminal-first, agentic coding assistant.");
+            println!("Unlike older tools, GOAT emphasizes safe, explicit approvals");
+            println!("for executing commands and editing files.");
+            println!("\nRun 'goat quickstart' to see the GOAT workflow.");
+        }
+    }
 }
