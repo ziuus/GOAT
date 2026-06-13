@@ -62,6 +62,38 @@ pub struct MemoryItem {
     pub use_count: u32,
 }
 
+pub fn redact_secrets(content: &str) -> String {
+    let mut redacted = content.to_string();
+    let patterns = [
+        "api_key",
+        "apikey",
+        "password",
+        "token",
+        "secret",
+        "private_key",
+        "client_secret",
+    ];
+
+    // Simple line-based redaction
+    let lines: Vec<&str> = redacted.split('\n').collect();
+    let mut out = Vec::new();
+    for line in lines {
+        let lower = line.to_lowercase();
+        let mut line_redacted = false;
+        for p in patterns.iter() {
+            if lower.contains(p) && (line.contains('=') || line.contains(':')) {
+                out.push("[REDACTED SECRET]");
+                line_redacted = true;
+                break;
+            }
+        }
+        if !line_redacted {
+            out.push(line);
+        }
+    }
+    out.join("\n")
+}
+
 pub struct MemoryManager {
     pub user_file: PathBuf,
     pub memory_file: PathBuf,
@@ -128,7 +160,9 @@ impl MemoryManager {
 
     pub fn get_user_content(&self) -> Result<String> {
         if !self.user_file.exists() {
-            return Ok(String::new());
+            let template = "# User Memory\n\nAdd your core preferences and profile details here.\n";
+            fs::write(&self.user_file, template)?;
+            return Ok(template.to_string());
         }
         let content = fs::read_to_string(&self.user_file)?;
         Ok(content)
@@ -145,7 +179,15 @@ impl MemoryManager {
     pub fn get_project_memory(&self, project_id: &str) -> Result<String> {
         let path = self.projects_dir.join(project_id).join("PROJECT_MEMORY.md");
         if !path.exists() {
-            return Ok(String::new());
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let template = format!(
+                "# Project Memory: {}\n\nAdd architecture notes and decisions here.\n",
+                project_id
+            );
+            fs::write(&path, &template)?;
+            return Ok(template);
         }
         let content = fs::read_to_string(&path)?;
         Ok(content)
@@ -356,7 +398,11 @@ impl MemoryManager {
                         ));
                     }
 
-                    let pid = meta.root_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "unknown".to_string());
+                    let pid = meta
+                        .root_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
                     if let Ok(proj_mem) = self.get_project_memory(&pid) {
                         if !proj_mem.trim().is_empty() {
                             context.push_str("\n-- PROJECT_MEMORY.md --\n");

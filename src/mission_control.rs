@@ -552,33 +552,49 @@ impl MissionControlManager {
         let mission_id = Uuid::new_v4().to_string();
         let now = Utc::now().timestamp_millis();
 
-        let mut notes = vec!["Mission plan automatically generated via rule-based logic.".to_string()];
-        
+        let mut notes =
+            vec!["Mission plan automatically generated via rule-based logic.".to_string()];
+
         // Inject memory context if available
         let paths = crate::paths::GoatPaths::resolve().unwrap();
         let memory_cfg = crate::config::MemoryConfig::default();
         let memory_mgr = crate::memory::MemoryManager::new(&paths, memory_cfg);
-        
+
         let mut memories_found = 0;
-        
+
         if let Some(ref pid) = req.project_id {
             if let Ok(mems) = memory_mgr.search_structured_memories(pid) {
-                for mem in mems.iter().take(3) {
+                for mem in mems
+                    .iter()
+                    .filter(|m| m.status == crate::memory::MemoryStatus::Active)
+                    .take(3)
+                {
                     notes.push(format!("Memory [{:?}]: {}", mem.kind, mem.title));
                     memories_found += 1;
                 }
             }
         }
-        
+
         if let Ok(sys_mems) = memory_mgr.search_structured_memories(&req.goal) {
-            for mem in sys_mems.iter().filter(|m| m.scope == crate::memory::MemoryScope::System || m.scope == crate::memory::MemoryScope::User).take(2) {
+            for mem in sys_mems
+                .iter()
+                .filter(|m| {
+                    m.status == crate::memory::MemoryStatus::Active
+                        && (m.scope == crate::memory::MemoryScope::System
+                            || m.scope == crate::memory::MemoryScope::User)
+                })
+                .take(2)
+            {
                 notes.push(format!("Relevant Memory [{:?}]: {}", mem.kind, mem.title));
                 memories_found += 1;
             }
         }
-        
+
         if memories_found > 0 {
-            notes.push(format!("Injected {} relevant memories into context.", memories_found));
+            notes.push(format!(
+                "Injected {} relevant memories into context.",
+                memories_found
+            ));
         }
 
         let mission = Mission {

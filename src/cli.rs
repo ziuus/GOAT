@@ -628,7 +628,15 @@ pub async fn handle_subcommand(
             project,
         } => {
             handle_memory_command(
-                paths, config, action.clone(), arg.clone(), scope.clone(), kind.clone(), text.clone(), mission.clone(), project.clone(),
+                paths,
+                config,
+                action.clone(),
+                arg.clone(),
+                scope.clone(),
+                kind.clone(),
+                text.clone(),
+                mission.clone(),
+                project.clone(),
             )?;
             Ok(true)
         }
@@ -2359,27 +2367,48 @@ fn handle_memory_command(
                 let mc = crate::mission_control::MissionControlManager::new();
                 let missions = mc.get_missions();
                 if let Some(m) = missions.into_iter().find(|m| m.mission_id == mid) {
-                    println!("[MEMORY] Extracting insights from mission: {}", m.title);
-                    let content = format!("Goal: {}\nOutcome: {:?}\nNotes: {}", m.raw_goal, m.status, m.notes.join("\n"));
-                    let item = MemoryItem {
-                        memory_id: "".to_string(),
-                        scope: MemoryScope::Mission,
-                        project_id: m.linked_project.clone(),
-                        mission_id: Some(m.mission_id.clone()),
-                        source: "extract".to_string(),
-                        kind: MemoryKind::ProjectDecision,
-                        title: format!("Mission Insight: {}", m.title),
-                        content,
-                        tags: vec!["mission-extraction".to_string()],
-                        confidence: 80,
-                        status: MemoryStatus::Active,
-                        created_at: 0,
-                        updated_at: 0,
-                        last_used_at: None,
-                        use_count: 0,
-                    };
-                    let id = manager.add_structured_memory(item)?;
-                    println!("Saved memory: {}", id);
+                    println!("[MEMORY] Proposed Extraction from Mission: {}", m.title);
+                    let content = format!(
+                        "Goal: {}\nOutcome: {:?}\nNotes: {}",
+                        m.raw_goal,
+                        m.status,
+                        m.notes.join("\n")
+                    );
+                    let redacted_content = crate::memory::redact_secrets(&content);
+                    println!("Scope: {:?}", MemoryScope::Mission);
+                    println!("Kind: {:?}", MemoryKind::ProjectDecision);
+                    println!("Tags: mission-extraction");
+                    println!("Content Preview:\n{}\n", redacted_content);
+
+                    use std::io::{self, Write};
+                    print!("Do you want to save this memory? [y/N]: ");
+                    io::stdout().flush().unwrap();
+                    let mut input = String::new();
+                    if io::stdin().read_line(&mut input).is_ok()
+                        && input.trim().eq_ignore_ascii_case("y")
+                    {
+                        let item = MemoryItem {
+                            memory_id: "".to_string(),
+                            scope: MemoryScope::Mission,
+                            project_id: m.linked_project.clone(),
+                            mission_id: Some(m.mission_id.clone()),
+                            source: "extract".to_string(),
+                            kind: MemoryKind::ProjectDecision,
+                            title: format!("Mission Insight: {}", m.title),
+                            content: redacted_content,
+                            tags: vec!["mission-extraction".to_string()],
+                            confidence: 80,
+                            status: MemoryStatus::Active,
+                            created_at: 0,
+                            updated_at: 0,
+                            last_used_at: None,
+                            use_count: 0,
+                        };
+                        let id = manager.add_structured_memory(item)?;
+                        println!("Saved memory: {}", id);
+                    } else {
+                        println!("Memory extraction cancelled.");
+                    }
                 } else {
                     println!("Mission not found: {}", mid);
                 }
