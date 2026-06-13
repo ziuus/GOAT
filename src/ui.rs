@@ -917,7 +917,8 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
                 }
             }
 
-            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(app.paths.clone());
+            let adapter =
+                crate::capability_runtime::CapabilityRuntimeAdapter::new(app.paths.clone());
             if let Ok(caps) = adapter.list_all() {
                 lines.push(Line::from(""));
                 lines.push(Line::from(Span::styled(

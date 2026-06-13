@@ -1519,7 +1519,10 @@ impl App {
                     "list" | "" => {
                         // Switch view and log
                         self.active_view = ActiveView::Tools;
-                        self.push_log("[TOOLS] Switching to Tools view. See capabilities in the Tools panel.".to_string());
+                        self.push_log(
+                            "[TOOLS] Switching to Tools view. See capabilities in the Tools panel."
+                                .to_string(),
+                        );
                     }
                     "categories" => {
                         self.push_log(
@@ -1616,16 +1619,34 @@ impl App {
                                 self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
                             } else {
                                 // Fallback to capability registry
-                                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                                let adapter =
+                                    crate::capability_runtime::CapabilityRuntimeAdapter::new(
+                                        self.paths.clone(),
+                                    );
                                 if let Ok(Some(rc)) = adapter.resolve(target_id) {
-                                    self.push_log(format!("[TOOLS] Extension Capability: {}", rc.capability.id));
+                                    self.push_log(format!(
+                                        "[TOOLS] Extension Capability: {}",
+                                        rc.capability.id
+                                    ));
                                     self.push_log(format!("[TOOLS] Name: {}", rc.capability.name));
-                                    self.push_log(format!("[TOOLS] Type: {:?}", rc.capability.capability_type));
-                                    self.push_log(format!("[TOOLS] Risk: {}", rc.capability.risk_level));
+                                    self.push_log(format!(
+                                        "[TOOLS] Type: {:?}",
+                                        rc.capability.capability_type
+                                    ));
+                                    self.push_log(format!(
+                                        "[TOOLS] Risk: {}",
+                                        rc.capability.risk_level
+                                    ));
                                     self.push_log(format!("[TOOLS] Status: {}", rc.status));
-                                    self.push_log(format!("[TOOLS] Description: {}", rc.capability.description));
+                                    self.push_log(format!(
+                                        "[TOOLS] Description: {}",
+                                        rc.capability.description
+                                    ));
                                 } else {
-                                    self.push_log(format!("[TOOLS] Tool/Capability '{}' not found.", target_id));
+                                    self.push_log(format!(
+                                        "[TOOLS] Tool/Capability '{}' not found.",
+                                        target_id
+                                    ));
                                 }
                             }
                         }
@@ -1634,20 +1655,33 @@ impl App {
                         if target_id.is_empty() {
                             self.push_log("[TOOLS] Usage: /tool prepare <capability-id>");
                         } else {
-                            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(
+                                self.paths.clone(),
+                            );
                             match adapter.prepare(target_id) {
                                 Ok(result) => {
-                                    self.push_log(format!("[TOOLS] Prepare: {}", result.capability_id));
+                                    self.push_log(format!(
+                                        "[TOOLS] Prepare: {}",
+                                        result.capability_id
+                                    ));
                                     self.push_log(format!("  Status: {}", result.status));
-                                    self.push_log(format!("  Approval Required: {}", result.approval_required));
+                                    self.push_log(format!(
+                                        "  Approval Required: {}",
+                                        result.approval_required
+                                    ));
                                     for check in result.checks {
                                         let icon = if check.passed { "✓" } else { "✗" };
-                                        self.push_log(format!("  {} {} — {}", icon, check.label, check.message));
+                                        self.push_log(format!(
+                                            "  {} {} — {}",
+                                            icon, check.label, check.message
+                                        ));
                                     }
                                     if result.safe_to_invoke {
                                         self.push_log(format!("[TOOLS] READY. Use 'goat tools invoke {}' in terminal to execute.", target_id));
                                     } else {
-                                        self.push_log("[TOOLS] NOT READY. Fix failed checks above.");
+                                        self.push_log(
+                                            "[TOOLS] NOT READY. Fix failed checks above.",
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -1671,13 +1705,25 @@ impl App {
                                 self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
                                 self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
                             } else {
-                                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                                let adapter =
+                                    crate::capability_runtime::CapabilityRuntimeAdapter::new(
+                                        self.paths.clone(),
+                                    );
                                 if let Ok(Some(rc)) = adapter.resolve(target_id) {
-                                    self.push_log(format!("[TOOLS] Capability: {}", rc.capability.id));
-                                    self.push_log(format!("[TOOLS] Type: {:?}", rc.capability.capability_type));
+                                    self.push_log(format!(
+                                        "[TOOLS] Capability: {}",
+                                        rc.capability.id
+                                    ));
+                                    self.push_log(format!(
+                                        "[TOOLS] Type: {:?}",
+                                        rc.capability.capability_type
+                                    ));
                                     self.push_log(format!("[TOOLS] Status: {}", rc.status));
                                 } else {
-                                    self.push_log(format!("[TOOLS] Tool '{}' not found.", target_id));
+                                    self.push_log(format!(
+                                        "[TOOLS] Tool '{}' not found.",
+                                        target_id
+                                    ));
                                 }
                             }
                         }
@@ -6433,8 +6479,17 @@ mod tests {
     fn test_app_status_label() {
         assert_eq!(AppStatus::Ready.label(), "READY");
         assert_eq!(AppStatus::Thinking.label(), "THINKING…");
-        assert_eq!(AppStatus::ToolRunning("test".to_string()).label(), "RUNNING: test");
-        assert_eq!(AppStatus::WaitingApproval("test".to_string()).label(), "APPROVAL REQUIRED: test");
-        assert_eq!(AppStatus::Error("error msg".to_string()).label(), "ERROR: error msg");
+        assert_eq!(
+            AppStatus::ToolRunning("test".to_string()).label(),
+            "RUNNING: test"
+        );
+        assert_eq!(
+            AppStatus::WaitingApproval("test".to_string()).label(),
+            "APPROVAL REQUIRED: test"
+        );
+        assert_eq!(
+            AppStatus::Error("error msg".to_string()).label(),
+            "ERROR: error msg"
+        );
     }
 }

@@ -522,6 +522,10 @@ pub enum Command {
         #[arg(default_value = "message")]
         action: String,
     },
+
+    /// Print a quickstart guide for Alpha 1.
+    #[command(name = "quickstart")]
+    Quickstart,
 }
 
 /// Handle CLI subcommands that do not need TUI or headless mode.
@@ -553,6 +557,47 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
+        Command::Quickstart => {
+            let quickstart_text = r#"
+============================================================
+              🐐 GOAT ALPHA 1 QUICKSTART 🐐                 
+============================================================
+
+Welcome to GOAT (General Objective Agentic Task-engine)!
+
+As an Alpha tester migrating from other AI coding assistants,
+here is your "Golden Path" to success:
+
+1. Check System Health
+   $ goat doctor alpha
+   (Verifies extensions, keys, and DB are ready)
+
+2. Learn Your Project
+   $ cd /your/project
+   $ goat learn
+   (Builds the AST repo-map for intelligent context)
+
+3. Start the Interactive TUI
+   $ goat
+   (Or use CLI directly for all commands)
+
+4. Run a Pre-defined Capability (Skill or Recipe)
+   $ goat tools prepare <id>
+   $ goat validate --recipe <id>
+
+5. Propose & Apply Safe Edits
+   $ goat patch propose --mission <id>
+   $ goat patch list
+   $ goat patch apply <patch-id>
+
+Type 'goat help' to see all 40+ commands.
+For the full guide, read docs/GOAT_ALPHA_QUICKSTART.md!
+============================================================
+"#;
+            println!("{}", quickstart_text);
+            Ok(true)
+        }
+
         Command::Doctor { mode } => {
             let mut checks = crate::paths::run_doctor(paths, config, cli.headless);
             if mode.as_deref() == Some("alpha") {
@@ -562,7 +607,7 @@ pub async fn handle_subcommand(
                     label: "Alpha Readiness".to_string(),
                     detail: "Running alpha readiness checks...".to_string(),
                 });
-                
+
                 // Check tools configuration
                 if config.tools.enabled {
                     checks.push(crate::paths::DoctorCheck {
@@ -577,9 +622,12 @@ pub async fn handle_subcommand(
                         detail: "Tools are currently disabled. Extension capabilities will not function properly.".to_string(),
                     });
                 }
-                
+
                 // Check capability registry
-                let reg_path = paths.data_dir.join("capabilities").join("capabilities.json");
+                let reg_path = paths
+                    .data_dir
+                    .join("capabilities")
+                    .join("capabilities.json");
                 if reg_path.exists() {
                     checks.push(crate::paths::DoctorCheck {
                         status: crate::paths::DoctorStatus::Ok,
@@ -1316,7 +1364,8 @@ pub async fn handle_subcommand(
 
             // Phase 9.4: Extension capability validation recipes
             if let Some(recipe_id) = recipe {
-                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+                let adapter =
+                    crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
                 match adapter.prepare(&recipe_id) {
                     Ok(prep) => {
                         if !prep.safe_to_invoke {
@@ -1331,15 +1380,27 @@ pub async fn handle_subcommand(
                         }
 
                         // Get the command to run
-                        let reg = crate::capability_registry::CapabilityRegistry::new(&paths.data_dir).unwrap();
+                        let reg =
+                            crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)
+                                .unwrap();
                         if let Some(cap) = reg.get(&recipe_id) {
-                            if !matches!(cap.capability_type, crate::capability_registry::CapabilityType::ValidationRecipe) {
+                            if !matches!(
+                                cap.capability_type,
+                                crate::capability_registry::CapabilityType::ValidationRecipe
+                            ) {
                                 println!("✗ Capability '{}' is not a ValidationRecipe.", recipe_id);
                                 return Ok(true);
                             }
-                            let cmd = cap.metadata.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                            let cmd = cap
+                                .metadata
+                                .get("command")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
                             if cmd.is_empty() {
-                                println!("✗ Validation recipe '{}' has no 'command' in metadata.", recipe_id);
+                                println!(
+                                    "✗ Validation recipe '{}' has no 'command' in metadata.",
+                                    recipe_id
+                                );
                                 return Ok(true);
                             }
 
@@ -1347,12 +1408,19 @@ pub async fn handle_subcommand(
                             println!("  Source : {:?}", cap.source);
                             println!("  Command: {}", crate::approval::redact_secrets(cmd));
                             println!("  Risk   : {}", cap.risk_level);
-                            
+
                             let mut gate = crate::approval::ApprovalGate::new();
                             let req = crate::approval::ApprovalRequest {
                                 tool_name: format!("validate:{}", recipe_id),
-                                action_summary: format!("Run validation recipe '{}': {}", cap.name, crate::approval::redact_secrets(cmd)),
-                                risk_level: crate::capability_runtime::RuntimeCapability::parse_risk(&cap.risk_level),
+                                action_summary: format!(
+                                    "Run validation recipe '{}': {}",
+                                    cap.name,
+                                    crate::approval::redact_secrets(cmd)
+                                ),
+                                risk_level:
+                                    crate::capability_runtime::RuntimeCapability::parse_risk(
+                                        &cap.risk_level,
+                                    ),
                                 explanation: Some(format!("Source: {:?}", cap.source)),
                                 working_directory: None,
                             };
@@ -1389,7 +1457,10 @@ pub async fn handle_subcommand(
                                         println!("✓ Validation passed.");
                                         println!("{}", stdout);
                                     } else {
-                                        println!("✗ Validation failed (exit code {}).", out.status.code().unwrap_or(-1));
+                                        println!(
+                                            "✗ Validation failed (exit code {}).",
+                                            out.status.code().unwrap_or(-1)
+                                        );
                                         println!("{}", stdout);
                                         eprintln!("{}", stderr);
                                     }
@@ -1401,7 +1472,10 @@ pub async fn handle_subcommand(
                         }
                     }
                     Err(e) => {
-                        println!("✗ Failed to prepare validation recipe '{}': {}", recipe_id, e);
+                        println!(
+                            "✗ Failed to prepare validation recipe '{}': {}",
+                            recipe_id, e
+                        );
                     }
                 }
                 return Ok(true);
@@ -1410,7 +1484,9 @@ pub async fn handle_subcommand(
             let pid = if let Some(id) = project_id {
                 id.clone()
             } else {
-                println!("No project ID provided. Usage: goat validate <project_id> or goat validate --recipe <id>");
+                println!(
+                    "No project ID provided. Usage: goat validate <project_id> or goat validate --recipe <id>"
+                );
                 return Ok(true);
             };
 
@@ -2997,7 +3073,8 @@ async fn handle_skills_command(
             // Phase 9.4: Support running skills from extension capabilities
             if let Some(ext_id) = from_extension {
                 println!("Running skill via extension capability '{}'...", ext_id);
-                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+                let adapter =
+                    crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
                 match adapter.prepare(ext_id) {
                     Ok(prep) => {
                         if !prep.safe_to_invoke {
@@ -3006,13 +3083,22 @@ async fn handle_skills_command(
                             return Ok(());
                         }
 
-                        let reg = crate::capability_registry::CapabilityRegistry::new(&paths.data_dir).unwrap();
+                        let reg =
+                            crate::capability_registry::CapabilityRegistry::new(&paths.data_dir)
+                                .unwrap();
                         if let Some(cap) = reg.get(ext_id) {
-                            if !matches!(cap.capability_type, crate::capability_registry::CapabilityType::Skill) {
+                            if !matches!(
+                                cap.capability_type,
+                                crate::capability_registry::CapabilityType::Skill
+                            ) {
                                 println!("✗ Capability '{}' is not a Skill.", ext_id);
                                 return Ok(());
                             }
-                            let cmd = cap.metadata.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                            let cmd = cap
+                                .metadata
+                                .get("command")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
                             if cmd.is_empty() {
                                 println!("✗ Skill extension '{}' has no 'command'.", ext_id);
                                 return Ok(());
@@ -3024,8 +3110,14 @@ async fn handle_skills_command(
                             let mut gate = crate::approval::ApprovalGate::new();
                             let req = crate::approval::ApprovalRequest {
                                 tool_name: format!("skill:{}", ext_id),
-                                action_summary: format!("Run skill via extension '{}': {} {}", cap.name, cmd, skill_name),
-                                risk_level: crate::capability_runtime::RuntimeCapability::parse_risk(&cap.risk_level),
+                                action_summary: format!(
+                                    "Run skill via extension '{}': {} {}",
+                                    cap.name, cmd, skill_name
+                                ),
+                                risk_level:
+                                    crate::capability_runtime::RuntimeCapability::parse_risk(
+                                        &cap.risk_level,
+                                    ),
                                 explanation: Some(format!("Source: {:?}", cap.source)),
                                 working_directory: None,
                             };
@@ -3056,7 +3148,9 @@ async fn handle_skills_command(
                             if !skill_name.is_empty() {
                                 full_args.push(skill_name);
                             }
-                            let output = std::process::Command::new(cmd_exec).args(&full_args).output();
+                            let output = std::process::Command::new(cmd_exec)
+                                .args(&full_args)
+                                .output();
                             match output {
                                 Ok(out) => {
                                     if out.status.success() {
