@@ -82,12 +82,14 @@ impl PatchManager {
         project: &crate::project_intelligence::ProjectIntelligence,
     ) -> Result<PatchProposal> {
         let mut target_file = "README.md".to_string();
-        
+
         let goal_lower = mission.raw_goal.to_lowercase();
         if !goal_lower.contains("readme") {
             for f in &project.important_files {
                 let f_lower = f.to_lowercase();
-                let is_match = goal_lower.split_whitespace().any(|word| f_lower.contains(word) && word.len() > 3);
+                let is_match = goal_lower
+                    .split_whitespace()
+                    .any(|word| f_lower.contains(word) && word.len() > 3);
                 if is_match {
                     target_file = f.clone();
                     break;
@@ -96,12 +98,12 @@ impl PatchManager {
         }
 
         let file_path = project.root_path.join(&target_file);
-        
+
         // Safety checks
         if crate::repo_map::looks_like_secret_file(&file_path) {
             anyhow::bail!("Refusing to patch sensitive file: {}", target_file);
         }
-        
+
         let original_content = if file_path.exists() {
             fs::read_to_string(&file_path).unwrap_or_default()
         } else {
@@ -109,10 +111,16 @@ impl PatchManager {
         };
 
         let new_content = if target_file.ends_with(".md") {
-            format!("{}\n\n<!-- GOAT Checkpoint: {} -->\n", original_content, mission.raw_goal)
+            format!(
+                "{}\n\n<!-- GOAT Checkpoint: {} -->\n",
+                original_content, mission.raw_goal
+            )
         } else if target_file.ends_with(".rs") {
             format!("// GOAT: {}\n{}", mission.raw_goal, original_content)
-        } else if target_file.ends_with(".ts") || target_file.ends_with(".js") || target_file.ends_with(".tsx") {
+        } else if target_file.ends_with(".ts")
+            || target_file.ends_with(".js")
+            || target_file.ends_with(".tsx")
+        {
             format!("// GOAT: {}\n{}", mission.raw_goal, original_content)
         } else {
             format!("{}\n# GOAT: {}\n", original_content, mission.raw_goal)
@@ -125,17 +133,26 @@ impl PatchManager {
         };
 
         // Basic diff preview
-        let diff_preview = format!("--- {}\n+++ {}\n@@ ... @@\n+ // GOAT Edit", target_file, target_file);
+        let diff_preview = format!(
+            "--- {}\n+++ {}\n@@ ... @@\n+ // GOAT Edit",
+            target_file, target_file
+        );
 
         use std::time::SystemTime;
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
         let patch = PatchProposal {
             patch_id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
             mission_id: mission.mission_id.clone(),
             project_id: project.project_id.clone(),
             title: format!("Update {}", target_file),
-            summary: format!("Proposing changes to {} based on mission goal.", target_file),
+            summary: format!(
+                "Proposing changes to {} based on mission goal.",
+                target_file
+            ),
             edits: vec![edit],
             diff_preview,
             risk_level: "low".to_string(),
@@ -155,7 +172,7 @@ impl PatchManager {
     ) -> Result<()> {
         for edit in &patch.edits {
             let file_path = project_root.join(&edit.path);
-            
+
             // Re-verify path containment
             let canonical_root = project_root.canonicalize()?;
             // Allow creating new files by checking parent
@@ -176,7 +193,12 @@ impl PatchManager {
 
         use std::time::SystemTime;
         patch.status = "applied".to_string();
-        patch.applied_at = Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs());
+        patch.applied_at = Some(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        );
         self.save_patch(patch)?;
 
         Ok(())

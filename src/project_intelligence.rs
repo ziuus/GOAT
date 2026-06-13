@@ -73,8 +73,12 @@ impl ProjectIntelligenceManager {
     }
 
     pub fn get_project_by_path(&self, root_path: &Path) -> Option<ProjectIntelligence> {
-        let canonical = root_path.canonicalize().unwrap_or_else(|_| root_path.to_path_buf());
-        self.get_projects().into_iter().find(|p| p.root_path == canonical)
+        let canonical = root_path
+            .canonicalize()
+            .unwrap_or_else(|_| root_path.to_path_buf());
+        self.get_projects()
+            .into_iter()
+            .find(|p| p.root_path == canonical)
     }
 
     pub fn save_project(&self, proj: &ProjectIntelligence) -> Result<()> {
@@ -95,12 +99,24 @@ impl DeepProjectScanner {
     }
 
     pub fn scan(&self) -> Result<ProjectIntelligence> {
-        let canonical_root = self.root.canonicalize().unwrap_or_else(|_| self.root.clone());
-        use sha2::{Sha256, Digest};
+        let canonical_root = self
+            .root
+            .canonicalize()
+            .unwrap_or_else(|_| self.root.clone());
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(canonical_root.to_string_lossy().as_bytes());
-        let project_id = hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect::<String>()[..12].to_string();
-        let name = canonical_root.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let project_id = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()[..12]
+            .to_string();
+        let name = canonical_root
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
 
         let mut pi = ProjectIntelligence {
             project_id,
@@ -119,7 +135,10 @@ impl DeepProjectScanner {
             deploy_commands: Vec::new(),
             readme_summary: "No README detected.".to_string(),
             architecture_summary: "Unknown architecture.".to_string(),
-            last_scanned_at: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+            last_scanned_at: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             scan_status: "success".to_string(),
             risk_notes: Vec::new(),
             ignored_paths: Vec::new(),
@@ -128,13 +147,32 @@ impl DeepProjectScanner {
 
         // Ignore limits
         let known_ignore_dirs = [
-            ".git", "node_modules", "target", "dist", "build", ".next", ".turbo", 
-            ".cache", "venv", ".venv", "__pycache__", "coverage", "bin", "obj"
+            ".git",
+            "node_modules",
+            "target",
+            "dist",
+            "build",
+            ".next",
+            ".turbo",
+            ".cache",
+            "venv",
+            ".venv",
+            "__pycache__",
+            "coverage",
+            "bin",
+            "obj",
         ];
-        
+
         let sensitive_files = [
-            ".env", ".env.local", ".env.development", ".env.production",
-            "id_rsa", "id_ed25519", "secrets.json", "credentials.json", "key.pem"
+            ".env",
+            ".env.local",
+            ".env.development",
+            ".env.production",
+            "id_rsa",
+            "id_ed25519",
+            "secrets.json",
+            "credentials.json",
+            "key.pem",
         ];
 
         let mut has_rust = false;
@@ -149,7 +187,7 @@ impl DeepProjectScanner {
             for entry in entries.flatten() {
                 let fname = entry.file_name().to_string_lossy().to_string();
                 let path = entry.path();
-                
+
                 if path.is_dir() {
                     if known_ignore_dirs.contains(&fname.as_str()) {
                         pi.ignored_paths.push(fname.clone());
@@ -165,14 +203,19 @@ impl DeepProjectScanner {
                     }
                 } else if path.is_file() {
                     // Sensitive filtering
-                    if sensitive_files.iter().any(|s| fname.starts_with(s)) || fname.ends_with(".pem") || fname.ends_with(".key") {
+                    if sensitive_files.iter().any(|s| fname.starts_with(s))
+                        || fname.ends_with(".pem")
+                        || fname.ends_with(".key")
+                    {
                         pi.ignored_paths.push(fname.clone());
-                        pi.risk_notes.push(format!("Ignored sensitive file: {}", fname));
+                        pi.risk_notes
+                            .push(format!("Ignored sensitive file: {}", fname));
                         continue;
                     }
 
                     let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                    if file_size > 1024 * 1024 { // 1MB limit for safety
+                    if file_size > 1024 * 1024 {
+                        // 1MB limit for safety
                         pi.ignored_paths.push(fname.clone());
                         continue;
                     }
@@ -187,18 +230,32 @@ impl DeepProjectScanner {
                             has_node = true;
                             pi.package_managers.push("npm/yarn/pnpm".to_string());
                             pi.important_files.push(fname.clone());
-                            
+
                             // Parse scripts deterministically
                             if let Ok(content) = fs::read_to_string(&path) {
-                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                                    if let Some(scripts) = json.get("scripts").and_then(|s| s.as_object()) {
+                                if let Ok(json) =
+                                    serde_json::from_str::<serde_json::Value>(&content)
+                                {
+                                    if let Some(scripts) =
+                                        json.get("scripts").and_then(|s| s.as_object())
+                                    {
                                         for k in scripts.keys() {
                                             pi.available_commands.push(format!("npm run {}", k));
-                                            if k.contains("test") { pi.test_commands.push(format!("npm run {}", k)); }
-                                            if k.contains("build") { pi.build_commands.push(format!("npm run {}", k)); }
-                                            if k.contains("dev") || k.contains("start") { pi.dev_commands.push(format!("npm run {}", k)); }
-                                            if k.contains("lint") { pi.lint_commands.push(format!("npm run {}", k)); }
-                                            if k.contains("deploy") { pi.deploy_commands.push(format!("npm run {}", k)); }
+                                            if k.contains("test") {
+                                                pi.test_commands.push(format!("npm run {}", k));
+                                            }
+                                            if k.contains("build") {
+                                                pi.build_commands.push(format!("npm run {}", k));
+                                            }
+                                            if k.contains("dev") || k.contains("start") {
+                                                pi.dev_commands.push(format!("npm run {}", k));
+                                            }
+                                            if k.contains("lint") {
+                                                pi.lint_commands.push(format!("npm run {}", k));
+                                            }
+                                            if k.contains("deploy") {
+                                                pi.deploy_commands.push(format!("npm run {}", k));
+                                            }
                                         }
                                     }
                                 }
@@ -226,9 +283,15 @@ impl DeepProjectScanner {
                             pi.readme_summary = "README detected.".to_string();
                         }
                         _ => {
-                            if fname.ends_with(".rs") { has_rust = true; }
-                            if fname.ends_with(".js") || fname.ends_with(".ts") { has_node = true; }
-                            if fname.ends_with(".py") { has_python = true; }
+                            if fname.ends_with(".rs") {
+                                has_rust = true;
+                            }
+                            if fname.ends_with(".js") || fname.ends_with(".ts") {
+                                has_node = true;
+                            }
+                            if fname.ends_with(".py") {
+                                has_python = true;
+                            }
                         }
                     }
                 }
@@ -263,7 +326,7 @@ impl DeepProjectScanner {
         if has_github_actions {
             pi.detected_stack.push("GitHub Actions".to_string());
         }
-        
+
         pi.package_managers.dedup();
         pi.languages.dedup();
         pi.frameworks.dedup();
@@ -271,7 +334,11 @@ impl DeepProjectScanner {
         pi.important_files.sort();
 
         let arch = if !pi.frameworks.is_empty() {
-            format!("This appears to be a {} project using {}.", pi.languages.join("/"), pi.frameworks.join(" + "))
+            format!(
+                "This appears to be a {} project using {}.",
+                pi.languages.join("/"),
+                pi.frameworks.join(" + ")
+            )
         } else if !pi.languages.is_empty() {
             format!("This appears to be a {} project.", pi.languages.join("/"))
         } else {

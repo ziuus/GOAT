@@ -1,7 +1,7 @@
 # GOAT — Implementation Roadmap
 
 **Last Updated:** 2026-06-08  
-**Current Phase:** 0 (Audit Complete)
+**Current Phase:** 9 (Ecosystem & Extensions)
 
 ---
 
@@ -724,3 +724,19 @@
 * Implemented Risk Classification (Low/Medium/High) based on shell command payload (e.g. `rm -rf` = High).
 * Added explicit `--auto-approve` flag to `goat validate` and test runner for CI opt-in.
 * Enforced "Deny-by-default" semantics.
+
+## Phase 9.0: MCP Server + VS Code Prototype (✅ COMPLETED)
+We are turning GOAT into a headless backend that *other* editors and agents can talk to over MCP (Model Context Protocol).
+
+*   [x] MCP Server Base: Add the rust-mcp crate and build an MCP server running on stdio. Expose GOAT’s basic memory and repo commands as MCP tools.
+*   [x] VS Code Extension Prototype: Write a minimal TypeScript extension for VS Code that starts the GOAT MCP server in the background and surfaces "Project Memory" inside the editor sidebar.
+
+## Phase 9.1: Extension Manifest + Local Plugin Registry (PENDING)
+We will add a local extension registry allowing users to install, manage, and validate MCP manifests or skill packs inside GOAT.
+
+*   [ ] Ecosystem Extension Manifest (`GOAT_EXTENSION.toml`)
+*   [ ] CLI Commands: `goat extension install <path>`, `goat extension list`, `goat extension show <id>`, `goat extension enable/disable <id>`, `goat extension validate <path>`
+*   [ ] Local Plugin Registry (`~/.local/share/goat/extensions/`)
+*   [ ] Extension Permission Model
+*   [ ] Extension Doctor
+*   [ ] Metadata Discovery: skill-pack, validation-pack, agent-adapter, MCP-pack discovery

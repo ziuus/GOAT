@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::fs;
-use anyhow::{Context, Result};
 use crate::skills::Skill;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -71,7 +71,7 @@ impl SkillRunner {
         let mut current_desc = String::new();
         let mut current_cmd = None;
         let mut in_code_block = false;
-        
+
         for line in skill_content.lines() {
             let line = line.trim();
             if line.starts_with("```bash") || line.starts_with("```sh") {
@@ -96,11 +96,15 @@ impl SkillRunner {
                     });
                 }
                 let text = line[2..].to_string();
-                current_step_type = if text.to_lowercase().contains("inspect") || text.to_lowercase().contains("read") {
+                current_step_type = if text.to_lowercase().contains("inspect")
+                    || text.to_lowercase().contains("read")
+                {
                     SkillStepType::InspectFile
                 } else if text.to_lowercase().contains("patch") {
                     SkillStepType::ProposePatch
-                } else if text.to_lowercase().contains("validate") || text.to_lowercase().contains("test") {
+                } else if text.to_lowercase().contains("validate")
+                    || text.to_lowercase().contains("test")
+                {
                     SkillStepType::RunValidation
                 } else if text.to_lowercase().contains("ask") {
                     SkillStepType::AskUser
@@ -112,7 +116,7 @@ impl SkillRunner {
                 current_desc = text;
             }
         }
-        
+
         if !current_desc.is_empty() {
             steps.push(SkillStep {
                 step_type: current_step_type,
@@ -120,7 +124,7 @@ impl SkillRunner {
                 command: current_cmd,
             });
         }
-        
+
         if steps.is_empty() {
             steps.push(SkillStep {
                 step_type: SkillStepType::ManualStep,
@@ -128,11 +132,16 @@ impl SkillRunner {
                 command: None,
             });
         }
-        
+
         steps
     }
 
-    pub fn start_execution(&self, skill: &Skill, mission_id: Option<String>, project_id: Option<String>) -> Result<SkillExecution> {
+    pub fn start_execution(
+        &self,
+        skill: &Skill,
+        mission_id: Option<String>,
+        project_id: Option<String>,
+    ) -> Result<SkillExecution> {
         let steps = Self::parse_steps(&skill.content);
         let execution = SkillExecution {
             execution_id: uuid::Uuid::new_v4().to_string(),

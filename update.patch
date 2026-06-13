@@ -1,0 +1,31 @@
+--- src/external_agents.rs
++++ src/external_agents.rs
+@@ -101,17 +101,23 @@
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ExternalAgentRun {
+-    pub id: String,
+-    pub timestamp: chrono::DateTime<chrono::Utc>,
++    pub run_id: String,
+     pub agent_name: String,
+-    pub command_path: PathBuf,
+-    pub task: String,
+-    pub mode: String,
+-    pub workspace_path: PathBuf,
+-    pub duration: Duration,
++    pub command: String,
++    pub task_summary: String,
++    pub working_directory: PathBuf,
++    pub permission_profile: String,
++    pub status: String,
++    pub approval_decision: String,
++    pub started_at: chrono::DateTime<chrono::Utc>,
++    pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
+     pub exit_code: Option<i32>,
+-    pub success: bool,
+-    pub changed_files_count: Option<usize>,
++    pub stdout_log_path: Option<PathBuf>,
++    pub stderr_log_path: Option<PathBuf>,
++    pub mission_id: Option<String>,
++    pub project_id: Option<String>,
+ }

@@ -836,7 +836,13 @@ async fn handle_slash_command(
                 }
 
                 println!("[EXTERNAL] Delegating to '{}'...", name);
-                match rt.external_agent_manager.delegate(name, task, &rt.config) {
+                match rt.external_agent_manager.delegate(
+                    name,
+                    task,
+                    &rt.config,
+                    crate::approval::ApprovalDecision::Approved,
+                    None,
+                ) {
                     Ok(res) => {
                         println!("[EXTERNAL] Done. Success: {}", res.success);
                         println!("[EXTERNAL] STDOUT:\n{}", res.stdout);
@@ -878,10 +884,13 @@ async fn handle_slash_command(
             }
             println!("[COMPARE] Checking external agent (aider)...");
             if rt.config.external_agents.allow_execution {
-                match rt
-                    .external_agent_manager
-                    .delegate("aider", task, &rt.config)
-                {
+                match rt.external_agent_manager.delegate(
+                    "aider",
+                    task,
+                    &rt.config,
+                    crate::approval::ApprovalDecision::Approved,
+                    None,
+                ) {
                     Ok(res) => println!("[COMPARE] External Response (aider):\n{}", res.stdout),
                     Err(e) => println!(
                         "[COMPARE] External agent execution disabled or failed: {}",
@@ -1285,7 +1294,10 @@ async fn handle_slash_command(
                                     crate::external_agents::ExternalAgentRun,
                                 >(line)
                                 {
-                                    println!("{} | {} | {}", run.id, run.agent_name, run.mode);
+                                    println!(
+                                        "{} | {} | {}",
+                                        run.run_id, run.agent_name, run.permission_profile
+                                    );
                                 }
                             }
                         }
@@ -1310,7 +1322,10 @@ async fn handle_slash_command(
                         if let Ok(run) =
                             serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line)
                         {
-                            println!("{} | {} | {}", run.id, run.agent_name, run.mode);
+                            println!(
+                                "{} | {} | {}",
+                                run.run_id, run.agent_name, run.permission_profile
+                            );
                         }
                     }
                 }
@@ -1329,13 +1344,13 @@ async fn handle_slash_command(
                         if let Ok(run) =
                             serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line)
                         {
-                            if run.id == run_id {
+                            if run.run_id == run_id {
                                 println!(
                                     "Run ID: {}\nAgent: {}\nWorkspace: {}\nTask: {}",
-                                    run.id,
+                                    run.run_id,
                                     run.agent_name,
-                                    run.workspace_path.display(),
-                                    run.task
+                                    run.working_directory.display(),
+                                    run.task_summary
                                 );
                             }
                         }

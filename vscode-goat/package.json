@@ -1,0 +1,38 @@
+{
+  "name": "goat",
+  "displayName": "GOAT AI Agent",
+  "description": "GOAT Local-first Agent OS Extension",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Machine Learning"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "goat.startMcp",
+        "title": "GOAT: Start MCP Server"
+      },
+      {
+        "command": "goat.repoStatus",
+        "title": "GOAT: Show Repo Status"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "18.x",
+    "typescript": "^5.1.3"
+  }
+}

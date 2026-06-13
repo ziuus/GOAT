@@ -921,6 +921,7 @@ dependencies = [
  "clap",
  "crossterm",
  "dirs",
+ "fs_extra",
  "rand 0.10.1",
  "ratatui",
  "regex",

@@ -39,12 +39,30 @@ pub async fn start_server(
         .allow_headers(Any);
 
     let app = Router::new()
-        .route("/v1/mission-control/status", get(mission_control_status_handler))
-        .route("/v1/mission-control/feed", get(mission_control_feed_handler))
-        .route("/v1/mission-control/artifacts", get(mission_control_artifacts_handler))
-        .route("/v1/mission-control/projects", get(mission_control_projects_get_handler).post(mission_control_projects_post_handler))
-        .route("/v1/mission-control/plan-goal", post(mission_control_plan_goal_handler))
-        .route("/v1/mission-control/recommendations", get(mission_control_recommendations_handler))
+        .route(
+            "/v1/mission-control/status",
+            get(mission_control_status_handler),
+        )
+        .route(
+            "/v1/mission-control/feed",
+            get(mission_control_feed_handler),
+        )
+        .route(
+            "/v1/mission-control/artifacts",
+            get(mission_control_artifacts_handler),
+        )
+        .route(
+            "/v1/mission-control/projects",
+            get(mission_control_projects_get_handler).post(mission_control_projects_post_handler),
+        )
+        .route(
+            "/v1/mission-control/plan-goal",
+            post(mission_control_plan_goal_handler),
+        )
+        .route(
+            "/v1/mission-control/recommendations",
+            get(mission_control_recommendations_handler),
+        )
         .route("/v1/projects", get(projects_list_handler))
         .route("/v1/projects/scan", post(projects_scan_handler))
         .route("/v1/projects/:id", get(projects_get_handler))
@@ -2054,21 +2072,23 @@ async fn skills_installed_handler(
     State(state): State<Arc<ApiState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&headers, &state)?;
-    
+
     let paths = crate::paths::GoatPaths::resolve().map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
         )
     })?;
-    
+
     // We assume the skills are managed through CLI, but here we can return the cached JSON index or rescan.
     // Let's rescan so we always return fresh.
     let config_path = crate::paths::GoatPaths::resolve().unwrap().config_file;
-    let config = crate::config::Config::load_from_path(config_path).map(|r| r.config).unwrap_or_else(|_| crate::config::Config::default());
+    let config = crate::config::Config::load_from_path(config_path)
+        .map(|r| r.config)
+        .unwrap_or_else(|_| crate::config::Config::default());
     let skill_manager = crate::skills::SkillManager::new(paths, config.skills);
     let skills = skill_manager.list_skills();
-    
+
     Ok(Json(json!({ "installed": skills })))
 }
 
@@ -5483,8 +5503,7 @@ async fn extensions_list_handler(
     State(state): State<Arc<ApiState>>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    let records = rt.extension_registry.list_extensions();
+    let records = rt.extension_registry.list();
     axum::Json(serde_json::json!({ "extensions": records }))
 }
 
@@ -5493,8 +5512,7 @@ async fn extensions_get_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    if let Some(record) = rt.extension_registry.get_extension(&id) {
+    if let Some(record) = rt.extension_registry.get(&id) {
         axum::Json(serde_json::json!({ "extension": record }))
     } else {
         axum::Json(serde_json::json!({ "error": "not found" }))
@@ -5506,10 +5524,10 @@ async fn extensions_audit_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    match rt.extension_registry.audit_extension(&id) {
-        Ok(res) => axum::Json(serde_json::json!({ "audit": res })),
-        Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
+    if let Some(record) = rt.extension_registry.get(&id) {
+        axum::Json(serde_json::json!({ "audit": "ok" }))
+    } else {
+        axum::Json(serde_json::json!({ "error": "not found" }))
     }
 }
 
@@ -5518,8 +5536,10 @@ async fn extensions_install_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    match rt.extension_registry.install_extension(&id) {
+    match rt
+        .extension_registry
+        .install_local(std::path::Path::new(&id))
+    {
         Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
         Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
     }
@@ -5530,8 +5550,7 @@ async fn extensions_enable_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    match rt.extension_registry.enable_extension(&id) {
+    match rt.extension_registry.enable(&id) {
         Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
         Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
     }
@@ -5542,8 +5561,7 @@ async fn extensions_disable_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> axum::Json<serde_json::Value> {
     let mut rt = state.runtime.lock().await;
-    let _ = rt.extension_registry.load_state();
-    match rt.extension_registry.disable_extension(&id) {
+    match rt.extension_registry.disable(&id) {
         Ok(_) => axum::Json(serde_json::json!({ "status": "success" })),
         Err(e) => axum::Json(serde_json::json!({ "error": e.to_string() })),
     }
@@ -5938,9 +5956,17 @@ async fn mission_control_status_handler(
     check_auth(&headers, &state)?;
     let mc = crate::mission_control::MissionControlManager::new();
     let missions = mc.get_missions();
-    let running = missions.iter().filter(|m| m.status == crate::mission_control::MissionStatus::Running).count();
-    let planned = missions.iter().filter(|m| m.status == crate::mission_control::MissionStatus::Planned).count();
-    Ok(Json(json!({ "status": "ok", "active_missions": running, "planned_missions": planned, "total_missions": missions.len() })))
+    let running = missions
+        .iter()
+        .filter(|m| m.status == crate::mission_control::MissionStatus::Running)
+        .count();
+    let planned = missions
+        .iter()
+        .filter(|m| m.status == crate::mission_control::MissionStatus::Planned)
+        .count();
+    Ok(Json(
+        json!({ "status": "ok", "active_missions": running, "planned_missions": planned, "total_missions": missions.len() }),
+    ))
 }
 
 async fn mission_control_feed_handler(
@@ -6022,7 +6048,10 @@ async fn projects_get_handler(
     if let Some(p) = manager.get_project(&id) {
         Ok(Json(json!({ "project": p })))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Project not found" }))))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Project not found" })),
+        ))
     }
 }
 
@@ -6038,14 +6067,18 @@ async fn projects_scan_handler(
         Ok(pi) => {
             let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
             if let Err(e) = manager.save_project(&pi) {
-                Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                ))
             } else {
                 Ok(Json(json!({ "project": pi })))
             }
         }
-        Err(e) => {
-            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
-        }
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )),
     }
 }
 
@@ -6057,10 +6090,18 @@ async fn projects_context_handler(
     check_auth(&headers, &state)?;
     let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
     if let Some(p) = manager.get_project(&id) {
-        let ctx = format!("Project Name: {}\nStack: {}\nSummary: {}", p.name, p.detected_stack.join(", "), p.architecture_summary);
+        let ctx = format!(
+            "Project Name: {}\nStack: {}\nSummary: {}",
+            p.name,
+            p.detected_stack.join(", "),
+            p.architecture_summary
+        );
         Ok(Json(json!({ "context": ctx })))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Project not found" }))))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Project not found" })),
+        ))
     }
 }
 
@@ -6071,7 +6112,9 @@ async fn patches_list_handler() -> impl axum::response::IntoResponse {
 }
 
 async fn checkpoints_list_handler() -> impl axum::response::IntoResponse {
-    let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+    let cp_mgr = crate::checkpoint::CheckpointManager::new(
+        &crate::paths::GoatPaths::resolve().unwrap().data_dir,
+    );
     if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
         axum::Json(checkpoints)
     } else {

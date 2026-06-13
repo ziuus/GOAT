@@ -20,6 +20,7 @@ pub mod code_retry;
 pub mod command_registry;
 pub mod config;
 pub mod daemon;
+pub mod diff_analyzer;
 pub mod embeddings;
 pub mod error;
 pub mod events;
@@ -33,17 +34,18 @@ pub mod jobs;
 pub mod llm;
 pub mod mcp;
 pub mod mcp_runtime;
+pub mod mcp_server;
 pub mod memory;
 pub mod mission_control;
 pub mod models;
 pub mod onboarding;
+pub mod patch_manager;
 pub mod paths;
 pub mod project;
 pub mod project_intelligence;
 pub mod project_profiles;
 pub mod promptforge;
 pub mod provider;
-pub mod patch_manager;
 pub mod providers;
 pub mod quick_access;
 pub mod recipe_marketplace;
@@ -54,6 +56,7 @@ pub mod runtime;
 pub mod scheduler;
 pub mod skill_marketplace;
 pub mod skill_researcher;
+pub mod skill_runner;
 mod skills;
 pub mod studio;
 pub mod subagents;
@@ -196,7 +199,12 @@ async fn main() -> Result<()> {
     boot_log.splice(0..0, logo);
 
     // ── 8. Route to TUI or headless ───────────────────────────────────────────
-    if cli.headless {
+    if cli.mcp_server {
+        info!("launching MCP server mode");
+        mcp_server::run(runtime)
+            .await
+            .context("mcp server mode failed")?;
+    } else if cli.headless {
         info!("launching headless mode");
         headless::run(runtime)
             .await
@@ -247,6 +255,7 @@ async fn run_app(
         terminal.draw(|f| ui::render(f, app))?;
 
         app.handle_scheduled_jobs().await;
+        app.process_active_skill().await;
 
         if crossterm::event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {

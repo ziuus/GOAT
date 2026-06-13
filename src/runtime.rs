@@ -66,7 +66,7 @@ pub struct GoatRuntime {
     pub brain_disabled: bool,
 
     /// Extension Registry for Phase 6.8
-    pub extension_registry: crate::extensions::ExtensionRegistry,
+    pub extension_registry: crate::extensions::ExtensionManager,
 
     // ── Agent components ──────────────────────────────────────────────────────
     /// SQLite brain (memory/session store).
@@ -270,21 +270,10 @@ impl GoatRuntime {
         );
         external_agent_manager.detect_all(&config);
 
-        let mut extension_registry = crate::extensions::ExtensionRegistry::new(
-            paths
-                .config_file
-                .parent()
-                .unwrap_or(std::path::Path::new("/")),
-            &paths.data_dir,
-        )
-        .unwrap_or_else(|_| {
-            crate::extensions::ExtensionRegistry::new(
-                std::path::Path::new("/tmp"),
-                std::path::Path::new("/tmp"),
-            )
-            .unwrap()
-        });
-        let _ = extension_registry.load_state();
+        let mut extension_registry = crate::extensions::ExtensionManager::new(&paths.data_dir)
+            .unwrap_or_else(|_| {
+                crate::extensions::ExtensionManager::new(std::path::Path::new("/tmp")).unwrap()
+            });
 
         let runtime = GoatRuntime {
             subagent_manager: crate::subagents::SubagentManager::new(paths.clone()),

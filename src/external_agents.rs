@@ -582,7 +582,11 @@ impl ExternalAgentManager {
             let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
 
-            run_record.status = if success { "success".to_string() } else { "failed".to_string() };
+            run_record.status = if success {
+                "success".to_string()
+            } else {
+                "failed".to_string()
+            };
             run_record.finished_at = Some(chrono::Utc::now());
             run_record.exit_code = output.status.code();
 
@@ -632,11 +636,31 @@ impl ExternalAgentManager {
 
         // Also append to the JSONL global log
         let jsonl_path = self.data_dir.join("external-agent-runs.jsonl");
-        if let Ok(mut json_file) = OpenOptions::new().create(true).append(true).open(&jsonl_path) {
+        if let Ok(mut json_file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&jsonl_path)
+        {
             if let Ok(json_str) = serde_json::to_string(&run_to_save) {
                 let _ = writeln!(json_file, "{}", json_str);
             }
         }
+    }
+
+    pub fn get_run(&self, id: &str) -> Option<ExternalAgentRun> {
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+        if let Ok(file) = File::open(&self.audit_log_path) {
+            let reader = BufReader::new(file);
+            for line in reader.lines().filter_map(|l| l.ok()) {
+                if let Ok(run) = serde_json::from_str::<ExternalAgentRun>(&line) {
+                    if run.run_id == id {
+                        return Some(run);
+                    }
+                }
+            }
+        }
+        None
     }
 }
 

@@ -208,6 +208,9 @@ impl App {
         );
         logs.push("[HELP] Dev tools: /check · /test · /lint · /format · /patch".to_string());
         logs.push("[HELP] Memory:    /memory · /recall <query> · /save-skill <name>".to_string());
+        logs.push(
+            "[HELP] Plugins:   /extensions · /extension <id> · /extension-doctor".to_string(),
+        );
         logs.push("[HELP] Sessions:  /new · /sessions · /profile · /profiles".to_string());
         logs.push(
             "[HELP] Keys:      Enter=send · ↑=history · Ctrl+C=quit · Esc=cancel".to_string(),
@@ -3279,7 +3282,8 @@ impl App {
                     ver
                 ));
                 self.push_log(
-                    "[HELP] Quick: /help · /status · /repo-map · /skills · /memory".to_string(),
+                    "[HELP] Quick: /help · /status · /repo-map · /skills · /memory · /extensions"
+                        .to_string(),
                 );
                 true
             }
@@ -3681,6 +3685,99 @@ impl App {
                 self.push_log("  - Workflow Nodes  : 0");
                 self.push_log("  - Skill Nodes     : 0");
                 self.push_log("[MEMORY GALAXY] Visualization rendering is mocked.");
+                true
+            }
+
+            cmd if cmd.starts_with("/extensions") || cmd.starts_with("/extension") => {
+                let parts: Vec<&str> = cmd.split_whitespace().collect();
+                let base = parts[0];
+                match base {
+                    "/extensions" => {
+                        self.push_log("[EXTENSIONS] Listing extensions...");
+                        if let Ok(manager) =
+                            crate::extensions::ExtensionManager::new(&self.paths.data_dir)
+                        {
+                            let records = manager.list();
+                            if records.is_empty() {
+                                self.push_log("  No extensions installed.");
+                            } else {
+                                for r in records {
+                                    self.push_log(&format!(
+                                        "  - {} [{:?}] ({:?})",
+                                        r.manifest.extension.id,
+                                        r.status,
+                                        r.manifest.extension.ext_type
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    "/extension-doctor" => {
+                        self.push_log("[EXTENSIONS] Running doctor...");
+                        if let Ok(manager) =
+                            crate::extensions::ExtensionManager::new(&self.paths.data_dir)
+                        {
+                            if let Ok(findings) = manager.doctor() {
+                                for f in findings {
+                                    self.push_log(&format!("  {}", f));
+                                }
+                            }
+                        }
+                    }
+                    "/extension-enable" | "/extension-disable" => {
+                        if parts.len() < 2 {
+                            self.push_log(&format!("[EXTENSIONS] Usage: {} <id>", base));
+                        } else {
+                            let id = parts[1];
+                            if let Ok(mut manager) =
+                                crate::extensions::ExtensionManager::new(&self.paths.data_dir)
+                            {
+                                let res = if base == "/extension-enable" {
+                                    manager.enable(id)
+                                } else {
+                                    manager.disable(id)
+                                };
+                                match res {
+                                    Ok(_) => self.push_log(&format!(
+                                        "[EXTENSIONS] Successfully modified {}",
+                                        id
+                                    )),
+                                    Err(e) => self.push_log(&format!("[EXTENSIONS] Error: {}", e)),
+                                }
+                            }
+                        }
+                    }
+                    "/extension" => {
+                        if parts.len() < 2 {
+                            self.push_log("[EXTENSIONS] Usage: /extension <id>");
+                        } else {
+                            let id = parts[1];
+                            if let Ok(manager) =
+                                crate::extensions::ExtensionManager::new(&self.paths.data_dir)
+                            {
+                                if let Some(r) = manager.get(id) {
+                                    self.push_log(&format!("[EXTENSION] {}", id));
+                                    self.push_log(&format!(
+                                        "  Name  : {}",
+                                        r.manifest.extension.name
+                                    ));
+                                    self.push_log(&format!(
+                                        "  Type  : {:?}",
+                                        r.manifest.extension.ext_type
+                                    ));
+                                    self.push_log(&format!("  Status: {:?}", r.status));
+                                    self.push_log(&format!(
+                                        "  Risk  : {:?}",
+                                        r.manifest.extension.risk_level
+                                    ));
+                                } else {
+                                    self.push_log(&format!("[EXTENSIONS] Not found: {}", id));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
                 true
             }
 

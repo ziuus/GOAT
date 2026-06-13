@@ -95,7 +95,7 @@ impl SkillManager {
         let mut source = "manual".to_string();
         let mut source_mission_id = None;
         let mut risk_level = "low".to_string();
-        
+
         let mut is_suspicious = false;
         let mut warnings = Vec::new();
 
@@ -116,7 +116,8 @@ impl SkillManager {
             } else if trimmed.starts_with("source:") {
                 source = trimmed.replace("source:", "").trim().to_string();
             } else if trimmed.starts_with("source_mission_id:") {
-                source_mission_id = Some(trimmed.replace("source_mission_id:", "").trim().to_string());
+                source_mission_id =
+                    Some(trimmed.replace("source_mission_id:", "").trim().to_string());
             } else if trimmed.starts_with("risk_level:") {
                 risk_level = trimmed.replace("risk_level:", "").trim().to_string();
             } else if trimmed.starts_with("## Description") {

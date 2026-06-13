@@ -1,0 +1,733 @@
+    Checking goat v0.14.0-alpha.1 (/home/zius/Projects/GOAT)
+warning: unused import: `TaskKind`
+ --> src/agents/builder.rs:1:61
+  |
+1 | use crate::agent_quality::{AgentContextPacker, QualityGate, TaskKind};
+  |                                                             ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Path`
+ --> src/agents/builder.rs:6:17
+  |
+6 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `crate::error::GoatError`
+ --> src/agents/cofounder.rs:1:5
+  |
+1 | use crate::error::GoatError;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/cofounder.rs:7:17
+  |
+7 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/agents/designer.rs:4:5
+  |
+4 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/designer.rs:6:17
+  |
+6 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/agents/learner.rs:4:5
+  |
+4 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/learner.rs:6:17
+  |
+6 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/agents/operator.rs:4:5
+  |
+4 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/operator.rs:6:17
+  |
+6 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `PathBuf`
+ --> src/agents/registry.rs:3:23
+  |
+3 | use std::path::{Path, PathBuf};
+  |                       ^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/researcher.rs:6:17
+  |
+6 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `crate::reports::ReportManager`
+ --> src/agents/socializer.rs:4:5
+  |
+4 | use crate::reports::ReportManager;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Path`
+ --> src/agents/socializer.rs:9:17
+  |
+9 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `anyhow`
+ --> src/brain_index.rs:1:22
+  |
+1 | use anyhow::{Result, anyhow};
+  |                      ^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+ --> src/brain_index.rs:3:13
+  |
+3 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `HashSet`
+ --> src/brain_index.rs:4:33
+  |
+4 | use std::collections::{HashMap, HashSet};
+  |                                 ^^^^^^^
+
+warning: unused import: `error`
+ --> src/brain_index.rs:7:15
+  |
+7 | use tracing::{error, info, warn};
+  |               ^^^^^
+
+warning: unused import: `std::path::PathBuf`
+ --> src/browser_adapter.rs:4:5
+  |
+4 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `tokio::sync::Mutex`
+ --> src/browser_adapter.rs:6:5
+  |
+6 | use tokio::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `BrowserActionKind` and `BrowserScreenshot`
+ --> src/browser_workflows.rs:2:5
+  |
+2 |     BrowserActionKind, BrowserActionResult, BrowserAdapterManager, Browse...
+  |     ^^^^^^^^^^^^^^^^^
+3 |     BrowserScreenshot,
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src/browser_workflows.rs:9:5
+  |
+9 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `tokio::sync::Mutex`
+  --> src/browser_workflows.rs:10:5
+   |
+10 | use tokio::sync::Mutex;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> src/checkpoint.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `ModelProviderCapability`
+    --> src/cli.rs:1899:28
+     |
+1899 |     use crate::providers::{ModelProviderCapability, ModelProviderRegis...
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+    --> src/cli.rs:3231:9
+     |
+3231 |     use std::sync::Arc;
+     |         ^^^^^^^^^^^^^^
+
+warning: unused import: `tokio::sync::Mutex`
+    --> src/cli.rs:3232:9
+     |
+3232 |     use tokio::sync::Mutex;
+     |         ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DateTime`
+ --> src/extensions.rs:2:14
+  |
+2 | use chrono::{DateTime, Utc};
+  |              ^^^^^^^^
+
+warning: unused import: `Stdio`
+ --> src/external_agents.rs:7:29
+  |
+7 | use std::process::{Command, Stdio};
+  |                             ^^^^^
+
+warning: unused import: `crate::paths::GoatPaths`
+  --> src/headless.rs:24:5
+   |
+24 | use crate::paths::GoatPaths;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::fs`
+  --> src/headless.rs:29:5
+   |
+29 | use std::fs;
+   |     ^^^^^^^
+
+warning: unused import: `HookRuleConfig`
+ --> src/hooks.rs:6:21
+  |
+6 | use crate::config::{HookRuleConfig, HooksConfig};
+  |                     ^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> src/project_intelligence.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `Path`
+ --> src/reports.rs:4:17
+  |
+4 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+
+warning: unused import: `anyhow::Result`
+ --> src/scheduler.rs:1:5
+  |
+1 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src/skill_researcher.rs:4:5
+  |
+4 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `tokio::sync::Mutex`
+ --> src/skill_researcher.rs:5:5
+  |
+5 | use tokio::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> src/skill_runner.rs:4:14
+  |
+4 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused imports: `ApprovalRequest` and `RiskLevel`
+   --> src/task.rs:101:23
+    |
+101 | use crate::approval::{ApprovalRequest, RiskLevel};
+    |                       ^^^^^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::runtime::GoatRuntime`
+   --> src/task.rs:102:5
+    |
+102 | use crate::runtime::GoatRuntime;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/timeline.rs:3:5
+  |
+3 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+ --> src/timeline.rs:7:5
+  |
+7 | use uuid::Uuid;
+  |     ^^^^^^^^^^
+
+warning: unused import: `tokio::sync::Mutex`
+ --> src/transports.rs:6:5
+  |
+6 | use tokio::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/validation.rs:3:5
+  |
+3 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BufReader`
+ --> src/validation.rs:8:31
+  |
+8 | use tokio::io::{AsyncReadExt, BufReader};
+  |                               ^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src/agents/cofounder.rs:632:13
+    |
+632 |         let mut sys_prompt = String::from(
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> src/brain_index.rs:83:13
+   |
+83 |         let mut out = String::new();
+   |             ----^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unreachable pattern
+    --> src/app.rs:4893:39
+     |
+ 841 | ...   "/learn" | "@learn" => {
+     |                  -------- matches all the relevant values
+...
+4893 | ...   "/learner" | "@learner" | "@learn" | "@study" | "@dsa" | "@ml" |...
+     |                                 ^^^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+    --> src/app.rs:1448:13
+     |
+ 841 |             "/learn" | "@learn" => {
+     |             ------------------- matches all the relevant values
+...
+1448 |             "/learn" => {
+     |             ^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+    --> src/app.rs:2570:13
+     |
+ 881 |             "/save-skill" | "@save-skill" => {
+     |             ----------------------------- matches all the relevant values
+...
+2570 |             "/save-skill" => {
+     |             ^^^^^^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+    --> src/app.rs:4075:13
+     |
+ 894 |             "/patch" | "/patches" | "@patch" => {
+     |             -------------------------------- matches all the relevant values
+...
+4075 |             "/patch" => {
+     |             ^^^^^^^^ no value can reach this
+
+warning: unreachable pattern
+    --> src/app.rs:5086:13
+     |
+4326 | ...   "/agents" | "/agent-selector" | "/subagent-selector" | "/agent-select" => {
+     |       ---------------------------------------------------------------------- matches all the relevant values
+...
+5086 | ...   "/agents" => {
+     |       ^^^^^^^^^ no value can reach this
+
+warning: variable does not need to be mutable
+    --> src/app.rs:2969:29
+     |
+2969 | ...   let mut cmds = val_mgr.generate_commands(&project);
+     |           ----^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/app.rs:2976:33
+     |
+2976 | ...                   for mut val in cmds {
+     |                           ----^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/app.rs:5977:17
+     |
+5977 | ...   let mut runner = crate::skill_runner::SkillRunner::new(&self.pat...
+     |           ----^^^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/app.rs:5988:17
+     |
+5988 | ...   let mut runner = crate::skill_runner::SkillRunner::new(&self.pat...
+     |           ----^^^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/app.rs:6011:13
+     |
+6011 | ...   let mut runner = crate::skill_runner::SkillRunner::new(&self.pat...
+     |           ----^^^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:1071:61
+     |
+1071 | ...                   let mut child = std::process::Command::new(prog)
+     |                           ----^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:1135:21
+     |
+1135 |                 let mut cmds = val_mgr.generate_commands(&project);
+     |                     ----^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2329:17
+     |
+2329 | ...   let mut registry = crate::models::ProfileRegistry::from_config(&...
+     |           ----^^^^^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2330:17
+     |
+2330 |             let mut router = crate::llm::LlmRouter::from_config(config);
+     |                 ----^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2418:17
+     |
+2418 | ...   let mut registry = crate::models::ProfileRegistry::from_config(&...
+     |           ----^^^^^^^^
+     |           |
+     |           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2419:17
+     |
+2419 |             let mut router = crate::llm::LlmRouter::from_config(config);
+     |                 ----^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> src/daemon.rs:15:18
+   |
+15 | pub async fn run(mut rt: GoatRuntime) -> Result<()> {
+   |                  ----^^
+   |                  |
+   |                  help: remove this `mut`
+
+error[E0277]: `DiffAnalysisSource` doesn't implement `std::fmt::Display`
+   --> src/mission_control.rs:152:127
+    |
+152 | ...e: {}", analysis.analysis_id, analysis.risk_level, analysis.source_type);
+    |       -- required by this formatting parameter        ^^^^^^^^^^^^^^^^^^^^ `DiffAnalysisSource` cannot be formatted with the default formatter
+    |
+help: the trait `std::fmt::Display` is not implemented for `DiffAnalysisSource`
+   --> src/diff_analyzer.rs:9:1
+    |
+  9 | pub enum DiffAnalysisSource {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+
+warning: unused import: `PermissionsExt`
+ --> src/daemon.rs:4:41
+  |
+4 | use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+  |                                         ^^^^^^^^^^^^^^
+
+warning: unused variable: `elapsed`
+  --> src/brain_context.rs:95:13
+   |
+95 |         let elapsed = start.elapsed();
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_elapsed`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `log_text`
+   --> src/agents/operator.rs:355:54
+    |
+355 | ...self, system_id: &str, log_text: &str) -> Result<LogReview> {
+    |                           ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_log_text`
+
+warning: variable does not need to be mutable
+   --> src/agents/socializer.rs:170:13
+    |
+170 |         let mut agent = Self {
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `id`
+   --> src/api_server.rs:969:10
+    |
+969 |     Path(id): Path<String>,
+    |          ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `evt`
+    --> src/api_server.rs:1414:13
+     |
+1414 |         let evt = crate::events::GoatEvent::new(
+     |             ^^^ help: if this is intentional, prefix it with an underscore: `_evt`
+
+warning: unused variable: `rt`
+    --> src/api_server.rs:1945:9
+     |
+1945 |     let rt = state.runtime.lock().await;
+     |         ^^ help: if this is intentional, prefix it with an underscore: `_rt`
+
+warning: unused variable: `headers`
+    --> src/api_server.rs:2131:5
+     |
+2131 |     headers: HeaderMap,
+     |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_headers`
+
+warning: unused variable: `state`
+    --> src/api_server.rs:2133:11
+     |
+2133 |     State(state): State<Arc<ApiState>>,
+     |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `out`
+  --> src/brain_index.rs:83:13
+   |
+83 |         let mut out = String::new();
+   |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_out`
+
+warning: unused variable: `id`
+    --> src/api_server.rs:4136:10
+     |
+4136 |     Path(id): Path<String>,
+     |          ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `id`
+    --> src/api_server.rs:4147:10
+     |
+4147 |     Path(id): Path<String>,
+     |          ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `req`
+    --> src/api_server.rs:4538:16
+     |
+4538 |     axum::Json(req): axum::Json<CreateDesignerReviewReq>,
+     |                ^^^ help: if this is intentional, prefix it with an underscore: `_req`
+
+warning: unused variable: `state`
+    --> src/api_server.rs:5341:11
+     |
+5341 |     State(state): State<Arc<ApiState>>,
+     |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `id`
+    --> src/api_server.rs:5342:25
+     |
+5342 |     axum::extract::Path(id): axum::extract::Path<String>,
+     |                         ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `e`
+    --> src/app.rs:2987:48
+     |
+2987 | ...                if let Err(e) = v_mgr.run_validation(val, &q).await {
+     |                               ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `srv_config`
+    --> src/app.rs:1283:37
+     |
+1283 | ...           if let Some(srv_config) = self.config.mcp_servers.get(na...
+     |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_srv_config`
+
+warning: unused variable: `pt`
+    --> src/app.rs:4992:32
+     |
+4992 | ...                      Ok(pt) => self.push_log(format!("[LEARNER] Pr...
+     |                             ^^ help: if this is intentional, prefix it with an underscore: `_pt`
+
+warning: unused variable: `pending`
+   --> src/validation.rs:202:14
+    |
+202 |         let (pending, rx) = approval_queue.add(req, "validation").await;
+    |              ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+
+warning: unused variable: `args`
+    --> src/cli.rs:1102:42
+     |
+1102 |         Command::CheckpointCmd { action, args } => {
+     |                                          ^^^^ help: try ignoring the field: `args: _`
+
+warning: unused variable: `reports_dir`
+    --> src/cli.rs:1350:9
+     |
+1350 |     let reports_dir = paths.data_dir.join("reports");
+     |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_reports_dir`
+
+warning: unused variable: `config`
+    --> src/cli.rs:1451:5
+     |
+1451 |     config: &crate::config::Config,
+     |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2916:21
+     |
+2916 |                 let mut lines = req.display_lines();
+     |                     ----^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2960:9
+     |
+2960 |     let mut hm = crate::hooks::HooksManager::new(config.hooks.clone(),...
+     |         ----^^
+     |         |
+     |         help: remove this `mut`
+
+warning: unused variable: `name`
+    --> src/cli.rs:2971:25
+     |
+2971 |             if let Some(name) = arg {
+     |                         ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: variable does not need to be mutable
+    --> src/cli.rs:2990:9
+     |
+2990 |     let mut sm = crate::scheduler::SchedulerManager::new(config.schedu...
+     |         ----^^
+     |         |
+     |         help: remove this `mut`
+
+warning: unused variable: `args`
+    --> src/cli.rs:2988:5
+     |
+2988 |     args: &[String],
+     |     ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: variable does not need to be mutable
+   --> src/code_execution.rs:289:9
+    |
+289 |         mut cmd: ValidationCommand,
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `cp`
+   --> src/code_execution.rs:389:25
+    |
+389 |             if let Some(cp) = checkpoint_mgr.get_checkpoint(cp_id)? {
+    |                         ^^ help: if this is intentional, prefix it with an underscore: `_cp`
+
+warning: unused variable: `pid`
+   --> src/daemon.rs:165:38
+    |
+165 | ...let is_stale = if let Ok(pid) = pid_str.trim().parse::<i32>() {
+    |                             ^^^ help: if this is intentional, prefix it with an underscore: `_pid`
+
+warning: variable does not need to be mutable
+   --> src/diff_analyzer.rs:152:13
+    |
+152 |         let mut analysis = DiffAnalysis {
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `enabled_path`
+   --> src/extensions.rs:164:13
+    |
+164 |         let enabled_path = self.config_dir.join("enabled.json");
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_enabled_path`
+
+warning: unused variable: `trust_path`
+   --> src/extensions.rs:165:13
+    |
+165 |         let trust_path = self.config_dir.join("trust.json");
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_trust_path`
+
+warning: variable does not need to be mutable
+   --> src/extensions.rs:365:13
+    |
+365 |         let mut record = self
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/extensions.rs:388:13
+    |
+388 |         let mut record = self
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/extensions.rs:405:13
+    |
+405 |         let mut record = self
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `timeout_secs`
+   --> src/external_agents.rs:507:13
+    |
+507 |         let timeout_secs = config.external_agents.default_timeout_secs;
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_timeout_secs`
+
+warning: unused variable: `start`
+   --> src/external_agents.rs:508:13
+    |
+508 |         let start = Instant::now();
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: variable does not need to be mutable
+  --> src/failure_memory.rs:91:13
+   |
+91 |         let mut msg = failure.evidence.source.normalized_message.clone();
+   |             ----^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: value assigned to `title` is never read
+   --> src/mission_control.rs:192:25
+    |
+192 |         let mut title = "New Mission".to_string();
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^ this value is reassigned later and never used
+...
+196 |                 title = "Build New Feature".to_string();
+    |                 ----- `title` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/runtime.rs:386:13
+    |
+386 |         for mut mrs in self.mcp_runtime.list_all_mut() {
+    |             ----^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `app`
+    --> src/ui.rs:1301:40
+     |
+1301 | fn render_palette_modal(f: &mut Frame, app: &App, area: Rect) {
+     |                                        ^^^ help: if this is intentional, prefix it with an underscore: `_app`
+
+For more information about this error, try `rustc --explain E0277`.
+warning: `goat` (bin "goat") generated 106 warnings
+error: could not compile `goat` (bin "goat") due to 1 previous error; 106 warnings emitted

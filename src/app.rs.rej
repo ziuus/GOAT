@@ -1,0 +1,20 @@
+--- src/app.rs
++++ src/app.rs
+@@ -2571,14 +2571,14 @@
+                     } else {
+                         self.push_log("[SKILLS]   None");
+                     }
+-                } else if sub_cmd == "next" {
++                } else if arg == "next" {
+                     if let Some(ref mut session) = self.active_skill_session {
+                         self.push_log("[SKILLS] Advancing to next step...");
+                         session.waiting_for_user_next = false;
+                     } else {
+                         self.push_log("[SKILLS] No active skill execution.");
+                     }
+-                } else if sub_cmd == "cancel" {
++                } else if arg == "cancel" {
+                     if let Some(mut session) = self.active_skill_session.take() {
+                         self.push_log("[SKILLS] Cancelled skill execution.");
+-                        session.execution.status = crate::skill_runner::ExecutionStatus::Cancelled;
++                        session.execution.status = crate::skill_runner::SkillExecutionStatus::Cancelled;

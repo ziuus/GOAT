@@ -62,6 +62,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_brain: bool,
 
+    /// Start GOAT as an MCP server.
+    #[arg(long, alias = "mcp", global = true)]
+    pub mcp_server: bool,
+
     /// Select a model profile by name (e.g. balanced, coding, cheap, powerful).
     /// Overrides the default profile from goat.toml.
     /// Run `goat models` to list available profiles.
@@ -1589,7 +1593,7 @@ fn handle_new_session_command(paths: &crate::paths::GoatPaths) -> anyhow::Result
     Ok(())
 }
 
-// ── tools command ─────────────────────────────────────────────────────────────
+// ── extension command ─────────────────────────────────────────────────────────
 
 fn handle_extensions_command(
     paths: &crate::paths::GoatPaths,
@@ -1597,113 +1601,159 @@ fn handle_extensions_command(
     action: &str,
     args: &[String],
 ) -> anyhow::Result<()> {
-    use crate::extensions::ExtensionRegistry;
-    let mut registry = ExtensionRegistry::new(
-        paths
-            .config_file
-            .parent()
-            .unwrap_or(std::path::Path::new("/")),
-        &paths.data_dir,
-    )?;
-    registry.load_state()?;
+    use crate::extensions::{ExtensionManager, ExtensionRiskLevel};
+    let mut manager = ExtensionManager::new(&paths.data_dir)?;
 
     match action {
         "list" => {
-            println!("Extension Registry (Phase 6.8)");
-            println!("{:-<80}", "");
+            println!("Extension Registry (Phase 9.0)");
+            println!("{:-<100}", "");
             println!(
-                "{:<30} | {:<15} | {:<15} | {:<10}",
-                "ID", "Kind", "Status", "Trust"
+                "{:<30} | {:<15} | {:<15} | {:<15} | {:<10}",
+                "ID", "Name", "Type", "Status", "Risk"
             );
-            println!("{:-<80}", "");
+            println!("{:-<100}", "");
 
-            let mut records = registry.list_extensions();
-            records.sort_by_key(|r| r.manifest.id.clone());
+            let mut records = manager.list();
+            records.sort_by_key(|r| r.manifest.extension.id.clone());
 
             for r in records {
+                let m = &r.manifest.extension;
                 println!(
-                    "{:<30} | {:<15?} | {:<15?} | {:<10?}",
-                    r.manifest.id, r.manifest.kind, r.status, r.trust_level
+                    "{:<30} | {:<15} | {:<15?} | {:<15?} | {:<10?}",
+                    m.id,
+                    if m.name.len() > 15 {
+                        format!("{}...", &m.name[..12])
+                    } else {
+                        m.name.clone()
+                    },
+                    m.ext_type,
+                    r.status,
+                    m.risk_level
                 );
             }
         }
-        "discover" => {
+        "validate" => {
             if args.is_empty() {
-                println!("Usage: goat extensions discover <path>");
+                println!("Usage: goat extension validate <path>");
                 return Ok(());
             }
             let path = std::path::Path::new(&args[0]);
-            match registry.discover_local(path) {
-                Ok(id) => println!("Discovered extension: {}", id),
-                Err(e) => println!("Error discovering extension: {}", e),
-            }
-        }
-        "audit" => {
-            if args.is_empty() {
-                println!("Usage: goat extensions audit <id>");
-                return Ok(());
-            }
-            match registry.audit_extension(&args[0]) {
-                Ok(result) => {
-                    println!("Audit Results for {}: ", result.extension_id);
-                    println!("Passed: {}", result.passed);
-                    if result.findings.is_empty() {
-                        println!("No findings.");
-                    } else {
-                        for finding in result.findings {
-                            println!("- [{:?}] {}", finding.severity, finding.message);
-                        }
-                    }
+            match manager.validate_manifest(path) {
+                Ok(m) => {
+                    println!("Manifest is valid!");
+                    println!("ID: {}", m.extension.id);
+                    println!("Name: {}", m.extension.name);
+                    println!("Type: {:?}", m.extension.ext_type);
+                    println!("Risk Level: {:?}", m.extension.risk_level);
                 }
-                Err(e) => println!("Error: {}", e),
+                Err(e) => println!("Validation failed: {}", e),
             }
         }
         "install" => {
             if args.is_empty() {
-                println!("Usage: goat extensions install <id>");
+                println!("Usage: goat extension install <path>");
                 return Ok(());
             }
-            let id = &args[0];
+            let path = std::path::Path::new(&args[0]);
 
-            // For CLI we assume user interaction is outside or explicitly trusted
-            if let Some(record) = registry.get_extension(id) {
-                if record.trust_level != crate::extensions::ExtensionTrustLevel::LocalBuiltin {
-                    println!("Warning: Installing untrusted extension.");
+            // Validate first to show summary
+            let manifest = match manager.validate_manifest(path) {
+                Ok(m) => m,
+                Err(e) => {
+                    println!("Cannot install, validation failed: {}", e);
+                    return Ok(());
                 }
-            }
+            };
 
-            match registry.install_extension(id) {
-                Ok(_) => println!("Successfully installed {}. It is currently DISABLED.", id),
-                Err(e) => println!("Error installing: {}", e),
+            println!("Installing Extension: {}", manifest.extension.name);
+            println!("ID: {}", manifest.extension.id);
+            println!("Risk Level: {:?}", manifest.extension.risk_level);
+            println!("Requested Permissions: {:?}", manifest.permissions);
+
+            use std::io::{self, Write};
+            print!("Do you want to install this extension? [y/N]: ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_ok() && input.trim().eq_ignore_ascii_case("y") {
+                match manager.install_local(path) {
+                    Ok(id) => println!("Successfully installed {}. It is currently DISABLED.", id),
+                    Err(e) => println!("Error installing: {}", e),
+                }
+            } else {
+                println!("Installation cancelled.");
+            }
+        }
+        "show" => {
+            if args.is_empty() {
+                println!("Usage: goat extension show <id>");
+                return Ok(());
+            }
+            if let Some(r) = manager.get(&args[0]) {
+                println!("--- Extension: {} ---", r.manifest.extension.id);
+                println!("Name: {}", r.manifest.extension.name);
+                println!("Version: {}", r.manifest.extension.version);
+                println!("Description: {}", r.manifest.extension.description);
+                println!("Author: {}", r.manifest.extension.author);
+                println!("Type: {:?}", r.manifest.extension.ext_type);
+                println!("Status: {:?}", r.status);
+                println!("Risk Level: {:?}", r.manifest.extension.risk_level);
+                println!("Capabilities: {:?}", r.manifest.capabilities);
+                println!("Permissions: {:?}", r.manifest.permissions);
+                println!("Entrypoints: {:?}", r.manifest.entrypoints);
+                if let Some(p) = &r.installed_path {
+                    println!("Installed at: {}", p.display());
+                }
+            } else {
+                println!("Extension not found: {}", args[0]);
             }
         }
         "enable" => {
             if args.is_empty() {
-                println!("Usage: goat extensions enable <id>");
+                println!("Usage: goat extension enable <id>");
                 return Ok(());
             }
-            match registry.enable_extension(&args[0]) {
-                Ok(_) => println!("Successfully enabled {}.", args[0]),
-                Err(e) => println!("Error enabling: {}", e),
+            let id = &args[0];
+            if let Some(entry) = manager.get(id) {
+                let risk = &entry.manifest.extension.risk_level;
+                if risk == &ExtensionRiskLevel::High || risk == &ExtensionRiskLevel::Critical {
+                    use std::io::{self, Write};
+                    println!("WARNING: This extension has a risk level of {:?}.", risk);
+                    print!("Are you sure you want to enable it? [y/N]: ");
+                    io::stdout().flush()?;
+                    let mut input = String::new();
+                    if !io::stdin().read_line(&mut input).is_ok()
+                        || !input.trim().eq_ignore_ascii_case("y")
+                    {
+                        println!("Enable cancelled.");
+                        return Ok(());
+                    }
+                }
+                match manager.enable(id) {
+                    Ok(_) => println!("Successfully enabled {}.", id),
+                    Err(e) => println!("Error enabling: {}", e),
+                }
+            } else {
+                println!("Extension not found: {}", id);
             }
         }
         "disable" => {
             if args.is_empty() {
-                println!("Usage: goat extensions disable <id>");
+                println!("Usage: goat extension disable <id>");
                 return Ok(());
             }
-            match registry.disable_extension(&args[0]) {
+            match manager.disable(&args[0]) {
                 Ok(_) => println!("Successfully disabled {}.", args[0]),
                 Err(e) => println!("Error disabling: {}", e),
             }
         }
         "remove" => {
             if args.is_empty() {
-                println!("Usage: goat extensions remove <id>");
+                println!("Usage: goat extension remove <id>");
                 return Ok(());
             }
-            match registry.remove_extension(&args[0]) {
-                Ok(_) => println!("Successfully removed {}.", args[0]),
+            match manager.remove(&args[0]) {
+                Ok(_) => println!("Successfully removed/archived {}.", args[0]),
                 Err(e) => println!("Error removing: {}", e),
             }
         }
@@ -2424,13 +2474,21 @@ fn handle_memory_command(
                 "User Memory: {}/{} chars {}",
                 u_count,
                 u_max,
-                if u_warn { "(WARNING: OVER BUDGET)" } else { "(OK)" }
+                if u_warn {
+                    "(WARNING: OVER BUDGET)"
+                } else {
+                    "(OK)"
+                }
             );
             println!(
                 "Struct Memory: {}/{} chars {}",
                 m_count,
                 m_max,
-                if m_warn { "(WARNING: OVER BUDGET)" } else { "(OK)" }
+                if m_warn {
+                    "(WARNING: OVER BUDGET)"
+                } else {
+                    "(OK)"
+                }
             );
         }
         _ => {

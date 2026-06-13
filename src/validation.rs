@@ -1,4 +1,4 @@
-use anyhow::{Result, bail, Context};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -64,7 +64,7 @@ impl ValidationManager {
         let base_dir = crate::paths::GoatPaths::resolve()
             .map(|p| p.data_dir.join("validation-logs"))
             .unwrap_or_else(|_| PathBuf::from("~/.local/share/goat/validation-logs"));
-        
+
         if !base_dir.exists() {
             let _ = fs::create_dir_all(&base_dir);
         }
@@ -84,19 +84,59 @@ impl ValidationManager {
         for lang in &project.languages {
             let lang_lower = lang.to_lowercase();
             if lang_lower == "rust" {
-                results.push(self.create_pending(&proj_id, "cargo test", ValidationType::Test, &root));
-                results.push(self.create_pending(&proj_id, "cargo check", ValidationType::Typecheck, &root));
-                results.push(self.create_pending(&proj_id, "cargo fmt --check", ValidationType::Format, &root));
+                results.push(self.create_pending(
+                    &proj_id,
+                    "cargo test",
+                    ValidationType::Test,
+                    &root,
+                ));
+                results.push(self.create_pending(
+                    &proj_id,
+                    "cargo check",
+                    ValidationType::Typecheck,
+                    &root,
+                ));
+                results.push(self.create_pending(
+                    &proj_id,
+                    "cargo fmt --check",
+                    ValidationType::Format,
+                    &root,
+                ));
             } else if lang_lower == "typescript" || lang_lower == "javascript" {
                 if project.package_managers.contains(&"npm".to_string()) {
-                    results.push(self.create_pending(&proj_id, "npm run build", ValidationType::Build, &root));
-                    results.push(self.create_pending(&proj_id, "npm run lint", ValidationType::Lint, &root));
+                    results.push(self.create_pending(
+                        &proj_id,
+                        "npm run build",
+                        ValidationType::Build,
+                        &root,
+                    ));
+                    results.push(self.create_pending(
+                        &proj_id,
+                        "npm run lint",
+                        ValidationType::Lint,
+                        &root,
+                    ));
                 } else if project.package_managers.contains(&"pnpm".to_string()) {
-                    results.push(self.create_pending(&proj_id, "pnpm build", ValidationType::Build, &root));
-                    results.push(self.create_pending(&proj_id, "pnpm lint", ValidationType::Lint, &root));
+                    results.push(self.create_pending(
+                        &proj_id,
+                        "pnpm build",
+                        ValidationType::Build,
+                        &root,
+                    ));
+                    results.push(self.create_pending(
+                        &proj_id,
+                        "pnpm lint",
+                        ValidationType::Lint,
+                        &root,
+                    ));
                 }
             } else if lang_lower == "python" {
-                results.push(self.create_pending(&proj_id, "python -m pytest", ValidationType::Test, &root));
+                results.push(self.create_pending(
+                    &proj_id,
+                    "python -m pytest",
+                    ValidationType::Test,
+                    &root,
+                ));
             }
         }
 
@@ -173,17 +213,35 @@ impl ValidationManager {
         mut val: ValidationResult,
         approval_queue: &crate::approval::ApprovalQueue,
     ) -> Result<ValidationResult> {
-        let risk_level = if val.command.contains("rm -rf") || val.command.contains("sudo ") || val.command.contains("curl | sh") || val.command.contains("wget | sh") || val.command.contains("install") || val.command.contains("remove") || val.command.contains("delete") {
+        let risk_level = if val.command.contains("rm -rf")
+            || val.command.contains("sudo ")
+            || val.command.contains("curl | sh")
+            || val.command.contains("wget | sh")
+            || val.command.contains("install")
+            || val.command.contains("remove")
+            || val.command.contains("delete")
+        {
             crate::approval::RiskLevel::High
-        } else if val.command.contains("build") || val.command.contains("lint") || val.command.contains("npm ") || val.command.contains("yarn ") || val.command.contains("pnpm ") {
+        } else if val.command.contains("build")
+            || val.command.contains("lint")
+            || val.command.contains("npm ")
+            || val.command.contains("yarn ")
+            || val.command.contains("pnpm ")
+        {
             crate::approval::RiskLevel::Medium
-        } else if val.command.contains("cargo test") || val.command.contains("cargo check") || val.command.contains("cargo fmt") {
+        } else if val.command.contains("cargo test")
+            || val.command.contains("cargo check")
+            || val.command.contains("cargo fmt")
+        {
             crate::approval::RiskLevel::Low
         } else {
             crate::approval::RiskLevel::Medium
         };
 
-        let mut explanation = format!("Command Type: {:?}\nProject: {:?}\n", val.command_type, val.project_id);
+        let mut explanation = format!(
+            "Command Type: {:?}\nProject: {:?}\n",
+            val.command_type, val.project_id
+        );
         if let Some(m) = &val.mission_id {
             explanation.push_str(&format!("Linked Mission: {}\n", m));
         }
@@ -200,7 +258,7 @@ impl ValidationManager {
         };
 
         let (pending, rx) = approval_queue.add(req, "validation").await;
-        
+
         let decision = rx.await.unwrap_or('n');
 
         if decision != 'y' && decision != 'a' {
@@ -212,7 +270,10 @@ impl ValidationManager {
 
         // 2. Prepare Execution
         val.status = ValidationStatus::Running;
-        let start_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        let start_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         val.started_at = Some(start_time / 1000);
         self.save_validation(&val)?;
 
@@ -245,17 +306,24 @@ impl ValidationManager {
         });
 
         // Add 2 minute timeout
-        let status_res = tokio::time::timeout(std::time::Duration::from_secs(120), child.wait()).await;
-        
+        let status_res =
+            tokio::time::timeout(std::time::Duration::from_secs(120), child.wait()).await;
+
         let out_str = out_task.await.unwrap_or_default();
         let err_str = err_task.await.unwrap_or_default();
 
-        let end_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        let end_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
         val.finished_at = Some(end_time / 1000);
         val.duration_ms = Some(end_time - start_time);
 
         let log_path = self.base_dir.join(format!("{}.log", val.validation_id));
-        fs::write(&log_path, format!("STDOUT:\n{}\n\nSTDERR:\n{}", out_str, err_str))?;
+        fs::write(
+            &log_path,
+            format!("STDOUT:\n{}\n\nSTDERR:\n{}", out_str, err_str),
+        )?;
         val.full_log_path = Some(log_path);
 
         val.stdout_preview = Some(out_str.chars().take(500).collect());
@@ -270,7 +338,10 @@ impl ValidationManager {
                 } else {
                     val.status = ValidationStatus::Failed;
                     val.summary = Some("Command failed with errors".to_string());
-                    val.suggested_next_action = Some(format!("Check logs and fix errors in {}", val.working_directory.display()));
+                    val.suggested_next_action = Some(format!(
+                        "Check logs and fix errors in {}",
+                        val.working_directory.display()
+                    ));
                 }
             }
             Ok(Err(e)) => {
@@ -289,26 +360,37 @@ impl ValidationManager {
         // If part of a mission, update mission control
         if let Some(mission_id) = &val.mission_id {
             let mc = crate::mission_control::MissionControlManager::new();
-            if let Some(mut mission) = mc.get_missions().into_iter().find(|m| m.mission_id == *mission_id) {
+            if let Some(mut mission) = mc
+                .get_missions()
+                .into_iter()
+                .find(|m| m.mission_id == *mission_id)
+            {
                 // Determine step or action
-                let event = format!("Validation {} ({}) finished with status: {:?}", val.validation_id, val.command, val.status);
-                mission.plan_steps.push(crate::mission_control::MissionPlanStep {
-                    id: Uuid::new_v4().to_string(),
-                    title: format!("Validation: {}", val.command),
-                    description: event,
-                    assigned_agent: None,
-                    status: if val.status == ValidationStatus::Passed { 
-                        "Completed".to_string()
-                    } else { 
-                        "Failed".to_string()
-                    },
-                });
+                let event = format!(
+                    "Validation {} ({}) finished with status: {:?}",
+                    val.validation_id, val.command, val.status
+                );
+                mission
+                    .plan_steps
+                    .push(crate::mission_control::MissionPlanStep {
+                        id: Uuid::new_v4().to_string(),
+                        title: format!("Validation: {}", val.command),
+                        description: event,
+                        assigned_agent: None,
+                        status: if val.status == ValidationStatus::Passed {
+                            "Completed".to_string()
+                        } else {
+                            "Failed".to_string()
+                        },
+                    });
                 if val.status == ValidationStatus::Failed {
                     if let Some(na) = &val.suggested_next_action {
                         mission.next_actions.push(na.clone());
                     }
                 } else {
-                    mission.next_actions.push("Proceed with next mission steps".to_string());
+                    mission
+                        .next_actions
+                        .push("Proceed with next mission steps".to_string());
                 }
                 mc.update_mission(&mission);
             }
@@ -349,19 +431,17 @@ mod tests {
 
         // If we spawn it, it should just block waiting for approval.
         let q_clone = q.clone();
-        let handle = tokio::spawn(async move {
-            mgr.run_validation(val, &q_clone).await
-        });
+        let handle = tokio::spawn(async move { mgr.run_validation(val, &q_clone).await });
 
         // The queue should get a pending request
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let pending = q.list().await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].request.risk_level, RiskLevel::Medium);
-        
+
         // Deny it
         q.resolve(&pending[0].id, 'n').await;
-        
+
         let res = handle.await.unwrap();
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(), "Validation denied");
@@ -392,15 +472,13 @@ mod tests {
         };
 
         let q_clone = q.clone();
-        let handle = tokio::spawn(async move {
-            mgr.run_validation(val, &q_clone).await
-        });
+        let handle = tokio::spawn(async move { mgr.run_validation(val, &q_clone).await });
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let pending = q.list().await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].request.risk_level, RiskLevel::High);
-        
+
         // Approve it but wait, it will run rm -rf / ! So deny it.
         q.resolve(&pending[0].id, 'n').await;
         let _ = handle.await;
@@ -431,15 +509,13 @@ mod tests {
         };
 
         let q_clone = q.clone();
-        let handle = tokio::spawn(async move {
-            mgr.run_validation(val, &q_clone).await
-        });
+        let handle = tokio::spawn(async move { mgr.run_validation(val, &q_clone).await });
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let pending = q.list().await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].request.risk_level, RiskLevel::Low);
-        
+
         // Deny it
         q.resolve(&pending[0].id, 'n').await;
         let res = handle.await.unwrap();

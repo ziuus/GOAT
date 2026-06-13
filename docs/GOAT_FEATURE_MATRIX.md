@@ -275,6 +275,8 @@ Status legend:
 | Chat & Command UI | `working` | Phase 4.3 |
 | Repo Explorer | `working` | Phase 4.3 |
 | Diff Viewer | `working` | Phase 4.3 |
+| Context-Aware Diff Analyzer | `working` | Phase 8.9 |
+| Auto-Patching Proposals | `working` | Phase 8.9 |
 | Context Management API | `working` | Phase 4.3 |
 | Safe Command Execution UI | `working` | Phase 4.4 |
 | Async Agent Chat & Jobs | `working` | Phase 4.5 |

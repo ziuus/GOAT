@@ -1,0 +1,90 @@
+--- src/skill_runner.rs
++++ src/skill_runner.rs
+@@ -62,26 +62,45 @@
+         let mut steps = Vec::new();
+         // A very basic parser for now. We split by bullet points or headers.
+         // In a real scenario, this would parse structured blocks or specific markdown patterns.
++        let mut current_step_type = SkillStepType::ManualStep;
++        let mut current_desc = String::new();
++        let mut current_cmd = None;
++        let mut in_code_block = false;
++        
+         for line in skill_content.lines() {
+             let line = line.trim();
+-            if line.starts_with("- ") || line.starts_with("* ") {
++            if line.starts_with("```bash") || line.starts_with("```sh") {
++                in_code_block = true;
++                current_cmd = Some(String::new());
++            } else if line.starts_with("```") && in_code_block {
++                in_code_block = false;
++                if !current_desc.is_empty() {
++                    steps.push(SkillStep {
++                        step_type: current_step_type.clone(),
++                        description: current_desc.clone(),
++                        command: current_cmd.clone(),
++                    });
++                    current_desc.clear();
++                    current_cmd = None;
++                }
++            } else if in_code_block {
++                if let Some(cmd) = &mut current_cmd {
++                    cmd.push_str(line);
++                    cmd.push('\n');
++                }
++            } else if line.starts_with("- ") || line.starts_with("* ") {
++                if !current_desc.is_empty() {
++                    steps.push(SkillStep {
++                        step_type: current_step_type.clone(),
++                        description: current_desc.clone(),
++                        command: current_cmd.clone(),
++                    });
++                    current_cmd = None;
++                }
+                 let text = line[2..].to_string();
+-                let step_type = if text.to_lowercase().contains("inspect") || text.to_lowercase().contains("read") {
+-                    SkillStepType::InspectFile
+-                } else if text.to_lowercase().contains("patch") {
+-                    SkillStepType::ProposePatch
+-                } else if text.to_lowercase().contains("validate") || text.to_lowercase().contains("test") {
+-                    SkillStepType::RunValidation
+-                } else if text.to_lowercase().contains("ask") {
+-                    SkillStepType::AskUser
+-                } else if text.to_lowercase().contains("note") {
+-                    SkillStepType::RecordNote
+-                } else {
+-                    SkillStepType::ManualStep
+-                };
+-                steps.push(SkillStep {
+-                    step_type,
+-                    description: text,
+-                    command: None,
+-                });
+-            } else if line.starts_with("```bash") {
+-                // simple hack to attach command to previous step
+-                // ignoring complex logic for now as requested: "If a step cannot be mapped safely, mark it as manual_step."
++                current_step_type = if text.to_lowercase().contains("inspect") || text.to_lowercase().contains("read") {
++                    SkillStepType::InspectFile
++                } else if text.to_lowercase().contains("patch") {
++                    SkillStepType::ProposePatch
++                } else if text.to_lowercase().contains("validate") || text.to_lowercase().contains("test") {
++                    SkillStepType::RunValidation
++                } else if text.to_lowercase().contains("ask") {
++                    SkillStepType::AskUser
++                } else if text.to_lowercase().contains("note") {
++                    SkillStepType::RecordNote
++                } else {
++                    SkillStepType::ManualStep
++                };
++                current_desc = text;
+             }
+         }
++        if !current_desc.is_empty() {
++            steps.push(SkillStep {
++                step_type: current_step_type.clone(),
++                description: current_desc,
++                command: current_cmd,
++            });
++        }
+         
+         if steps.is_empty() {
+             steps.push(SkillStep {

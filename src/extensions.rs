@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -7,17 +7,26 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExtensionKind {
-    Tool,
-    McpServer,
+pub enum ExtensionType {
     SkillPack,
-    RecipePack,
-    PromptPack,
+    McpPack,
+    AgentAdapter,
     WorkflowPack,
-    ProviderProfile,
-    AgentExtension,
-    DashboardCard,
+    CommandPack,
+    ValidationPack,
+    MemoryPack,
+    DashboardWidget,
+    ProjectTemplate,
     Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtensionRiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -27,413 +36,343 @@ pub enum ExtensionStatus {
     Installed,
     Enabled,
     Disabled,
-    Quarantined,
-    Deprecated,
-    Failed,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ExtensionTrustLevel {
-    LocalBuiltin,
-    LocalUser,
-    RemoteUntrusted,
-    RemoteAudited,
-    VerifiedLater,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-pub enum ExtensionPermission {
-    ReadProject,
-    WriteProject,
-    ReadHomeLimited,
-    ShellCommand,
-    NetworkAccess,
-    BrowserAccess,
-    GithubAccess,
-    TransportAccess,
-    MemoryRead,
-    MemoryWrite,
-    ProviderAccess,
-    SecretEnvAccess,
-    FileSystemWide,
-    ExternalSideEffect,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ExtensionSource {
-    LocalBuiltin,
-    LocalFolder(PathBuf),
-    RemoteIndexLater(String),
+    Blocked,
+    Invalid,
+    Archived,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionManifest {
+pub struct ExtensionMeta {
     pub id: String,
     pub name: String,
     pub version: String,
     pub description: String,
-    pub kind: ExtensionKind,
-    pub author: Option<String>,
-    pub homepage: Option<String>,
-    pub source_url: Option<String>,
+    pub author: String,
     pub license: Option<String>,
-    pub entry_type: Option<String>,
-    pub entry_ref: Option<String>,
+    #[serde(rename = "type")]
+    pub ext_type: ExtensionType,
+    #[serde(default = "default_risk")]
+    pub risk_level: ExtensionRiskLevel,
+}
+
+fn default_risk() -> ExtensionRiskLevel {
+    ExtensionRiskLevel::Medium
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExtensionCapabilities {
     #[serde(default)]
-    pub permissions: Vec<ExtensionPermission>,
+    pub skills: bool,
     #[serde(default)]
-    pub commands: Vec<String>,
+    pub validation_recipes: bool,
     #[serde(default)]
-    pub tools: Vec<String>,
+    pub commands: bool,
+    #[serde(default)]
+    pub mcp_servers: bool,
+    #[serde(default)]
+    pub external_agents: bool,
+    #[serde(default)]
+    pub dashboard_widgets: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExtensionPermissions {
+    #[serde(default)]
+    pub read_project: bool,
+    #[serde(default)]
+    pub write_project: bool,
+    #[serde(default)]
+    pub run_commands: bool,
+    #[serde(default)]
+    pub network: bool,
+    #[serde(default)]
+    pub access_memory: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExtensionEntrypoints {
     #[serde(default)]
     pub skills: Vec<String>,
     #[serde(default)]
-    pub recipes: Vec<String>,
+    pub validation_recipes: Vec<String>,
     #[serde(default)]
-    pub mcp_servers: Vec<serde_json::Value>,
+    pub commands: Vec<String>,
     #[serde(default)]
-    pub provider_profiles: Vec<serde_json::Value>,
+    pub mcp_servers: Vec<String>,
     #[serde(default)]
-    pub prompt_templates: Vec<String>,
-    pub safety_notes: Option<String>,
-    pub install_notes: Option<String>,
-    pub created_at: Option<String>,
+    pub external_agents: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionRecord {
-    pub manifest: ExtensionManifest,
+pub struct GoatExtensionManifest {
+    pub extension: ExtensionMeta,
+    #[serde(default)]
+    pub capabilities: ExtensionCapabilities,
+    #[serde(default)]
+    pub permissions: ExtensionPermissions,
+    #[serde(default)]
+    pub entrypoints: ExtensionEntrypoints,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionRegistryEntry {
+    pub manifest: GoatExtensionManifest,
     pub status: ExtensionStatus,
-    pub trust_level: ExtensionTrustLevel,
-    pub source: ExtensionSource,
-    pub install_path: Option<PathBuf>,
+    pub install_source: String,
+    pub installed_path: Option<PathBuf>,
+    pub installed_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AuditSeverity {
-    Info,
-    Low,
-    Medium,
-    High,
-    Critical,
+pub struct ExtensionManager {
+    pub base_dir: PathBuf,
+    pub installed_dir: PathBuf,
+    pub registry_file: PathBuf,
+    pub entries: HashMap<String, ExtensionRegistryEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionAuditFinding {
-    pub severity: AuditSeverity,
-    pub message: String,
-}
+impl ExtensionManager {
+    pub fn new(data_dir: &Path) -> Result<Self> {
+        let base_dir = data_dir.join("extensions");
+        let installed_dir = base_dir.join("installed");
+        let registry_file = base_dir.join("registry.jsonl");
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionAuditResult {
-    pub extension_id: String,
-    pub findings: Vec<ExtensionAuditFinding>,
-    pub passed: bool,
-}
+        fs::create_dir_all(&installed_dir)?;
 
-pub struct ExtensionRegistry {
-    pub config_dir: PathBuf,
-    pub data_dir: PathBuf,
-    records: HashMap<String, ExtensionRecord>,
-}
-
-impl ExtensionRegistry {
-    pub fn new(config_dir: &Path, data_dir: &Path) -> Result<Self> {
-        let registry = Self {
-            config_dir: config_dir.join("extensions"),
-            data_dir: data_dir.join("extensions"),
-            records: HashMap::new(),
+        let mut manager = Self {
+            base_dir,
+            installed_dir,
+            registry_file,
+            entries: HashMap::new(),
         };
-        registry.init_directories()?;
-        Ok(registry)
+        manager.load_registry()?;
+        Ok(manager)
     }
 
-    fn init_directories(&self) -> Result<()> {
-        fs::create_dir_all(&self.config_dir)?;
-        fs::create_dir_all(self.data_dir.join("installed"))?;
-        fs::create_dir_all(self.data_dir.join("catalog"))?;
-        fs::create_dir_all(self.data_dir.join("audit"))?;
-        fs::create_dir_all(self.data_dir.join("artifacts"))?;
-        Ok(())
-    }
-
-    pub fn load_state(&mut self) -> Result<()> {
-        let enabled_path = self.config_dir.join("enabled.json");
-        let trust_path = self.config_dir.join("trust.json");
-
-        // This is a stub for loading the state from disk
-        // In a real implementation we would load all ExtensionRecords
-
-        // Let's add some built-in extensions for demonstration
-        self.add_builtin_catalog();
-
-        Ok(())
-    }
-
-    pub fn save_state(&self) -> Result<()> {
-        // Stub for saving
-        Ok(())
-    }
-
-    fn add_builtin_catalog(&mut self) {
-        let builtin_manifests = vec![
-            ExtensionManifest {
-                id: "goat.builtin.github-pr-review".to_string(),
-                name: "GitHub PR Review Pack".to_string(),
-                version: "1.0.0".to_string(),
-                description: "Skill pack to review PRs automatically".to_string(),
-                kind: ExtensionKind::SkillPack,
-                author: Some("GOAT".to_string()),
-                homepage: None,
-                source_url: None,
-                license: Some("MIT".to_string()),
-                entry_type: None,
-                entry_ref: None,
-                permissions: vec![
-                    ExtensionPermission::GithubAccess,
-                    ExtensionPermission::ReadProject,
-                ],
-                commands: vec![],
-                tools: vec![],
-                skills: vec!["github_pr_reviewer".to_string()],
-                recipes: vec![],
-                mcp_servers: vec![],
-                provider_profiles: vec![],
-                prompt_templates: vec![],
-                safety_notes: Some("Requires GitHub read-only access".to_string()),
-                install_notes: None,
-                created_at: Some(Utc::now().to_rfc3339()),
-            },
-            ExtensionManifest {
-                id: "goat.builtin.react-ui-review".to_string(),
-                name: "React UI Review Skill Pack".to_string(),
-                version: "1.0.0".to_string(),
-                description: "Audits React UI against best practices".to_string(),
-                kind: ExtensionKind::SkillPack,
-                author: Some("GOAT".to_string()),
-                homepage: None,
-                source_url: None,
-                license: Some("MIT".to_string()),
-                entry_type: None,
-                entry_ref: None,
-                permissions: vec![ExtensionPermission::ReadProject],
-                commands: vec![],
-                tools: vec![],
-                skills: vec!["react_ui_audit".to_string()],
-                recipes: vec![],
-                mcp_servers: vec![],
-                provider_profiles: vec![],
-                prompt_templates: vec![],
-                safety_notes: None,
-                install_notes: None,
-                created_at: Some(Utc::now().to_rfc3339()),
-            },
-        ];
-
-        for m in builtin_manifests {
-            self.records.insert(
-                m.id.clone(),
-                ExtensionRecord {
-                    manifest: m,
-                    status: ExtensionStatus::Discovered,
-                    trust_level: ExtensionTrustLevel::LocalBuiltin,
-                    source: ExtensionSource::LocalBuiltin,
-                    install_path: None,
-                },
-            );
+    fn load_registry(&mut self) -> Result<()> {
+        if !self.registry_file.exists() {
+            return Ok(());
         }
+        let content = fs::read_to_string(&self.registry_file)?;
+        for line in content.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if let Ok(entry) = serde_json::from_str::<ExtensionRegistryEntry>(line) {
+                self.entries
+                    .insert(entry.manifest.extension.id.clone(), entry);
+            }
+        }
+        Ok(())
     }
 
-    pub fn list_extensions(&self) -> Vec<&ExtensionRecord> {
-        self.records.values().collect()
+    fn save_registry(&self) -> Result<()> {
+        let mut content = String::new();
+        for entry in self.entries.values() {
+            content.push_str(&serde_json::to_string(entry)?);
+            content.push('\n');
+        }
+        fs::write(&self.registry_file, content)?;
+        Ok(())
     }
 
-    pub fn get_extension(&self, id: &str) -> Option<&ExtensionRecord> {
-        self.records.get(id)
-    }
-
-    pub fn discover_local(&mut self, path: &Path) -> Result<String> {
+    pub fn validate_manifest(&self, path: &Path) -> Result<GoatExtensionManifest> {
         if !path.exists() {
-            return Err(anyhow!("Path does not exist"));
+            return Err(anyhow!("Extension path does not exist: {}", path.display()));
         }
 
         let manifest_path = if path.is_file() {
             path.to_path_buf()
         } else {
-            let json_path = path.join("manifest.json");
-            let toml_path = path.join("manifest.toml");
-            if json_path.exists() {
-                json_path
-            } else if toml_path.exists() {
+            let toml_path = path.join("GOAT_EXTENSION.toml");
+            if toml_path.exists() {
                 toml_path
             } else {
-                return Err(anyhow!(
-                    "No manifest.json or manifest.toml found in directory"
-                ));
+                let alt_path = path.join("goat.extension.toml");
+                if alt_path.exists() {
+                    alt_path
+                } else {
+                    return Err(anyhow!("No GOAT_EXTENSION.toml found in directory"));
+                }
             }
         };
 
         let content = fs::read_to_string(&manifest_path)?;
-        let manifest: ExtensionManifest =
-            if manifest_path.extension().and_then(|e| e.to_str()) == Some("toml") {
-                toml::from_str(&content)?
-            } else {
-                serde_json::from_str(&content)?
-            };
+        let manifest: GoatExtensionManifest =
+            toml::from_str(&content).map_err(|e| anyhow!("Failed to parse manifest: {}", e))?;
 
-        let id = manifest.id.clone();
+        // Path traversal checks
+        let check_paths = |paths: &Vec<String>, kind: &str| -> Result<()> {
+            for p in paths {
+                if p.contains("..") || p.starts_with('/') {
+                    return Err(anyhow!(
+                        "Path traversal detected in {} entrypoints: {}",
+                        kind,
+                        p
+                    ));
+                }
+            }
+            Ok(())
+        };
 
-        self.records.insert(
-            id.clone(),
-            ExtensionRecord {
-                manifest,
-                status: ExtensionStatus::Discovered,
-                trust_level: ExtensionTrustLevel::LocalUser,
-                source: ExtensionSource::LocalFolder(path.to_path_buf()),
-                install_path: None,
-            },
-        );
+        check_paths(&manifest.entrypoints.skills, "skills")?;
+        check_paths(
+            &manifest.entrypoints.validation_recipes,
+            "validation_recipes",
+        )?;
+        check_paths(&manifest.entrypoints.commands, "commands")?;
+        check_paths(&manifest.entrypoints.mcp_servers, "mcp_servers")?;
+        check_paths(&manifest.entrypoints.external_agents, "external_agents")?;
 
-        self.save_state()?;
+        Ok(manifest)
+    }
+
+    pub fn install_local(&mut self, path: &Path) -> Result<String> {
+        let manifest = self.validate_manifest(path)?;
+        let id = manifest.extension.id.clone();
+
+        if let Some(existing) = self.entries.get(&id) {
+            if existing.status != ExtensionStatus::Archived {
+                return Err(anyhow!("Extension with ID {} is already installed", id));
+            }
+        }
+
+        let source_dir = if path.is_file() {
+            path.parent().unwrap_or(Path::new(""))
+        } else {
+            path
+        };
+
+        let target_dir = self.installed_dir.join(&id);
+        if target_dir.exists() {
+            fs::remove_dir_all(&target_dir)?;
+        }
+
+        // Deep copy the directory
+        let mut options = fs_extra::dir::CopyOptions::new();
+        options.copy_inside = true;
+        fs_extra::dir::copy(source_dir, &target_dir, &options)
+            .map_err(|e| anyhow!("Failed to copy extension files: {}", e))?;
+
+        let entry = ExtensionRegistryEntry {
+            manifest,
+            status: ExtensionStatus::Disabled,
+            install_source: path.to_string_lossy().to_string(),
+            installed_path: Some(target_dir),
+            installed_at: Utc::now().to_rfc3339(),
+        };
+
+        self.entries.insert(id.clone(), entry);
+        self.save_registry()?;
+
         Ok(id)
     }
 
-    pub fn audit_extension(&self, id: &str) -> Result<ExtensionAuditResult> {
-        let record = self
-            .records
-            .get(id)
-            .ok_or_else(|| anyhow!("Extension not found"))?;
-        let mut findings = Vec::new();
-
-        if record.manifest.author.is_none() {
-            findings.push(ExtensionAuditFinding {
-                severity: AuditSeverity::Info,
-                message: "Author is not specified".to_string(),
-            });
-        }
-
-        if record.manifest.license.is_none() {
-            findings.push(ExtensionAuditFinding {
-                severity: AuditSeverity::Low,
-                message: "No license specified".to_string(),
-            });
-        }
-
-        let dangerous_perms = [
-            ExtensionPermission::ShellCommand,
-            ExtensionPermission::WriteProject,
-            ExtensionPermission::NetworkAccess,
-            ExtensionPermission::BrowserAccess,
-            ExtensionPermission::GithubAccess,
-            ExtensionPermission::SecretEnvAccess,
-            ExtensionPermission::FileSystemWide,
-            ExtensionPermission::ExternalSideEffect,
-        ];
-
-        let mut has_critical = false;
-        for perm in &record.manifest.permissions {
-            if dangerous_perms.contains(perm) {
-                has_critical = true;
-                findings.push(ExtensionAuditFinding {
-                    severity: AuditSeverity::High,
-                    message: format!("Requests dangerous permission: {:?}", perm),
-                });
-            }
-        }
-
-        match record.source {
-            ExtensionSource::RemoteIndexLater(_) => {
-                findings.push(ExtensionAuditFinding {
-                    severity: AuditSeverity::Medium,
-                    message: "Source is remote and untrusted".to_string(),
-                });
-            }
-            _ => {}
-        }
-
-        Ok(ExtensionAuditResult {
-            extension_id: id.to_string(),
-            findings,
-            passed: !has_critical,
-        })
-    }
-
-    pub fn install_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self
-            .records
+    pub fn enable(&mut self, id: &str) -> Result<()> {
+        let entry = self
+            .entries
             .get_mut(id)
             .ok_or_else(|| anyhow!("Extension not found"))?;
-
-        if record.status != ExtensionStatus::Discovered
-            && record.status != ExtensionStatus::Disabled
-        {
-            return Err(anyhow!("Extension is not in a state to be installed"));
+        if entry.status == ExtensionStatus::Enabled {
+            return Ok(());
         }
-
-        // Simulating install logic
-        let target_path = self.data_dir.join("installed").join(&record.manifest.id);
-        fs::create_dir_all(&target_path)?;
-
-        record.install_path = Some(target_path);
-        record.status = ExtensionStatus::Disabled; // Always default to disabled
-
-        self.save_state()?;
+        entry.status = ExtensionStatus::Enabled;
+        self.save_registry()?;
         Ok(())
     }
 
-    pub fn enable_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self
-            .records
+    pub fn disable(&mut self, id: &str) -> Result<()> {
+        let entry = self
+            .entries
             .get_mut(id)
             .ok_or_else(|| anyhow!("Extension not found"))?;
-        if record.status != ExtensionStatus::Disabled && record.status != ExtensionStatus::Installed
-        {
-            return Err(anyhow!(
-                "Extension must be installed and disabled before enabling"
-            ));
+        if entry.status == ExtensionStatus::Disabled {
+            return Ok(());
         }
-
-        record.status = ExtensionStatus::Enabled;
-        self.save_state()?;
+        entry.status = ExtensionStatus::Disabled;
+        self.save_registry()?;
         Ok(())
     }
 
-    pub fn disable_extension(&mut self, id: &str) -> Result<()> {
-        let mut record = self
-            .records
+    pub fn remove(&mut self, id: &str) -> Result<()> {
+        let entry = self
+            .entries
             .get_mut(id)
             .ok_or_else(|| anyhow!("Extension not found"))?;
-        if record.status != ExtensionStatus::Enabled {
-            return Err(anyhow!("Extension is not enabled"));
-        }
-
-        record.status = ExtensionStatus::Disabled;
-        self.save_state()?;
-        Ok(())
-    }
-
-    pub fn remove_extension(&mut self, id: &str) -> Result<()> {
-        let record = self
-            .records
-            .get(id)
-            .ok_or_else(|| anyhow!("Extension not found"))?;
-        if record.status == ExtensionStatus::Enabled {
-            return Err(anyhow!(
-                "Cannot remove an enabled extension. Disable it first."
-            ));
-        }
-
-        if let Some(path) = &record.install_path {
+        entry.status = ExtensionStatus::Archived;
+        if let Some(path) = &entry.installed_path {
             if path.exists() {
                 fs::remove_dir_all(path)?;
             }
         }
-
-        self.records.remove(id);
-        self.save_state()?;
+        entry.installed_path = None;
+        self.save_registry()?;
         Ok(())
+    }
+
+    pub fn list(&self) -> Vec<&ExtensionRegistryEntry> {
+        self.entries
+            .values()
+            .filter(|e| e.status != ExtensionStatus::Archived)
+            .collect()
+    }
+
+    pub fn get(&self, id: &str) -> Option<&ExtensionRegistryEntry> {
+        self.entries
+            .get(id)
+            .filter(|e| e.status != ExtensionStatus::Archived)
+    }
+
+    pub fn doctor(&self) -> Result<Vec<String>> {
+        let mut findings = Vec::new();
+
+        findings.push(format!("Registry Path: {}", self.registry_file.display()));
+        findings.push(format!("Installed Dir: {}", self.installed_dir.display()));
+
+        for entry in self.entries.values() {
+            if entry.status == ExtensionStatus::Archived {
+                continue;
+            }
+
+            let id = &entry.manifest.extension.id;
+
+            if entry.status == ExtensionStatus::Enabled {
+                match entry.manifest.extension.risk_level {
+                    ExtensionRiskLevel::High | ExtensionRiskLevel::Critical => {
+                        findings.push(format!(
+                            "WARNING: High/Critical risk extension '{}' is enabled.",
+                            id
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(path) = &entry.installed_path {
+                if !path.exists() {
+                    findings.push(format!(
+                        "ERROR: Installed path for '{}' is missing: {}",
+                        id,
+                        path.display()
+                    ));
+                } else {
+                    for sk in &entry.manifest.entrypoints.skills {
+                        if !path.join(sk).exists() {
+                            findings.push(format!(
+                                "ERROR: Extension '{}' missing skill entrypoint: {}",
+                                id, sk
+                            ));
+                        }
+                    }
+                }
+            } else {
+                findings.push(format!("ERROR: Installed path for '{}' is None", id));
+            }
+        }
+
+        if findings.len() == 2 {
+            findings.push("No issues found. Extensions are healthy.".to_string());
+        }
+
+        Ok(findings)
     }
 }
