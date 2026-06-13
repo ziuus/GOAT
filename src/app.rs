@@ -631,15 +631,39 @@ impl App {
                     }
                     format!("MCP Server '{}' stopped.", srv_name)
                 } else if deferred.name == "delegate_external_agent" {
-                    let agent_name = deferred.args.get("agent").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let task = deferred.args.get("task").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    match self.external_agent_manager.delegate(&agent_name, &task, &self.config) {
+                    let agent_name = deferred
+                        .args
+                        .get("agent")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let task = deferred
+                        .args
+                        .get("task")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let mission_id = deferred
+                        .args
+                        .get("mission_id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    match self.external_agent_manager.delegate(
+                        &agent_name,
+                        &task,
+                        &self.config,
+                        crate::approval::ApprovalDecision::Approved,
+                        mission_id,
+                    ) {
                         Ok(res) => {
                             self.push_log(format!(
                                 "[EXTERNAL] Execution finished. Success: {}",
                                 res.success
                             ));
-                            format!("External agent '{}' finished. Success: {}", agent_name, res.success)
+                            format!(
+                                "External agent '{}' finished. Success: {}",
+                                agent_name, res.success
+                            )
                         }
                         Err(e) => {
                             self.push_log(format!("[EXTERNAL] Error: {}", e));
@@ -792,21 +816,32 @@ impl App {
                         constraints: None,
                     };
                     let plan = mc.plan_goal(&req);
-                    self.push_log(format!("[MISSION] Created new mission: {} (Type: {:?})", plan.title, plan.mission_type));
+                    self.push_log(format!(
+                        "[MISSION] Created new mission: {} (Type: {:?})",
+                        plan.title, plan.mission_type
+                    ));
                     for step in plan.plan_steps {
-                        self.push_log(format!("  - [{}] {} (Agent: {:?})", step.status, step.title, step.assigned_agent));
+                        self.push_log(format!(
+                            "  - [{}] {} (Agent: {:?})",
+                            step.status, step.title, step.assigned_agent
+                        ));
                     }
                 } else {
                     let missions = mc.get_missions();
                     if let Some(m) = missions.first() {
-                        self.push_log(format!("[MISSION] Active Mission: {} ({:?})", m.title, m.status));
+                        self.push_log(format!(
+                            "[MISSION] Active Mission: {} ({:?})",
+                            m.title, m.status
+                        ));
                         self.push_log(format!("  Goal: {}", m.raw_goal));
                         self.push_log(format!("  Progress: {}%", m.progress));
                     } else {
                         self.push_log("[MISSION] No active missions found. Use `/mission <goal>` to plan one.");
                     }
                 }
-                self.push_log(format!("[SYSTEM] View full details at http://127.0.0.1:3000/mission-control"));
+                self.push_log(format!(
+                    "[SYSTEM] View full details at http://127.0.0.1:3000/mission-control"
+                ));
                 true
             }
             "/projects" | "@projects" => {
@@ -817,7 +852,10 @@ impl App {
                 } else {
                     self.push_log("[PROJECTS] Learned Projects:");
                     for p in projects {
-                        self.push_log(format!("- {} ({}) | {}", p.name, p.project_id, p.architecture_summary));
+                        self.push_log(format!(
+                            "- {} ({}) | {}",
+                            p.name, p.project_id, p.architecture_summary
+                        ));
                     }
                 }
                 true
@@ -837,22 +875,150 @@ impl App {
                 }
                 true
             }
+            "/memory" | "@memory" => {
+                if _args.starts_with("search ") {
+                    let query = _args[7..].trim();
+                    let mgr =
+                        crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                    match mgr.search_structured_memories(query) {
+                        Ok(mems) => {
+                            if mems.is_empty() {
+                                self.push_log(format!("[MEMORY] No matches for: {}", query));
+                            } else {
+                                self.push_log(format!("[MEMORY] Found {} matches:", mems.len()));
+                                for m in mems {
+                                    self.push_log(format!("- [{}] {}", m.memory_id, m.title));
+                                }
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[MEMORY] Error: {}", e)),
+                    }
+                } else {
+                    let mgr =
+                        crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                    match mgr.list_structured_memories() {
+                        Ok(mems) => {
+                            if mems.is_empty() {
+                                self.push_log("[MEMORY] No structured memories saved yet.");
+                            } else {
+                                self.push_log(format!(
+                                    "[MEMORY] {} structured memories:",
+                                    mems.len()
+                                ));
+                                for m in mems {
+                                    self.push_log(format!("- [{}] {}", m.memory_id, m.title));
+                                }
+                            }
+                        }
+                        Err(e) => self.push_log(format!("[MEMORY] Error: {}", e)),
+                    }
+                }
+                true
+            }
+            "/remember" | "@remember" => {
+                if _args.is_empty() {
+                    self.push_log("[MEMORY] Usage: /remember <text>");
+                } else {
+                    let mgr =
+                        crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                    let item = crate::memory::MemoryItem {
+                        memory_id: "".to_string(),
+                        scope: crate::memory::MemoryScope::System,
+                        project_id: None,
+                        mission_id: None,
+                        source: "tui".to_string(),
+                        kind: crate::memory::MemoryKind::Unknown,
+                        title: "TUI Manual Entry".to_string(),
+                        content: _args.to_string(),
+                        tags: vec![],
+                        confidence: 100,
+                        status: crate::memory::MemoryStatus::Active,
+                        created_at: 0,
+                        updated_at: 0,
+                        last_used_at: None,
+                        use_count: 0,
+                    };
+                    match mgr.add_structured_memory(item) {
+                        Ok(id) => self.push_log(format!("[MEMORY] Remembered as {}", id)),
+                        Err(e) => self.push_log(format!("[MEMORY] Failed to save: {}", e)),
+                    }
+                }
+                true
+            }
+            "/forget-memory" | "@forget-memory" => {
+                if _args.is_empty() {
+                    self.push_log("[MEMORY] Usage: /forget-memory <id>");
+                } else {
+                    let mgr =
+                        crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                    if let Err(e) = mgr.archive_memory(_args.trim()) {
+                        self.push_log(format!("[MEMORY] Error archiving: {}", e));
+                    } else {
+                        self.push_log(format!("[MEMORY] Memory {} archived.", _args.trim()));
+                    }
+                }
+                true
+            }
+            "/project-memory" | "@project-memory" => {
+                if _args.is_empty() {
+                    self.push_log("[MEMORY] Usage: /project-memory <project_id>");
+                } else {
+                    let mgr =
+                        crate::memory::MemoryManager::new(&self.paths, self.config.memory.clone());
+                    match mgr.get_project_memory(_args.trim()) {
+                        Ok(content) => {
+                            if content.trim().is_empty() {
+                                self.push_log(format!(
+                                    "[MEMORY] No PROJECT_MEMORY.md found for {}",
+                                    _args.trim()
+                                ));
+                            } else {
+                                self.push_log(format!(
+                                    "[MEMORY] --- PROJECT_MEMORY.md for {} ---",
+                                    _args.trim()
+                                ));
+                                self.push_log(content);
+                            }
+                        }
+                        Err(e) => {
+                            self.push_log(format!("[MEMORY] Error loading project memory: {}", e))
+                        }
+                    }
+                }
+                true
+            }
             "/learn" | "@learn" => {
-                let target_path = if _args.is_empty() { ".".to_string() } else { _args.to_string() };
+                let target_path = if _args.is_empty() {
+                    ".".to_string()
+                } else {
+                    _args.to_string()
+                };
                 let target_path_buf = std::path::PathBuf::from(&target_path);
-                let canonical = target_path_buf.canonicalize().unwrap_or_else(|_| target_path_buf.clone());
-                
+                let canonical = target_path_buf
+                    .canonicalize()
+                    .unwrap_or_else(|_| target_path_buf.clone());
+
                 // TODO: In TUI, we should prompt using a modal, but for now we'll auto-scan since it's user initiated
-                self.push_log(format!("[LEARN] Scanning project at: {}", canonical.display()));
+                self.push_log(format!(
+                    "[LEARN] Scanning project at: {}",
+                    canonical.display()
+                ));
                 let scanner = crate::project_intelligence::DeepProjectScanner::new(canonical);
                 match scanner.scan() {
                     Ok(pi) => {
-                        let manager = crate::project_intelligence::ProjectIntelligenceManager::new();
+                        let manager =
+                            crate::project_intelligence::ProjectIntelligenceManager::new();
                         if let Err(e) = manager.save_project(&pi) {
                             self.push_log(format!("[LEARN] Failed to save project: {}", e));
                         } else {
-                            self.push_log(format!("[LEARN] Learned project: {} ({})", pi.name, pi.project_id));
-                            self.push_log(format!("[LEARN] Stack: {}", pi.detected_stack.join(", ")));
+                            self.push_log(format!(
+                                "[LEARN] Learned project: {} ({})",
+                                pi.name, pi.project_id
+                            ));
+                            self.push_log(format!(
+                                "[LEARN] Stack: {}",
+                                pi.detected_stack.join(", ")
+                            ));
                         }
                     }
                     Err(e) => {
@@ -861,7 +1027,7 @@ impl App {
                 }
                 true
             }
-                        "/skills" | "@skills" => {
+            "/skills" | "@skills" => {
                 let paths = crate::paths::GoatPaths::resolve().unwrap();
                 let config = self.config.clone();
                 let skill_manager = crate::skills::SkillManager::new(paths, config.skills);
@@ -872,7 +1038,10 @@ impl App {
                     self.push_log(format!("[SKILLS] {} skills available:", skills.len()));
                     for s in skills {
                         let status = if s.is_suspicious { "[SUSPICIOUS]" } else { "" };
-                        self.push_log(format!("- {} v{} {}: {}", s.name, s.version, status, s.description));
+                        self.push_log(format!(
+                            "- {} v{} {}: {}",
+                            s.name, s.version, status, s.description
+                        ));
                     }
                 }
                 true
@@ -882,9 +1051,18 @@ impl App {
                 let missions = manager.get_missions();
                 if let Some(m) = missions.first() {
                     let mission_id = m.mission_id.clone();
-                    self.push_log(format!("[SKILLS] Run the following CLI command to save this mission as a skill:"));
-                    let name = if _args.is_empty() { "new-skill" } else { _args.trim() };
-                    self.push_log(format!("  goat skill create-from-mission {} --name {}", mission_id, name));
+                    self.push_log(format!(
+                        "[SKILLS] Run the following CLI command to save this mission as a skill:"
+                    ));
+                    let name = if _args.is_empty() {
+                        "new-skill"
+                    } else {
+                        _args.trim()
+                    };
+                    self.push_log(format!(
+                        "  goat skill create-from-mission {} --name {}",
+                        mission_id, name
+                    ));
                 } else {
                     self.push_log("[SKILLS] No active mission found to save.");
                 }
@@ -895,11 +1073,16 @@ impl App {
                 if _args.is_empty() {
                     let patches = patch_manager.get_patches();
                     if patches.is_empty() {
-                        self.push_log("[PATCH] No patches found. Run `goat patch propose <mission_id>`.");
+                        self.push_log(
+                            "[PATCH] No patches found. Run `goat patch propose <mission_id>`.",
+                        );
                     } else {
                         self.push_log("[PATCH] Proposed Patches:");
                         for p in patches {
-                            self.push_log(format!("- {} [{}] ({}) : {}", p.patch_id, p.status, p.project_id, p.title));
+                            self.push_log(format!(
+                                "- {} [{}] ({}) : {}",
+                                p.patch_id, p.status, p.project_id, p.title
+                            ));
                         }
                     }
                 } else {
@@ -908,7 +1091,9 @@ impl App {
                         self.push_log(format!("Title: {}", p.title));
                         self.push_log(format!("Project ID: {}", p.project_id));
                         self.push_log(format!("Diff Preview:\n{}", p.diff_preview));
-                        self.push_log("[PATCH] To apply this patch, use the CLI: `goat patch apply <id>`");
+                        self.push_log(
+                            "[PATCH] To apply this patch, use the CLI: `goat patch apply <id>`",
+                        );
                     } else {
                         self.push_log("[PATCH] Patch not found.");
                     }
@@ -916,19 +1101,30 @@ impl App {
                 true
             }
             "/apply" | "@apply" => {
-                self.push_log(format!("[PATCH] To safely apply patch '{}', please use the CLI with confirmation:", _args.trim()));
+                self.push_log(format!(
+                    "[PATCH] To safely apply patch '{}', please use the CLI with confirmation:",
+                    _args.trim()
+                ));
                 self.push_log(format!("  goat patch apply {}", _args.trim()));
                 true
             }
             "/checkpoints" | "@checkpoints" => {
-                let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+                let cp_mgr = crate::checkpoint::CheckpointManager::new(
+                    &crate::paths::GoatPaths::resolve().unwrap().data_dir,
+                );
                 if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
                     if checkpoints.is_empty() {
                         self.push_log("[CHECKPOINT] No checkpoints found.");
                     } else {
                         self.push_log("[CHECKPOINT] Checkpoints:");
                         for cp in checkpoints {
-                            self.push_log(format!("- {} [{}] {} (Files: {})", cp.id, cp.timestamp, cp.label, cp.changed_files.len()));
+                            self.push_log(format!(
+                                "- {} [{}] {} (Files: {})",
+                                cp.id,
+                                cp.timestamp,
+                                cp.label,
+                                cp.changed_files.len()
+                            ));
                         }
                     }
                 } else {
@@ -1559,10 +1755,13 @@ impl App {
                 // I will omit the full async block to avoid complexity, but output a stub.
                 self.push_log("[COMPARE] Feature /compare-agents requires async dispatch in TUI. Use headless mode for now.");
                 self.push_log("[COMPARE] Checking external agent (aider) synchronously...");
-                match self
-                    .external_agent_manager
-                    .delegate("aider", &task_clone, &self.config)
-                {
+                match self.external_agent_manager.delegate(
+                    "aider",
+                    &task_clone,
+                    &self.config,
+                    crate::approval::ApprovalDecision::Approved,
+                    None,
+                ) {
                     Ok(res) => self.push_log(format!(
                         "[COMPARE] External Response (aider):\n{}",
                         res.stdout
@@ -2370,13 +2569,13 @@ impl App {
                     if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                         self.push_log("[AGENTS] External Agent Runs:");
                         for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
+                            if let Ok(run) = serde_json::from_str::<
+                                crate::external_agents::ExternalAgentRun,
+                            >(line)
+                            {
                                 self.push_log(format!(
                                     "[AGENTS]   {} | Agent: {:<12} | Mode: {:<15} | Status: {}",
-                                    run.id,
-                                    run.agent_name,
-                                    run.mode,
-                                    if run.success { "Success" } else { "Failed" }
+                                    run.run_id, run.agent_name, run.permission_profile, run.status
                                 ));
                             }
                         }
@@ -2394,12 +2593,15 @@ impl App {
                 if jsonl_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(&jsonl_path) {
                         for line in content.lines() {
-                            if let Ok(run) = serde_json::from_str::<crate::external_agents::ExternalAgentRun>(line) {
-                                if run.id == run_id {
-                                    self.push_log(format!("[AGENTS] Run ID: {}", run.id));
+                            if let Ok(run) = serde_json::from_str::<
+                                crate::external_agents::ExternalAgentRun,
+                            >(line)
+                            {
+                                if run.run_id == run_id {
+                                    self.push_log(format!("[AGENTS] Run ID: {}", run.run_id));
                                     self.push_log(format!("[AGENTS] Agent: {}", run.agent_name));
-                                    self.push_log(format!("[AGENTS] Task: {}", run.task));
-                                    self.push_log(format!("[AGENTS] Success: {}", run.success));
+                                    self.push_log(format!("[AGENTS] Task: {}", run.task_summary));
+                                    self.push_log(format!("[AGENTS] Status: {}", run.status));
                                     found = true;
                                     break;
                                 }
@@ -2417,8 +2619,10 @@ impl App {
                 let agent_name = parts.get(1).copied().unwrap_or("").trim();
                 let prompt = parts.get(2..).unwrap_or(&[]).join(" ");
                 self.push_log(format!("[AGENTS] Delegating task to '{}'...", agent_name));
-                
-                let action_res = self.tool_registry.evaluate_action("delegate_external_agent", &self.config.tools);
+
+                let action_res = self
+                    .tool_registry
+                    .evaluate_action("delegate_external_agent", &self.config.tools);
                 if let crate::tool_registry::ToolAction::Deny(reason) = action_res {
                     self.push_log(format!("[AGENTS] Delegation denied: {}", reason));
                 } else {
@@ -2445,15 +2649,21 @@ impl App {
                             request: req,
                             patch_id: None,
                         });
-                        // The TUI main loop will detect `self.pending_approval.is_some()` 
+                        // The TUI main loop will detect `self.pending_approval.is_some()`
                         // and render the approval modal. The execution happens in `resolve_approval`.
-                        self.push_log(format!("[AGENTS] External agent '{}' queued for approval.", agent_name));
+                        self.push_log(format!(
+                            "[AGENTS] External agent '{}' queued for approval.",
+                            agent_name
+                        ));
                     }
                 }
                 true
             }
 
-            cmd if cmd.starts_with("/external-agents") || cmd.starts_with("/external-agent ") || cmd.starts_with("/delegate-external ") => {
+            cmd if cmd.starts_with("/external-agents")
+                || cmd.starts_with("/external-agent ")
+                || cmd.starts_with("/delegate-external ") =>
+            {
                 self.push_log("[EXTERNAL] Command deprecated. Please use /agents, /agent-doctor, /run-agent, /agent-runs, /agent-run instead.");
                 true
             }
@@ -2485,7 +2695,8 @@ impl App {
                 } else if arg == "cancel" {
                     if let Some(mut session) = self.active_skill_session.take() {
                         self.push_log("[SKILLS] Cancelled skill execution.");
-                        session.execution.status = crate::skill_runner::SkillExecutionStatus::Cancelled;
+                        session.execution.status =
+                            crate::skill_runner::SkillExecutionStatus::Cancelled;
                         let runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
                         let _ = runner.save_execution(&session.execution);
                     } else {
@@ -2504,9 +2715,16 @@ impl App {
                         let runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
                         match runner.start_execution(&skill, None, None) {
                             Ok(exec) => {
-                                let steps = crate::skill_runner::SkillRunner::parse_steps(&skill.content);
-                                self.push_log(format!("[SKILLS] Started execution '{}' for skill '{}'", exec.execution_id, skill.name));
-                                self.push_log(format!("[SKILLS] Steps to execute: {}", exec.total_steps));
+                                let steps =
+                                    crate::skill_runner::SkillRunner::parse_steps(&skill.content);
+                                self.push_log(format!(
+                                    "[SKILLS] Started execution '{}' for skill '{}'",
+                                    exec.execution_id, skill.name
+                                ));
+                                self.push_log(format!(
+                                    "[SKILLS] Steps to execute: {}",
+                                    exec.total_steps
+                                ));
                                 self.active_skill_session = Some(ActiveSkillSession {
                                     execution: exec,
                                     skill: skill.clone(),
@@ -2514,7 +2732,9 @@ impl App {
                                     waiting_for_user_next: false,
                                 });
                             }
-                            Err(e) => self.push_log(format!("[SKILLS] Error starting execution: {}", e)),
+                            Err(e) => {
+                                self.push_log(format!("[SKILLS] Error starting execution: {}", e))
+                            }
                         }
                     } else {
                         self.push_log(format!("[SKILLS] Skill '{}' not found.", rest));
@@ -2961,24 +3181,30 @@ impl App {
             cmd if cmd.starts_with("/validate") => {
                 let val_mgr = crate::validation::ValidationManager::new();
                 let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
-                
+
                 let project_id = parts.get(1).copied();
                 if let Some(pid) = project_id {
                     if let Some(project) = pi_mgr.get_project(pid) {
                         let mut cmds = val_mgr.generate_commands(&project);
                         if cmds.is_empty() {
-                            self.push_log(format!("[VALIDATE] No validation commands detected for project: {}", pid));
+                            self.push_log(format!(
+                                "[VALIDATE] No validation commands detected for project: {}",
+                                pid
+                            ));
                         } else {
-                            self.push_log(format!("[VALIDATE] Found {} validation commands. Executing...", cmds.len()));
-                            
+                            self.push_log(format!(
+                                "[VALIDATE] Found {} validation commands. Executing...",
+                                cmds.len()
+                            ));
+
                             // For TUI, we can run them and show status, auto-approving for now, or just spawning
                             for mut val in cmds {
                                 self.push_log(format!("Validating: {}", val.command));
                                 let approval_queue = self.approval_queue.clone();
-                                // We auto approve here for simple CLI/TUI flow 
+                                // We auto approve here for simple CLI/TUI flow
                                 // Alternatively, let the main loop handle the approval queue
                                 // In the TUI, ApprovalScreen takes care of it.
-                                
+
                                 // Spawn a task to run the validation
                                 let q = approval_queue.clone();
                                 let v_mgr = val_mgr.clone();
@@ -3007,9 +3233,15 @@ impl App {
                             if vals.is_empty() {
                                 self.push_log("[VALIDATION] No validation runs found.".to_string());
                             } else {
-                                self.push_log(format!("[VALIDATION] Found {} validations:", vals.len()));
+                                self.push_log(format!(
+                                    "[VALIDATION] Found {} validations:",
+                                    vals.len()
+                                ));
                                 for v in vals {
-                                    self.push_log(format!("- {} | {} | {:?}", v.validation_id, v.command, v.status));
+                                    self.push_log(format!(
+                                        "- {} | {} | {:?}",
+                                        v.validation_id, v.command, v.status
+                                    ));
                                 }
                             }
                         } else {
@@ -3965,6 +4197,55 @@ impl App {
                                 "[DIFF] Use 'git diff' in a real terminal to see full diffs."
                                     .to_string(),
                             );
+                        }
+                    }
+                } else if arg == "analyze" {
+                    let patch_id = parts.get(2).copied().unwrap_or("").trim();
+                    if patch_id.is_empty() {
+                        self.push_log("[DIFF] Usage: /diff analyze <patch_id>");
+                    } else {
+                        let analyzer = crate::diff_analyzer::DiffAnalyzer::new();
+                        let patch_manager = crate::patch_manager::PatchManager::new();
+                        if let Some(patch) = patch_manager.get_patch(patch_id) {
+                            match analyzer.analyze_patch(&patch) {
+                                Ok(a) => {
+                                    self.push_log(format!(
+                                        "[DIFF ANALYZER] Analysis ID: {}",
+                                        a.analysis_id
+                                    ));
+                                    self.push_log(format!(
+                                        "[DIFF ANALYZER] Risk: {:?}",
+                                        a.risk_level
+                                    ));
+                                    self.push_log(format!(
+                                        "[DIFF ANALYZER] Recommendation: {:?}",
+                                        a.recommendation
+                                    ));
+                                    self.push_log(format!(
+                                        "[DIFF ANALYZER] Summary: {}",
+                                        a.summary
+                                    ));
+                                    for f in a.findings {
+                                        self.push_log(format!(
+                                            "  [{:?}] {}: {}",
+                                            f.severity,
+                                            f.file_path.unwrap_or_default(),
+                                            f.message
+                                        ));
+                                    }
+                                }
+                                Err(e) => {
+                                    self.push_log(format!(
+                                        "[DIFF ANALYZER] Error analyzing patch: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        } else {
+                            self.push_log(format!(
+                                "[DIFF ANALYZER] Patch ID '{}' not found.",
+                                patch_id
+                            ));
                         }
                     }
                 } else {
@@ -5946,7 +6227,10 @@ impl App {
         }
 
         if session.execution.current_step >= session.execution.total_steps {
-            self.push_log(format!("[SKILLS] Execution '{}' completed successfully.", session.execution.execution_id));
+            self.push_log(format!(
+                "[SKILLS] Execution '{}' completed successfully.",
+                session.execution.execution_id
+            ));
             let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
             session.execution.status = crate::skill_runner::SkillExecutionStatus::Completed;
             let _ = runner.save_execution(&session.execution);
@@ -5956,13 +6240,15 @@ impl App {
         let step_idx = session.execution.current_step;
         // ensure we don't go out of bounds
         if step_idx >= session.steps.len() {
-            self.push_log(format!("[SKILLS] Execution step index out of bounds. Marking complete."));
+            self.push_log(format!(
+                "[SKILLS] Execution step index out of bounds. Marking complete."
+            ));
             session.execution.status = crate::skill_runner::SkillExecutionStatus::Completed;
             let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
             let _ = runner.save_execution(&session.execution);
             return;
         }
-        
+
         let step = &session.steps[step_idx];
 
         // Build the prompt for this step
@@ -5975,12 +6261,15 @@ impl App {
             step.command.as_deref().unwrap_or("No command provided.")
         );
 
-        self.push_log(format!("[SKILLS] Automatically advancing to Step {}...", step_idx + 1));
+        self.push_log(format!(
+            "[SKILLS] Automatically advancing to Step {}...",
+            step_idx + 1
+        ));
         self.push_log(format!("[SKILLS] {}", step.description));
-        
+
         // Advance the execution state
         session.execution.current_step += 1;
-        
+
         let mut runner = crate::skill_runner::SkillRunner::new(&self.paths.data_dir);
         let _ = runner.save_execution(&session.execution);
 
@@ -5991,7 +6280,7 @@ impl App {
         }
         self.active_skill_session = Some(session);
 
-        // Send the step to the LLM. 
+        // Send the step to the LLM.
         self.handle_user_input(msg).await;
     }
 }

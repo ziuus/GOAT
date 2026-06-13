@@ -248,8 +248,24 @@ pub enum Command {
     /// Learn the current or specified project folder.
     #[command(name = "learn")]
     Learn {
-        /// Path to learn (defaults to current directory)
-        path: Option<String>,
+        /// Target path (defaults to current directory).
+        #[arg(default_value = ".")]
+        path: String,
+    },
+
+    /// Context-Aware Diff Analyzer (Phase 8.9)
+    #[command(name = "diff")]
+    Diff {
+        /// Subcommand: analyze, list, show
+        action: String,
+        /// Patch ID, Agent Run ID, or "git"
+        arg: Option<String>,
+        /// Target project for git diff
+        #[arg(long)]
+        project: Option<String>,
+        /// Type of analysis (patch, git, agent-run)
+        #[arg(long)]
+        source: Option<String>,
     },
 
     /// Manage proposed code changes (patches).
@@ -387,10 +403,26 @@ pub enum Command {
     /// Manage GOAT curated memory files.
     #[command(name = "memory")]
     Memory {
-        /// "status", "show", "path", "edit", "add-user", or "add-note"
+        /// "list", "search", "show", "archive", "extract", "add", "user" or "project"
         action: String,
-        /// The text to add (for add-user and add-note)
+        /// The query, ID, or text
+        #[arg(default_value = "")]
+        arg: String,
+        /// Scope for add (user, project, mission, skill, system)
+        #[arg(long)]
+        scope: Option<String>,
+        /// Kind for add (preference, architecture_note, etc.)
+        #[arg(long)]
+        kind: Option<String>,
+        /// Text for add
+        #[arg(long)]
         text: Option<String>,
+        /// Mission ID for extract
+        #[arg(long)]
+        mission: Option<String>,
+        /// Project ID
+        #[arg(long)]
+        project: Option<String>,
     },
 
     /// Search past conversation interactions.
@@ -586,8 +618,18 @@ pub async fn handle_subcommand(
             handle_project_command(paths, config, action)?;
             Ok(true)
         }
-        Command::Memory { action, text } => {
-            handle_memory_command(paths, config, action, text.as_deref())?;
+        Command::Memory {
+            action,
+            arg,
+            scope,
+            kind,
+            text,
+            mission,
+            project,
+        } => {
+            handle_memory_command(
+                paths, config, action.clone(), arg.clone(), scope.clone(), kind.clone(), text.clone(), mission.clone(), project.clone(),
+            )?;
             Ok(true)
         }
         Command::Recall { query } => {
@@ -595,8 +637,21 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Skills { action, arg, name, session } => {
-            handle_skills_command(paths, config, action, arg.as_deref(), name.as_deref(), session.as_deref()).await?;
+        Command::Skills {
+            action,
+            arg,
+            name,
+            session,
+        } => {
+            handle_skills_command(
+                paths,
+                config,
+                action,
+                arg.as_deref(),
+                name.as_deref(),
+                session.as_deref(),
+            )
+            .await?;
             Ok(true)
         }
 
@@ -629,8 +684,6 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-
-
         Command::Daemon { action } => {
             handle_daemon_command(paths, config, action).await?;
             Ok(true)
@@ -645,8 +698,6 @@ pub async fn handle_subcommand(
             handle_desktop_command(action);
             Ok(true)
         }
-
-
 
         Command::Rollback { id } => {
             println!("Rollback via CLI defaults to 'plan' mode to prevent accidental data loss.");
@@ -760,7 +811,12 @@ pub async fn handle_subcommand(
             handle_ask_agent_command(&name, &task, &rt).await?;
             Ok(true)
         }
-        Command::Agent { action, arg, prompt, mission } => {
+        Command::Agent {
+            action,
+            arg,
+            prompt,
+            mission,
+        } => {
             let (rt, _) = crate::runtime::GoatRuntime::bootstrap(
                 config.clone(),
                 paths.clone(),
@@ -768,7 +824,13 @@ pub async fn handle_subcommand(
                 false,
                 None,
             );
-            handle_agent_command(rt, &action, arg.as_deref(), prompt.as_deref(), mission.as_deref());
+            handle_agent_command(
+                rt,
+                &action,
+                arg.as_deref(),
+                prompt.as_deref(),
+                mission.as_deref(),
+            );
             Ok(true)
         }
         Command::Mcp { action, arg } => {
@@ -797,9 +859,15 @@ pub async fn handle_subcommand(
                     constraints: None,
                 };
                 let plan = mc.plan_goal(&req);
-                println!("Created Mission: {} (Type: {:?})", plan.title, plan.mission_type);
+                println!(
+                    "Created Mission: {} (Type: {:?})",
+                    plan.title, plan.mission_type
+                );
                 for step in plan.plan_steps {
-                    println!("  - [{}] {} (Agent: {:?})", step.status, step.title, step.assigned_agent);
+                    println!(
+                        "  - [{}] {} (Agent: {:?})",
+                        step.status, step.title, step.assigned_agent
+                    );
                 }
             } else {
                 let missions = mc.get_missions();
@@ -808,21 +876,29 @@ pub async fn handle_subcommand(
                     println!("  Goal: {}", m.raw_goal);
                     println!("  Progress: {}%", m.progress);
                 } else {
-                    println!("No active missions found. Run `goat mission plan \"<goal>\"` to plan one.");
+                    println!(
+                        "No active missions found. Run `goat mission plan \"<goal>\"` to plan one."
+                    );
                 }
             }
-            println!("\nView the full Mission Control workspace at http://127.0.0.1:3000/mission-control");
+            println!(
+                "\nView the full Mission Control workspace at http://127.0.0.1:3000/mission-control"
+            );
             Ok(true)
         }
         Command::Learn { path } => {
-            let target_path = path.clone().unwrap_or_else(|| ".".to_string());
+            let target_path = path;
             let target_path_buf = std::path::PathBuf::from(&target_path);
-            let canonical = target_path_buf.canonicalize().unwrap_or_else(|_| target_path_buf.clone());
-            
+            let canonical = target_path_buf
+                .canonicalize()
+                .unwrap_or_else(|_| target_path_buf.clone());
+
             println!("You are about to scan: {}", canonical.display());
             println!("This will analyze files for tech stack, commands, and project context.");
-            println!("Sensitive files (secrets, .env) and large directories (.git, node_modules) will be ignored.");
-            
+            println!(
+                "Sensitive files (secrets, .env) and large directories (.git, node_modules) will be ignored."
+            );
+
             let mut prompt = String::new();
             println!("Do you want to proceed? [y/N]: ");
             std::io::stdin().read_line(&mut prompt).ok();
@@ -830,7 +906,7 @@ pub async fn handle_subcommand(
                 println!("Scan aborted.");
                 return Ok(true);
             }
-            
+
             let scanner = crate::project_intelligence::DeepProjectScanner::new(canonical);
             match scanner.scan() {
                 Ok(pi) => {
@@ -849,6 +925,123 @@ pub async fn handle_subcommand(
             }
             Ok(true)
         }
+        Command::Diff {
+            action,
+            arg,
+            project,
+            source,
+        } => {
+            let analyzer = crate::diff_analyzer::DiffAnalyzer::new();
+            if action == "list" {
+                match analyzer.list_analyses() {
+                    Ok(analyses) => {
+                        if analyses.is_empty() {
+                            println!("No diff analyses found.");
+                        } else {
+                            for a in analyses {
+                                println!(
+                                    "- {} | {} | Risk: {:?} | Source: {:?}",
+                                    a.analysis_id, a.title, a.risk_level, a.source_type
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => println!("Error listing diff analyses: {}", e),
+                }
+            } else if action == "show" {
+                if let Some(id) = arg {
+                    match analyzer.get_analysis(&id) {
+                        Ok(a) => {
+                            println!("Analysis ID: {}", a.analysis_id);
+                            println!("Title: {}", a.title);
+                            println!("Source: {:?}", a.source_type);
+                            println!("Risk Level: {:?}", a.risk_level);
+                            println!("Recommendation: {:?}", a.recommendation);
+                            println!("Summary: {}", a.summary);
+                            if !a.findings.is_empty() {
+                                println!("\nFindings:");
+                                for f in a.findings {
+                                    println!(
+                                        "  [{:?}] {}: {}",
+                                        f.severity,
+                                        f.file_path.unwrap_or_default(),
+                                        f.message
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => println!("Error fetching analysis: {}", e),
+                    }
+                } else {
+                    println!("Usage: goat diff show <analysis_id>");
+                }
+            } else if action == "analyze" {
+                let src = source.clone().unwrap_or_else(|| "patch".to_string());
+                if src == "patch" {
+                    if let Some(id) = arg {
+                        let patch_manager = crate::patch_manager::PatchManager::new();
+                        if let Some(patch) = patch_manager.get_patch(&id) {
+                            match analyzer.analyze_patch(&patch) {
+                                Ok(a) => println!(
+                                    "Patch analyzed successfully. ID: {} | Risk: {:?}",
+                                    a.analysis_id, a.risk_level
+                                ),
+                                Err(e) => println!("Error analyzing patch: {}", e),
+                            }
+                        } else {
+                            println!("Patch not found.");
+                        }
+                    } else {
+                        println!("Usage: goat diff analyze <patch_id> --source patch");
+                    }
+                } else if src == "git" {
+                    let project_path = project.clone().unwrap_or_else(|| ".".to_string());
+                    let path = std::path::PathBuf::from(project_path);
+                    if let Ok(output) = std::process::Command::new("git")
+                        .arg("diff")
+                        .current_dir(&path)
+                        .output()
+                    {
+                        let diff_text = String::from_utf8_lossy(&output.stdout);
+                        match analyzer.analyze_git_diff(&path, &diff_text) {
+                            Ok(a) => println!(
+                                "Git diff analyzed successfully. ID: {} | Risk: {:?}",
+                                a.analysis_id, a.risk_level
+                            ),
+                            Err(e) => println!("Error analyzing git diff: {}", e),
+                        }
+                    } else {
+                        println!("Failed to run git diff");
+                    }
+                } else if src == "agent-run" {
+                    if let Some(id) = arg {
+                        let paths = crate::paths::GoatPaths::resolve().unwrap();
+                        let em = crate::external_agents::ExternalAgentManager::new(
+                            paths.external_agent_audit_log_file.clone(),
+                            paths.data_dir.clone(),
+                        );
+                        if let Some(run) = em.get_run(&id) {
+                            match analyzer.analyze_agent_run(&run) {
+                                Ok(a) => println!(
+                                    "Agent run analyzed successfully. ID: {} | Risk: {:?}",
+                                    a.analysis_id, a.risk_level
+                                ),
+                                Err(e) => println!("Error analyzing agent run: {}", e),
+                            }
+                        } else {
+                            println!("Agent run not found.");
+                        }
+                    } else {
+                        println!("Usage: goat diff analyze <run_id> --source agent-run");
+                    }
+                } else {
+                    println!("Unknown source. Use 'patch', 'git', or 'agent-run'.");
+                }
+            } else {
+                println!("Unknown action. Use analyze, list, or show.");
+            }
+            Ok(true)
+        }
         Command::Patch { action, args } => {
             let patch_manager = crate::patch_manager::PatchManager::new();
             if action == "list" {
@@ -857,7 +1050,10 @@ pub async fn handle_subcommand(
                     println!("No patches found.");
                 } else {
                     for p in patches {
-                        println!("- {} [{}] ({}) : {}", p.patch_id, p.status, p.project_id, p.title);
+                        println!(
+                            "- {} [{}] ({}) : {}",
+                            p.patch_id, p.status, p.project_id, p.title
+                        );
                     }
                 }
             } else if action == "show" {
@@ -877,22 +1073,39 @@ pub async fn handle_subcommand(
             } else if action == "propose" {
                 if let Some(mission_id) = args.first() {
                     let mc = crate::mission_control::MissionControlManager::new();
-                    if let Some(mission) = mc.get_missions().into_iter().find(|m| m.mission_id == *mission_id) {
+                    if let Some(mission) = mc
+                        .get_missions()
+                        .into_iter()
+                        .find(|m| m.mission_id == *mission_id)
+                    {
                         if let Some(linked_project_id) = &mission.linked_project {
-                            let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
+                            let pi_mgr =
+                                crate::project_intelligence::ProjectIntelligenceManager::new();
                             if let Some(project) = pi_mgr.get_project(linked_project_id) {
                                 match patch_manager.generate_patch_proposal(&mission, &project) {
                                     Ok(patch) => {
                                         patch_manager.save_patch(&patch).unwrap();
-                                        println!("Patch proposed successfully! ID: {}", patch.patch_id);
+                                        println!(
+                                            "Patch proposed successfully! ID: {}",
+                                            patch.patch_id
+                                        );
                                         println!("Title: {}", patch.title);
-                                        println!("Review it with `goat patch show {}`", patch.patch_id);
-                                        println!("Apply it with `goat patch apply {}`", patch.patch_id);
+                                        println!(
+                                            "Review it with `goat patch show {}`",
+                                            patch.patch_id
+                                        );
+                                        println!(
+                                            "Apply it with `goat patch apply {}`",
+                                            patch.patch_id
+                                        );
                                     }
                                     Err(e) => println!("Failed to propose patch: {}", e),
                                 }
                             } else {
-                                println!("Project intelligence not found for ID: {}", linked_project_id);
+                                println!(
+                                    "Project intelligence not found for ID: {}",
+                                    linked_project_id
+                                );
                             }
                         } else {
                             println!("Mission is not linked to a project.");
@@ -912,19 +1125,27 @@ pub async fn handle_subcommand(
                         }
                         let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
                         if let Some(project) = pi_mgr.get_project(&patch.project_id) {
-                            println!("You are about to apply patch '{}' to project '{}'.", patch.patch_id, project.name);
+                            println!(
+                                "You are about to apply patch '{}' to project '{}'.",
+                                patch.patch_id, project.name
+                            );
                             println!("Diff Preview:\n{}", patch.diff_preview);
-                            
+
                             use std::io::Write;
                             print!("Do you approve this patch? [y/N]: ");
                             std::io::stdout().flush().unwrap();
                             let mut input = String::new();
                             std::io::stdin().read_line(&mut input).unwrap();
-                            
+
                             if input.trim().eq_ignore_ascii_case("y") {
                                 // Create Checkpoint
-                                let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
-                                match cp_mgr.create_checkpoint(&project.root_path, &format!("Pre-patch {}", patch.patch_id)) {
+                                let cp_mgr = crate::checkpoint::CheckpointManager::new(
+                                    &crate::paths::GoatPaths::resolve().unwrap().data_dir,
+                                );
+                                match cp_mgr.create_checkpoint(
+                                    &project.root_path,
+                                    &format!("Pre-patch {}", patch.patch_id),
+                                ) {
                                     Ok(cp) => {
                                         println!("Checkpoint created: {}", cp.id);
                                         patch.checkpoint_id = Some(cp.id.clone());
@@ -939,7 +1160,7 @@ pub async fn handle_subcommand(
                                 match patch_manager.apply_patch(&mut patch, &project.root_path) {
                                     Ok(_) => {
                                         println!("Patch applied successfully.");
-                                        
+
                                         // Command Validation Loop
                                         let mut commands_to_suggest = Vec::new();
                                         commands_to_suggest.extend(project.test_commands.clone());
@@ -960,10 +1181,11 @@ pub async fn handle_subcommand(
                                                     let mut parts = cmd.split_whitespace();
                                                     if let Some(prog) = parts.next() {
                                                         let args: Vec<&str> = parts.collect();
-                                                        let mut child = std::process::Command::new(prog)
-                                                            .args(args)
-                                                            .current_dir(&project.root_path)
-                                                            .spawn();
+                                                        let mut child =
+                                                            std::process::Command::new(prog)
+                                                                .args(args)
+                                                                .current_dir(&project.root_path)
+                                                                .spawn();
                                                         if let Ok(mut c) = child {
                                                             let _ = c.wait();
                                                         }
@@ -992,14 +1214,22 @@ pub async fn handle_subcommand(
             Ok(true)
         }
         Command::CheckpointCmd { action, args } => {
-            let cp_mgr = crate::checkpoint::CheckpointManager::new(&crate::paths::GoatPaths::resolve().unwrap().data_dir);
+            let cp_mgr = crate::checkpoint::CheckpointManager::new(
+                &crate::paths::GoatPaths::resolve().unwrap().data_dir,
+            );
             if action == "list" {
                 if let Ok(checkpoints) = cp_mgr.list_checkpoints() {
                     if checkpoints.is_empty() {
                         println!("No checkpoints found.");
                     } else {
                         for cp in checkpoints {
-                            println!("- {} [{}] {} (Files changed: {})", cp.id, cp.timestamp, cp.label, cp.changed_files.len());
+                            println!(
+                                "- {} [{}] {} (Files changed: {})",
+                                cp.id,
+                                cp.timestamp,
+                                cp.label,
+                                cp.changed_files.len()
+                            );
                         }
                     }
                 } else {
@@ -1012,10 +1242,15 @@ pub async fn handle_subcommand(
             }
             Ok(true)
         }
-        Command::Validate { project_id, mission, patch, auto_approve } => {
+        Command::Validate {
+            project_id,
+            mission,
+            patch,
+            auto_approve,
+        } => {
             let val_mgr = crate::validation::ValidationManager::new();
             let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
-            
+
             let pid = if let Some(id) = project_id {
                 id.clone()
             } else {
@@ -1034,16 +1269,16 @@ pub async fn handle_subcommand(
                     // We can just use an ephemeral approval queue for CLI test execution,
                     // or skip if we have no approval queue. Let's see what is available.
                     let approval_queue = std::sync::Arc::new(crate::approval::ApprovalQueue::new());
-                    
+
                     // Accept approvals automatically in CLI headless context for now, or just ask user.
                     // Wait, ApprovalQueue allows CLI approval via terminal prompting.
-                    
+
                     // Actually, we should spawn a task to auto-approve in headless if we want,
                     // or better yet, loop through and run them.
                     for mut val in cmds {
                         val.mission_id = mission.clone();
                         val.patch_id = patch.clone();
-                        
+
                         println!("Validating: {}", val.command);
                         let q = approval_queue.clone();
                         let auto_approve_flag = *auto_approve;
@@ -1061,7 +1296,9 @@ pub async fn handle_subcommand(
                                         if let Some(wd) = &p.request.working_directory {
                                             println!("  Dir    : {}", wd);
                                         }
-                                        println!("╚══════════════════════════════════════════════════════╝");
+                                        println!(
+                                            "╚══════════════════════════════════════════════════════╝"
+                                        );
                                         print!("Allow execution? (y/n/a): ");
                                         let dec = tokio::task::spawn_blocking(|| {
                                             use std::io::Write;
@@ -1077,7 +1314,9 @@ pub async fn handle_subcommand(
                                             } else {
                                                 'n'
                                             }
-                                        }).await.unwrap_or('n');
+                                        })
+                                        .await
+                                        .unwrap_or('n');
                                         q.resolve(&p.id, dec).await;
                                     }
                                 }
@@ -1108,7 +1347,10 @@ pub async fn handle_subcommand(
                         println!("No validation runs found.");
                     } else {
                         for v in vals {
-                            println!("- {} | {} | {:?} | Project: {:?}", v.validation_id, v.command, v.status, v.project_id);
+                            println!(
+                                "- {} | {} | {:?} | Project: {:?}",
+                                v.validation_id, v.command, v.status, v.project_id
+                            );
                         }
                     }
                 } else {
@@ -1141,7 +1383,10 @@ pub async fn handle_subcommand(
                 } else {
                     println!("Learned Projects:");
                     for p in projects {
-                        println!("- {} ({}) | {}", p.name, p.project_id, p.architecture_summary);
+                        println!(
+                            "- {} ({}) | {}",
+                            p.name, p.project_id, p.architecture_summary
+                        );
                     }
                 }
             } else if action == "show" {
@@ -1951,13 +2196,18 @@ fn print_project_summary(meta: &crate::project::ProjectMetadata) {
 fn handle_memory_command(
     paths: &crate::paths::GoatPaths,
     config: &crate::config::Config,
-    action: &str,
-    text: Option<&str>,
+    action: String,
+    arg: String,
+    scope: Option<String>,
+    kind: Option<String>,
+    text: Option<String>,
+    mission: Option<String>,
+    project: Option<String>,
 ) -> anyhow::Result<()> {
-    use crate::memory::MemoryManager;
+    use crate::memory::{MemoryItem, MemoryKind, MemoryManager, MemoryScope, MemoryStatus};
     let manager = MemoryManager::new(paths, config.memory.clone());
 
-    match action {
+    match action.as_str() {
         "status" => {
             let (u_count, u_max, u_warn) = manager.user_budget_status();
             let (m_count, m_max, m_warn) = manager.memory_budget_status();
@@ -1977,34 +2227,164 @@ fn handle_memory_command(
             println!("  Enabled   : {}", config.memory.enabled);
         }
         "show" => {
-            println!("--- USER.md ---");
-            println!("{}", manager.get_user_content().unwrap_or_default());
-            println!("--- MEMORY.md ---");
-            println!("{}", manager.get_memory_content().unwrap_or_default());
+            if arg.is_empty() {
+                println!("--- USER.md ---");
+                println!("{}", manager.get_user_content().unwrap_or_default());
+                println!("--- MEMORY.md ---");
+                println!("{}", manager.get_memory_content().unwrap_or_default());
+            } else {
+                if let Ok(Some(mem)) = manager.get_structured_memory(&arg) {
+                    println!("[MEMORY] ID: {}", mem.memory_id);
+                    println!("Scope: {:?} | Kind: {:?}", mem.scope, mem.kind);
+                    println!("Title: {}", mem.title);
+                    println!("Content: {}", mem.content);
+                } else {
+                    println!("Memory not found: {}", arg);
+                }
+            }
         }
         "path" => {
             println!("USER.md:   {}", manager.user_file.display());
             println!("MEMORY.md: {}", manager.memory_file.display());
+            println!("Structured:{}", manager.structured_store.display());
         }
         "edit" => {
             println!("To edit memory files, open these in your editor:");
             println!("  {}", manager.user_file.display());
             println!("  {}", manager.memory_file.display());
         }
-        "add-user" => {
-            if let Some(t) = text {
-                manager.add_user(t)?;
-                println!("Added to USER.md");
+        "user" => {
+            if arg == "edit" {
+                println!(
+                    "Open {} in your editor to edit.",
+                    manager.user_file.display()
+                );
+            } else if arg == "show" {
+                println!("--- USER.md ---");
+                println!("{}", manager.get_user_content().unwrap_or_default());
             } else {
-                println!("Please provide text to add.");
+                println!("Usage: goat memory user [show|edit]");
             }
         }
-        "add-note" => {
-            if let Some(t) = text {
-                manager.add_note(t)?;
-                println!("Added to MEMORY.md");
+        "project" => {
+            if arg == "show" {
+                if let Some(pid) = project {
+                    println!("--- PROJECT_MEMORY.md for {} ---", pid);
+                    println!("{}", manager.get_project_memory(&pid).unwrap_or_default());
+                } else {
+                    println!("Please provide --project <id>");
+                }
+            } else if arg == "update" {
+                if let (Some(pid), Some(txt)) = (project, text) {
+                    manager.update_project_memory(&pid, &txt)?;
+                    println!("Updated PROJECT_MEMORY.md for {}", pid);
+                } else {
+                    println!("Please provide --project <id> and --text \"...\"");
+                }
             } else {
-                println!("Please provide text to add.");
+                println!("Usage: goat memory project [show|update] --project <id>");
+            }
+        }
+        "add" => {
+            if let Some(t) = text {
+                let scope_enum = match scope.as_deref().unwrap_or("system") {
+                    "user" => MemoryScope::User,
+                    "project" => MemoryScope::Project,
+                    "mission" => MemoryScope::Mission,
+                    "skill" => MemoryScope::Skill,
+                    _ => MemoryScope::System,
+                };
+                let kind_enum = match kind.as_deref().unwrap_or("unknown") {
+                    "preference" => MemoryKind::Preference,
+                    "architecture_note" => MemoryKind::ArchitectureNote,
+                    "project_decision" => MemoryKind::ProjectDecision,
+                    "command" => MemoryKind::Command,
+                    "workflow" => MemoryKind::Workflow,
+                    "bug_fix" => MemoryKind::BugFix,
+                    _ => MemoryKind::Unknown,
+                };
+                let item = MemoryItem {
+                    memory_id: "".to_string(),
+                    scope: scope_enum,
+                    project_id: project,
+                    mission_id: mission,
+                    source: "manual".to_string(),
+                    kind: kind_enum,
+                    title: format!("Manual entry"),
+                    content: t.clone(),
+                    tags: vec![],
+                    confidence: 100,
+                    status: MemoryStatus::Active,
+                    created_at: 0,
+                    updated_at: 0,
+                    last_used_at: None,
+                    use_count: 0,
+                };
+                let id = manager.add_structured_memory(item)?;
+                println!("Added structured memory: {}", id);
+            } else {
+                println!("Please provide --text \"...\"");
+            }
+        }
+        "list" => {
+            let mems = manager.list_structured_memories()?;
+            if mems.is_empty() {
+                println!("No memories found.");
+            } else {
+                for m in mems {
+                    println!("- [{}] ({:?}) {}", m.memory_id, m.scope, m.title);
+                }
+            }
+        }
+        "search" => {
+            let mems = manager.search_structured_memories(&arg)?;
+            if mems.is_empty() {
+                println!("No matches found for: {}", arg);
+            } else {
+                for m in mems {
+                    println!("- [{}] ({:?}) {}", m.memory_id, m.scope, m.title);
+                }
+            }
+        }
+        "archive" => {
+            if arg.is_empty() {
+                println!("Please provide a memory ID to archive.");
+            } else {
+                manager.archive_memory(&arg)?;
+                println!("Archived memory: {}", arg);
+            }
+        }
+        "extract" => {
+            if let Some(mid) = mission {
+                let mc = crate::mission_control::MissionControlManager::new();
+                let missions = mc.get_missions();
+                if let Some(m) = missions.into_iter().find(|m| m.mission_id == mid) {
+                    println!("[MEMORY] Extracting insights from mission: {}", m.title);
+                    let content = format!("Goal: {}\nOutcome: {:?}\nNotes: {}", m.raw_goal, m.status, m.notes.join("\n"));
+                    let item = MemoryItem {
+                        memory_id: "".to_string(),
+                        scope: MemoryScope::Mission,
+                        project_id: m.linked_project.clone(),
+                        mission_id: Some(m.mission_id.clone()),
+                        source: "extract".to_string(),
+                        kind: MemoryKind::ProjectDecision,
+                        title: format!("Mission Insight: {}", m.title),
+                        content,
+                        tags: vec!["mission-extraction".to_string()],
+                        confidence: 80,
+                        status: MemoryStatus::Active,
+                        created_at: 0,
+                        updated_at: 0,
+                        last_used_at: None,
+                        use_count: 0,
+                    };
+                    let id = manager.add_structured_memory(item)?;
+                    println!("Saved memory: {}", id);
+                } else {
+                    println!("Mission not found: {}", mid);
+                }
+            } else {
+                println!("Please provide --mission <id> to extract memory.");
             }
         }
         _ => {
@@ -2092,14 +2472,18 @@ async fn handle_skills_command(
             }
         }
         "new" => {
-            let name = name_arg.or(arg).ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let name = name_arg
+                .or(arg)
+                .ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
             let path = skill_manager.create_template(name)?;
             println!("Created skill template at: {}", path.display());
             println!("Edit this file to implement your skill.");
             let _ = skill_manager.list_skills();
         }
         "create" => {
-            let name = name_arg.or(arg).ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
+            let name = name_arg
+                .or(arg)
+                .ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
             let path = skill_manager.create_template(name)?;
             println!("Created skill template at: {}", path.display());
             println!("Edit this file to implement your skill.");
@@ -2137,11 +2521,16 @@ async fn handle_skills_command(
         }
         "run" => {
             let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
-            let skill = skill_manager.get_skill(name).ok_or_else(|| anyhow::anyhow!("Skill not found"))?;
-            
+            let skill = skill_manager
+                .get_skill(name)
+                .ok_or_else(|| anyhow::anyhow!("Skill not found"))?;
+
             let runner = crate::skill_runner::SkillRunner::new(&paths.data_dir);
             let exec = runner.start_execution(&skill, None, None)?;
-            println!("Started execution {} for skill '{}'", exec.execution_id, skill.name);
+            println!(
+                "Started execution {} for skill '{}'",
+                exec.execution_id, skill.name
+            );
             println!("Steps to execute: {}", exec.total_steps);
             // We just print status here. A real TUI/CLI would loop and ask for approvals.
         }
@@ -2153,7 +2542,10 @@ async fn handle_skills_command(
             } else {
                 println!("Skill Runs ({}):", runs.len());
                 for r in runs {
-                    println!("  - {} (Skill: {}, Status: {:?})", r.execution_id, r.skill_name, r.status);
+                    println!(
+                        "  - {} (Skill: {}, Status: {:?})",
+                        r.execution_id, r.skill_name, r.status
+                    );
                 }
             }
         }
@@ -2200,15 +2592,20 @@ async fn handle_skills_command(
         "create-from-mission" => {
             let mission_id = arg.ok_or_else(|| anyhow::anyhow!("Expected mission ID"))?;
             let mission_manager = crate::mission_control::MissionControlManager::new();
-            
-            let mission = mission_manager.get_missions().into_iter().find(|m| m.mission_id == mission_id).ok_or_else(|| {
-                anyhow::anyhow!("Mission '{}' not found", mission_id)
-            })?;
+
+            let mission = mission_manager
+                .get_missions()
+                .into_iter()
+                .find(|m| m.mission_id == mission_id)
+                .ok_or_else(|| anyhow::anyhow!("Mission '{}' not found", mission_id))?;
 
             let name = name_arg.unwrap_or_else(|| "mission-skill").to_string();
 
             // Ask for confirmation
-            println!("Do you want to save this mission as a reusable skill '{}'? (y/N)", name);
+            println!(
+                "Do you want to save this mission as a reusable skill '{}'? (y/N)",
+                name
+            );
             let mut input = String::new();
             std::io::stdin().read_line(&mut input)?;
             if !input.trim().eq_ignore_ascii_case("y") {
@@ -2224,7 +2621,11 @@ async fn handle_skills_command(
             let profile_name = &registry.default_profile;
             let (_, chain) = registry.resolve(profile_name);
 
-            let steps: Vec<String> = mission.plan_steps.iter().map(|s| format!("- {}: {}", s.title, s.description)).collect();
+            let steps: Vec<String> = mission
+                .plan_steps
+                .iter()
+                .map(|s| format!("- {}: {}", s.title, s.description))
+                .collect();
             let steps_str = steps.join("\n");
 
             let prompt = format!(
@@ -2254,7 +2655,13 @@ async fn handle_skills_command(
                  ## Success criteria\n\
                  <criteria>\n\n\
                  Output only the Markdown content.",
-                name, mission.raw_goal, steps_str, mission.expected_artifacts.join(", "), name, mission_id, name
+                name,
+                mission.raw_goal,
+                steps_str,
+                mission.expected_artifacts.join(", "),
+                name,
+                mission_id,
+                name
             );
 
             let messages = vec![crate::llm::Message {
@@ -2679,7 +3086,11 @@ fn handle_agent_command(
             checks.push(DoctorCheck {
                 status: DoctorStatus::Info,
                 label: "External Agents global config".to_string(),
-                detail: if rt.config.external_agents.enabled { "Enabled".to_string() } else { "Disabled".to_string() },
+                detail: if rt.config.external_agents.enabled {
+                    "Enabled".to_string()
+                } else {
+                    "Disabled".to_string()
+                },
             });
 
             for agent in ext_mgr.registry.list_all() {
@@ -2692,12 +3103,23 @@ fn handle_agent_command(
                 };
                 let detail = match agent.status {
                     crate::external_agents::ExternalAgentStatus::Detected => {
-                        format!("Found at {}", agent.detected_path.as_ref().unwrap().display())
+                        format!(
+                            "Found at {}",
+                            agent.detected_path.as_ref().unwrap().display()
+                        )
                     }
-                    crate::external_agents::ExternalAgentStatus::Missing => "Command not found in PATH".to_string(),
-                    crate::external_agents::ExternalAgentStatus::Disabled => "Disabled by configuration".to_string(),
-                    crate::external_agents::ExternalAgentStatus::NeedsConfig => "Needs configuration (API key, etc)".to_string(),
-                    crate::external_agents::ExternalAgentStatus::Unsupported => "Unsupported environment or version".to_string(),
+                    crate::external_agents::ExternalAgentStatus::Missing => {
+                        "Command not found in PATH".to_string()
+                    }
+                    crate::external_agents::ExternalAgentStatus::Disabled => {
+                        "Disabled by configuration".to_string()
+                    }
+                    crate::external_agents::ExternalAgentStatus::NeedsConfig => {
+                        "Needs configuration (API key, etc)".to_string()
+                    }
+                    crate::external_agents::ExternalAgentStatus::Unsupported => {
+                        "Unsupported environment or version".to_string()
+                    }
                 };
                 checks.push(DoctorCheck {
                     status,
@@ -2708,16 +3130,32 @@ fn handle_agent_command(
 
             let audit_log = &rt.paths.external_agent_audit_log_file;
             checks.push(DoctorCheck {
-                status: if audit_log.exists() { DoctorStatus::Ok } else { DoctorStatus::Info },
+                status: if audit_log.exists() {
+                    DoctorStatus::Ok
+                } else {
+                    DoctorStatus::Info
+                },
                 label: "Audit Log".to_string(),
-                detail: if audit_log.exists() { audit_log.display().to_string() } else { "Not created yet".to_string() },
+                detail: if audit_log.exists() {
+                    audit_log.display().to_string()
+                } else {
+                    "Not created yet".to_string()
+                },
             });
 
             let runs_file = rt.paths.data_dir.join("external-agent-runs.jsonl");
             checks.push(DoctorCheck {
-                status: if runs_file.exists() { DoctorStatus::Ok } else { DoctorStatus::Info },
+                status: if runs_file.exists() {
+                    DoctorStatus::Ok
+                } else {
+                    DoctorStatus::Info
+                },
                 label: "Runs storage".to_string(),
-                detail: if runs_file.exists() { runs_file.display().to_string() } else { "Not created yet".to_string() },
+                detail: if runs_file.exists() {
+                    runs_file.display().to_string()
+                } else {
+                    "Not created yet".to_string()
+                },
             });
 
             crate::paths::print_doctor_results(&checks);
@@ -2733,10 +3171,7 @@ fn handle_agent_command(
                         {
                             println!(
                                 "  {} | Agent: {:<12} | Profile: {:<15} | Status: {}",
-                                run.run_id,
-                                run.agent_name,
-                                run.permission_profile,
-                                run.status
+                                run.run_id, run.agent_name, run.permission_profile, run.status
                             );
                         }
                     }
@@ -2765,7 +3200,10 @@ fn handle_agent_command(
                                     println!("Task: {}", run.task_summary);
                                     println!("Status: {}", run.status);
                                     if let Some(finished_at) = run.finished_at {
-                                        println!("Duration: {:?}", finished_at.signed_duration_since(run.started_at));
+                                        println!(
+                                            "Duration: {:?}",
+                                            finished_at.signed_duration_since(run.started_at)
+                                        );
                                     }
                                     found = true;
                                     break;
@@ -2815,7 +3253,13 @@ fn handle_agent_command(
                 rt.approval_gate.resolve(&req, char_in)
             };
 
-            match ext_mgr.delegate(name, task, &rt.config, decision.clone(), mission.map(|s| s.to_string())) {
+            match ext_mgr.delegate(
+                name,
+                task,
+                &rt.config,
+                decision.clone(),
+                mission.map(|s| s.to_string()),
+            ) {
                 Ok(res) => {
                     println!("Execution finished. Success: {}", res.success);
                     println!("Stdout:\n{}", res.stdout);
@@ -2837,7 +3281,9 @@ fn handle_agent_command(
         }
         _ => {
             println!("Unknown agent action: {}", action);
-            println!("Valid actions: list, doctor, runs, run-show <id>, run <name> --prompt <...>, compare");
+            println!(
+                "Valid actions: list, doctor, runs, run-show <id>, run <name> --prompt <...>, compare"
+            );
         }
     }
 }

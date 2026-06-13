@@ -1,22 +1,86 @@
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use crate::config::MemoryConfig;
 use crate::paths::GoatPaths;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryScope {
+    User,
+    Project,
+    Mission,
+    Skill,
+    System,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryKind {
+    Preference,
+    ProjectDecision,
+    ArchitectureNote,
+    Command,
+    Workflow,
+    BugFix,
+    ValidationResult,
+    DiffInsight,
+    AgentNote,
+    Reminder,
+    Caution,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryStatus {
+    Active,
+    Archived,
+    NeedsReview,
+    Rejected,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryItem {
+    pub memory_id: String,
+    pub scope: MemoryScope,
+    pub project_id: Option<String>,
+    pub mission_id: Option<String>,
+    pub source: String,
+    pub kind: MemoryKind,
+    pub title: String,
+    pub content: String,
+    pub tags: Vec<String>,
+    pub confidence: u32,
+    pub status: MemoryStatus,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_used_at: Option<i64>,
+    pub use_count: u32,
+}
+
 pub struct MemoryManager {
     pub user_file: PathBuf,
     pub memory_file: PathBuf,
+    pub projects_dir: PathBuf,
+    pub structured_store: PathBuf,
     pub config: MemoryConfig,
 }
 
 impl MemoryManager {
     pub fn new(paths: &GoatPaths, config: MemoryConfig) -> Self {
+        let projects_dir = paths.data_dir.join("projects");
+        let memory_dir = paths.data_dir.join("memory");
+        let structured_store = memory_dir.join("memories.jsonl");
+
         Self {
             user_file: paths.user_file.clone(),
             memory_file: paths.memory_file.clone(),
+            projects_dir,
+            structured_store,
             config,
         }
     }
@@ -30,6 +94,9 @@ impl MemoryManager {
             &self.memory_file,
             "# MEMORY.md\n\nGOAT's learned notes about the environment, projects, and workflows.\n\n",
         )?;
+        if let Some(parent) = self.structured_store.parent() {
+            fs::create_dir_all(parent)?;
+        }
         Ok(())
     }
 
@@ -73,6 +140,25 @@ impl MemoryManager {
         }
         let content = fs::read_to_string(&self.memory_file)?;
         Ok(content)
+    }
+
+    pub fn get_project_memory(&self, project_id: &str) -> Result<String> {
+        let path = self.projects_dir.join(project_id).join("PROJECT_MEMORY.md");
+        if !path.exists() {
+            return Ok(String::new());
+        }
+        let content = fs::read_to_string(&path)?;
+        Ok(content)
+    }
+
+    pub fn update_project_memory(&self, project_id: &str, content: &str) -> Result<()> {
+        self.check_secrets(content)?;
+        let path = self.projects_dir.join(project_id).join("PROJECT_MEMORY.md");
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, content)?;
+        Ok(())
     }
 
     pub fn get_user_char_count(&self) -> usize {
@@ -119,6 +205,102 @@ impl MemoryManager {
             return Err(anyhow!(
                 "Secret detected. Refusing to save sensitive data to memory."
             ));
+        }
+        Ok(())
+    }
+
+    pub fn add_structured_memory(&self, mut item: MemoryItem) -> Result<String> {
+        self.ensure_files()?;
+        self.check_secrets(&item.content)?;
+        item.memory_id = uuid::Uuid::new_v4().to_string();
+        item.created_at = chrono::Utc::now().timestamp();
+        item.updated_at = item.created_at;
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.structured_store)?;
+
+        let json = serde_json::to_string(&item)?;
+        writeln!(file, "{}", json)?;
+        Ok(item.memory_id)
+    }
+
+    pub fn list_structured_memories(&self) -> Result<Vec<MemoryItem>> {
+        if !self.structured_store.exists() {
+            return Ok(vec![]);
+        }
+
+        let file = fs::File::open(&self.structured_store)?;
+        let reader = BufReader::new(file);
+        let mut memories = Vec::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            if let Ok(item) = serde_json::from_str::<MemoryItem>(&line) {
+                memories.push(item);
+            }
+        }
+        Ok(memories)
+    }
+
+    pub fn search_structured_memories(&self, query: &str) -> Result<Vec<MemoryItem>> {
+        let memories = self.list_structured_memories()?;
+        let query_lower = query.to_lowercase();
+
+        let matched: Vec<MemoryItem> = memories
+            .into_iter()
+            .filter(|m| {
+                m.status == MemoryStatus::Active
+                    && (m.content.to_lowercase().contains(&query_lower)
+                        || m.title.to_lowercase().contains(&query_lower)
+                        || m.tags
+                            .iter()
+                            .any(|t| t.to_lowercase().contains(&query_lower))
+                        || (m.project_id.as_deref().unwrap_or("") == query)
+                        || (m.mission_id.as_deref().unwrap_or("") == query))
+            })
+            .collect();
+
+        Ok(matched)
+    }
+
+    pub fn get_structured_memory(&self, id: &str) -> Result<Option<MemoryItem>> {
+        let memories = self.list_structured_memories()?;
+        Ok(memories.into_iter().find(|m| m.memory_id == id))
+    }
+
+    pub fn update_structured_memory(&self, item: &MemoryItem) -> Result<()> {
+        let mut memories = self.list_structured_memories()?;
+        let mut found = false;
+        for m in memories.iter_mut() {
+            if m.memory_id == item.memory_id {
+                *m = item.clone();
+                m.updated_at = chrono::Utc::now().timestamp();
+                found = true;
+                break;
+            }
+        }
+
+        if found {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&self.structured_store)?;
+
+            for m in memories {
+                let json = serde_json::to_string(&m)?;
+                writeln!(file, "{}", json)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn archive_memory(&self, id: &str) -> Result<()> {
+        if let Some(mut m) = self.get_structured_memory(id)? {
+            m.status = MemoryStatus::Archived;
+            self.update_structured_memory(&m)?;
         }
         Ok(())
     }
@@ -173,7 +355,33 @@ impl MemoryManager {
                             meta.detected_commands.join(", ")
                         ));
                     }
-                    context.push_str("</PROJECT_CONTEXT>\n\n");
+
+                    let pid = meta.root_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "unknown".to_string());
+                    if let Ok(proj_mem) = self.get_project_memory(&pid) {
+                        if !proj_mem.trim().is_empty() {
+                            context.push_str("\n-- PROJECT_MEMORY.md --\n");
+                            let len = proj_mem.len().min(2000);
+                            context.push_str(&proj_mem[..len]);
+                        }
+                    }
+
+                    if let Ok(memories) = self.search_structured_memories(&pid) {
+                        let active_mems: Vec<_> = memories
+                            .iter()
+                            .filter(|m| m.status == MemoryStatus::Active)
+                            .collect();
+                        if !active_mems.is_empty() {
+                            context.push_str("\n-- Structured Project Memories --\n");
+                            for mem in active_mems.iter().take(5) {
+                                context.push_str(&format!(
+                                    "* [{:?}] {}: {}\n",
+                                    mem.kind, mem.title, mem.content
+                                ));
+                            }
+                        }
+                    }
+
+                    context.push_str("\n</PROJECT_CONTEXT>\n\n");
                 }
             }
         }
