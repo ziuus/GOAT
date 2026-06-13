@@ -9,8 +9,9 @@ Before tagging and publishing the Alpha 1 release, ensure all checks below pass.
 - [x] Version in `Cargo.toml` is `0.1.0-alpha.1`.
 
 ## 2. Test Checks
-- [x] `cargo test` passes all 100+ unit tests.
+- [x] `cargo test` passes all 125+ unit tests.
 - [x] `scripts/smoke-test-alpha.sh` executes successfully.
+- [x] `scripts/test-real-workspaces.sh` runs successfully against all local fixtures.
 
 ## 3. Documentation Checks
 - [x] `README.md` is updated with honest Alpha status, features, and Quickstart.
@@ -21,7 +22,8 @@ Before tagging and publishing the Alpha 1 release, ensure all checks below pass.
 
 ## 4. Safety & Approval Checks
 - [x] `ApprovalGate` is strictly enforced and has not been bypassed globally.
-- [x] "Approval Fatigue" handling is documented as a future planned feature (Tiered Approval Profiles) in release notes/blockers, rather than using an unsafe global `--auto-approve`.
+- [x] "Approval Fatigue" is mitigated via Tiered Approval Profiles (`validation-fast`), documented in `GOAT_APPROVAL_PROFILES.md`.
+- [x] `GOAT_ALPHA_FEEDBACK.md` is present to collect real-world fatigue and migration data.
 
 ## 5. Sample Extension Checks
 - [x] `examples/capabilities/` contains sample extension payloads.
@@ -29,7 +31,6 @@ Before tagging and publishing the Alpha 1 release, ensure all checks below pass.
 
 ## 6. Known Limitations (Documented)
 - [x] No live IDE Context syncing (CLI/TUI only).
-- [x] Constant approval prompts may cause fatigue.
 - [x] Advanced capability scheduling not implemented yet.
 
 ## 7. Tag Checklist

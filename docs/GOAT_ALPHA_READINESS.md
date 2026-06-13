@@ -10,6 +10,7 @@ Unlike simple wrappers or unconstrained bots, GOAT provides deterministic execut
    - No auto-running bash loops.
    - All shell commands, filesystem changes, and external tool calls run through our `ApprovalGate`. 
    - Strict audit logs track what was executed, by whom, and what secrets were redacted.
+   - **Tiered Approval Profiles** (`goat approval profile`) allow caching safe validation commands without compromising security.
    
 2. **First-Class Extension Capabilities (Phase 9)**
    - Most CLI bots hardcode "tools". GOAT treats capabilities (Skills, Validators, MCP Metadata) as declarative assets via `CapabilityRegistry`.
@@ -22,6 +23,7 @@ Unlike simple wrappers or unconstrained bots, GOAT provides deterministic execut
 ## Breaking Changes from Pre-Alpha (Phase 8 & Below)
 
 - **ApprovalGate Enforcement:** Unapproved tools will immediately fail. Use `/tool prepare <id>` inside the TUI or `goat tools prepare <id>` in the CLI to satisfy preconditions.
+- **Approval Fatigue Mitigation:** Instead of an unsafe global `--auto-approve`, use `goat approval profile set validation-fast` to safely cache and reuse explicitly approved test commands.
 - **MCP Server Autostart Disabled:** To prevent untrusted processes from lingering, MCP servers no longer automatically spawn without explicit preparation.
 - **Skill Execution:** Skills are no longer simple bash scripts; they are "guided workflows" attached to the capability engine.
 
@@ -40,6 +42,8 @@ Before filing bug reports, run:
 goat doctor alpha
 ```
 This performs standard filesystem/DB checks along with Alpha-specific checks (Tools enabled state, Extension Registry presence). 
+
+For feedback submission instructions and test cases, please read [GOAT Alpha Feedback](GOAT_ALPHA_FEEDBACK.md). 
 
 ## Building Custom Extensions
 
