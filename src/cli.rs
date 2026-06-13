@@ -2416,6 +2416,23 @@ fn handle_memory_command(
                 println!("Please provide --mission <id> to extract memory.");
             }
         }
+        "status" => {
+            let (u_count, u_max, u_warn) = manager.user_budget_status();
+            let (m_count, m_max, m_warn) = manager.memory_budget_status();
+            println!("--- Memory Budget Status ---");
+            println!(
+                "User Memory: {}/{} chars {}",
+                u_count,
+                u_max,
+                if u_warn { "(WARNING: OVER BUDGET)" } else { "(OK)" }
+            );
+            println!(
+                "Struct Memory: {}/{} chars {}",
+                m_count,
+                m_max,
+                if m_warn { "(WARNING: OVER BUDGET)" } else { "(OK)" }
+            );
+        }
         _ => {
             println!("Unknown memory action: {}", action);
         }
