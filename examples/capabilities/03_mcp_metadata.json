@@ -1,0 +1,14 @@
+{
+  "id": "example-mcp-github",
+  "name": "GitHub MCP",
+  "capability_type": "McpMetadata",
+  "risk_level": "Medium",
+  "description": "Standard GitHub MCP integration",
+  "source": "Local",
+  "version": "1.0",
+  "metadata": {
+    "server_name": "github",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"]
+  }
+}

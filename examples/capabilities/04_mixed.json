@@ -1,0 +1,14 @@
+{
+  "id": "example-mixed",
+  "name": "Mixed Deploy Workflow",
+  "capability_type": "Skill",
+  "risk_level": "High",
+  "description": "Builds, tests, and prepares deployment",
+  "source": "Local",
+  "version": "1.0",
+  "metadata": {
+    "command": "bash",
+    "args": ["-c", "cargo build --release && cargo test && echo 'Ready to deploy'"],
+    "requires_approval": true
+  }
+}

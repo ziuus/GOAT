@@ -870,10 +870,10 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
 
         ActiveView::Tools => {
             let enabled = app.config.tools.enabled;
-            let lines = vec![
+            let mut lines = vec![
                 Line::from(""),
                 Line::from(Span::styled(
-                    " 🔧  Tool Registry",
+                    " 🔧  Tool Registry & Capabilities",
                     Style::default()
                         .fg(COLOR_HEADER_ACCENT)
                         .add_modifier(Modifier::BOLD),
@@ -887,45 +887,66 @@ fn build_view_content(app: &App) -> (&'static str, Vec<Line<'static>>) {
                         COLOR_ERROR
                     }),
                 )),
-                Line::from(Span::styled(
-                    " Timeout:  60s (default)",
-                    Style::default().fg(Color::Rgb(120, 140, 190)),
-                )),
                 Line::from(""),
-                Line::from(Span::styled(
-                    " Built-in tools:",
-                    Style::default().fg(COLOR_DIM),
-                )),
-                Line::from(Span::styled(
-                    "   bash         Shell execution (approval required)",
-                    Style::default().fg(Color::Rgb(110, 130, 175)),
-                )),
-                Line::from(Span::styled(
-                    "   read_file    Read any file from disk",
-                    Style::default().fg(Color::Rgb(110, 130, 175)),
-                )),
-                Line::from(Span::styled(
-                    "   write_file   Write/modify files (approval required)",
-                    Style::default().fg(Color::Rgb(110, 130, 175)),
-                )),
-                Line::from(Span::styled(
-                    "   list_dir     List directory contents",
-                    Style::default().fg(Color::Rgb(110, 130, 175)),
-                )),
-                Line::from(Span::styled(
-                    "   call_subagent  Spawn a subagent (approval required)",
-                    Style::default().fg(Color::Rgb(110, 130, 175)),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
-                    " All dangerous operations require ApprovalGate.",
-                    Style::default().fg(COLOR_DIM),
-                )),
-                Line::from(Span::styled(
-                    " Use /tools for full list in chat.",
-                    Style::default().fg(COLOR_HELP),
-                )),
             ];
+
+            let native_tools = app.tool_registry.list_all();
+            lines.push(Line::from(Span::styled(
+                format!(" Built-in Tools ({}):", native_tools.len()),
+                Style::default().fg(COLOR_DIM),
+            )));
+            for t in native_tools {
+                lines.push(Line::from(Span::styled(
+                    format!("   {:<15} {}", t.name, t.description),
+                    Style::default().fg(Color::Rgb(110, 130, 175)),
+                )));
+            }
+
+            let mcp_tools = app.mcp_manager.all_tools();
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!(" MCP Tools ({}):", mcp_tools.len()),
+                Style::default().fg(COLOR_DIM),
+            )));
+            for t in mcp_tools {
+                if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
+                    lines.push(Line::from(Span::styled(
+                        format!("   {}", name),
+                        Style::default().fg(Color::Rgb(110, 160, 140)),
+                    )));
+                }
+            }
+
+            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(app.paths.clone());
+            if let Ok(caps) = adapter.list_all() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    format!(" Extension Capabilities ({}):", caps.len()),
+                    Style::default().fg(COLOR_DIM),
+                )));
+                for rc in caps {
+                    lines.push(Line::from(Span::styled(
+                        format!(
+                            "   {:<20} | {:<15} | {}",
+                            rc.capability.id,
+                            format!("{:?}", rc.capability.capability_type),
+                            rc.status
+                        ),
+                        Style::default().fg(Color::Rgb(180, 140, 180)),
+                    )));
+                }
+            }
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                " All dangerous operations require ApprovalGate.",
+                Style::default().fg(COLOR_DIM),
+            )));
+            lines.push(Line::from(Span::styled(
+                " Use /tool prepare <id> or /tool show <id> in chat.",
+                Style::default().fg(COLOR_HELP),
+            )));
+
             (" 🔧 Tools ", lines)
         }
 

@@ -97,7 +97,10 @@ pub enum Command {
     /// database, legacy DB migration status, provider keys, profile + chain,
     /// ApprovalGate, headless readiness, log directory.
     #[command(name = "doctor")]
-    Doctor,
+    Doctor {
+        /// Mode (e.g. 'alpha' for alpha readiness check)
+        mode: Option<String>,
+    },
 
     /// Migrate the legacy project-root goat_brain.db to the XDG data path.
     ///
@@ -299,6 +302,9 @@ pub enum Command {
     Validate {
         /// Project ID to validate
         project_id: Option<String>,
+        /// Extension capability recipe ID to run
+        #[arg(long)]
+        recipe: Option<String>,
         /// Associated mission ID
         #[arg(long)]
         mission: Option<String>,
@@ -441,6 +447,9 @@ pub enum Command {
         action: String,
         /// The name, query, or mission ID
         arg: Option<String>,
+        /// Extension capability ID to run skill from
+        #[arg(long)]
+        from_extension: Option<String>,
         /// Skill name for create commands
         #[arg(long)]
         name: Option<String>,
@@ -544,8 +553,47 @@ pub async fn handle_subcommand(
             Ok(true)
         }
 
-        Command::Doctor => {
-            let checks = crate::paths::run_doctor(paths, config, cli.headless);
+        Command::Doctor { mode } => {
+            let mut checks = crate::paths::run_doctor(paths, config, cli.headless);
+            if mode.as_deref() == Some("alpha") {
+                // Phase 9.4: Alpha Release Hardening Health Checks
+                checks.push(crate::paths::DoctorCheck {
+                    status: crate::paths::DoctorStatus::Info,
+                    label: "Alpha Readiness".to_string(),
+                    detail: "Running alpha readiness checks...".to_string(),
+                });
+                
+                // Check tools configuration
+                if config.tools.enabled {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Ok,
+                        label: "Alpha: Tools".to_string(),
+                        detail: "Tools are enabled in configuration".to_string(),
+                    });
+                } else {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Warn,
+                        label: "Alpha: Tools".to_string(),
+                        detail: "Tools are currently disabled. Extension capabilities will not function properly.".to_string(),
+                    });
+                }
+                
+                // Check capability registry
+                let reg_path = paths.data_dir.join("capabilities").join("capabilities.json");
+                if reg_path.exists() {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Ok,
+                        label: "Alpha: Extension Registry".to_string(),
+                        detail: "Capability registry file exists".to_string(),
+                    });
+                } else {
+                    checks.push(crate::paths::DoctorCheck {
+                        status: crate::paths::DoctorStatus::Warn,
+                        label: "Alpha: Extension Registry".to_string(),
+                        detail: "Capability registry file not found. Run 'goat extension install' or manually register.".to_string(),
+                    });
+                }
+            }
             crate::paths::print_doctor_results(&checks);
             Ok(true)
         }
@@ -652,6 +700,7 @@ pub async fn handle_subcommand(
         Command::Skills {
             action,
             arg,
+            from_extension,
             name,
             session,
         } => {
@@ -660,6 +709,7 @@ pub async fn handle_subcommand(
                 config,
                 action,
                 arg.as_deref(),
+                from_extension.as_deref(),
                 name.as_deref(),
                 session.as_deref(),
             )
@@ -1256,6 +1306,7 @@ pub async fn handle_subcommand(
         }
         Command::Validate {
             project_id,
+            recipe,
             mission,
             patch,
             auto_approve,
@@ -1263,10 +1314,103 @@ pub async fn handle_subcommand(
             let val_mgr = crate::validation::ValidationManager::new();
             let pi_mgr = crate::project_intelligence::ProjectIntelligenceManager::new();
 
+            // Phase 9.4: Extension capability validation recipes
+            if let Some(recipe_id) = recipe {
+                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+                match adapter.prepare(&recipe_id) {
+                    Ok(prep) => {
+                        if !prep.safe_to_invoke {
+                            println!("✗ Validation recipe '{}' is NOT safe to run:", recipe_id);
+                            println!("  Status: {}", prep.status);
+                            for c in prep.checks {
+                                if !c.passed {
+                                    println!("  - {}", c.message);
+                                }
+                            }
+                            return Ok(true);
+                        }
+
+                        // Get the command to run
+                        let reg = crate::capability_registry::CapabilityRegistry::new(&paths.data_dir).unwrap();
+                        if let Some(cap) = reg.get(&recipe_id) {
+                            if !matches!(cap.capability_type, crate::capability_registry::CapabilityType::ValidationRecipe) {
+                                println!("✗ Capability '{}' is not a ValidationRecipe.", recipe_id);
+                                return Ok(true);
+                            }
+                            let cmd = cap.metadata.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                            if cmd.is_empty() {
+                                println!("✗ Validation recipe '{}' has no 'command' in metadata.", recipe_id);
+                                return Ok(true);
+                            }
+
+                            println!("✓ Ready to run validation recipe: {}", cap.name);
+                            println!("  Source : {:?}", cap.source);
+                            println!("  Command: {}", crate::approval::redact_secrets(cmd));
+                            println!("  Risk   : {}", cap.risk_level);
+                            
+                            let mut gate = crate::approval::ApprovalGate::new();
+                            let req = crate::approval::ApprovalRequest {
+                                tool_name: format!("validate:{}", recipe_id),
+                                action_summary: format!("Run validation recipe '{}': {}", cap.name, crate::approval::redact_secrets(cmd)),
+                                risk_level: crate::capability_runtime::RuntimeCapability::parse_risk(&cap.risk_level),
+                                explanation: Some(format!("Source: {:?}", cap.source)),
+                                working_directory: None,
+                            };
+
+                            let decision = match gate.check_policy(&req) {
+                                Some(d) => d,
+                                None => {
+                                    println!();
+                                    for line in req.display_lines() {
+                                        println!("{}", line);
+                                    }
+                                    let mut input = String::new();
+                                    std::io::stdin().read_line(&mut input).unwrap_or(0);
+                                    let ch = input.trim().chars().next().unwrap_or('n');
+                                    gate.resolve(&req, ch)
+                                }
+                            };
+
+                            if let crate::approval::ApprovalDecision::Denied(reason) = decision {
+                                println!("✗ Denied: {}", reason);
+                                return Ok(true);
+                            }
+
+                            println!("Running validation...");
+                            let parts: Vec<&str> = cmd.split_whitespace().collect();
+                            let (cmd_exec, args) = parts.split_first().unwrap();
+                            let output = std::process::Command::new(cmd_exec).args(args).output();
+                            match output {
+                                Ok(out) => {
+                                    let success = out.status.success();
+                                    let stdout = String::from_utf8_lossy(&out.stdout);
+                                    let stderr = String::from_utf8_lossy(&out.stderr);
+                                    if success {
+                                        println!("✓ Validation passed.");
+                                        println!("{}", stdout);
+                                    } else {
+                                        println!("✗ Validation failed (exit code {}).", out.status.code().unwrap_or(-1));
+                                        println!("{}", stdout);
+                                        eprintln!("{}", stderr);
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("✗ Failed to execute validation recipe: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("✗ Failed to prepare validation recipe '{}': {}", recipe_id, e);
+                    }
+                }
+                return Ok(true);
+            }
+
             let pid = if let Some(id) = project_id {
                 id.clone()
             } else {
-                println!("No project ID provided. Usage: goat validate <project_id>");
+                println!("No project ID provided. Usage: goat validate <project_id> or goat validate --recipe <id>");
                 return Ok(true);
             };
 
@@ -2757,6 +2901,7 @@ async fn handle_skills_command(
     config: &crate::config::Config,
     action: &str,
     arg: Option<&str>,
+    from_extension: Option<&str>,
     name_arg: Option<&str>,
     session_id: Option<&str>,
 ) -> anyhow::Result<()> {
@@ -2849,6 +2994,89 @@ async fn handle_skills_command(
             }
         }
         "run" => {
+            // Phase 9.4: Support running skills from extension capabilities
+            if let Some(ext_id) = from_extension {
+                println!("Running skill via extension capability '{}'...", ext_id);
+                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(paths.clone());
+                match adapter.prepare(ext_id) {
+                    Ok(prep) => {
+                        if !prep.safe_to_invoke {
+                            println!("✗ Capability '{}' is NOT safe to run:", ext_id);
+                            println!("  Status: {}", prep.status);
+                            return Ok(());
+                        }
+
+                        let reg = crate::capability_registry::CapabilityRegistry::new(&paths.data_dir).unwrap();
+                        if let Some(cap) = reg.get(ext_id) {
+                            if !matches!(cap.capability_type, crate::capability_registry::CapabilityType::Skill) {
+                                println!("✗ Capability '{}' is not a Skill.", ext_id);
+                                return Ok(());
+                            }
+                            let cmd = cap.metadata.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                            if cmd.is_empty() {
+                                println!("✗ Skill extension '{}' has no 'command'.", ext_id);
+                                return Ok(());
+                            }
+                            let skill_name = arg.unwrap_or_default();
+                            println!("✓ Ready to run skill extension: {}", cap.name);
+                            println!("  Command: {} {}", cmd, skill_name);
+
+                            let mut gate = crate::approval::ApprovalGate::new();
+                            let req = crate::approval::ApprovalRequest {
+                                tool_name: format!("skill:{}", ext_id),
+                                action_summary: format!("Run skill via extension '{}': {} {}", cap.name, cmd, skill_name),
+                                risk_level: crate::capability_runtime::RuntimeCapability::parse_risk(&cap.risk_level),
+                                explanation: Some(format!("Source: {:?}", cap.source)),
+                                working_directory: None,
+                            };
+
+                            let decision = match gate.check_policy(&req) {
+                                Some(d) => d,
+                                None => {
+                                    println!();
+                                    for line in req.display_lines() {
+                                        println!("{}", line);
+                                    }
+                                    let mut input = String::new();
+                                    std::io::stdin().read_line(&mut input).unwrap_or(0);
+                                    let ch = input.trim().chars().next().unwrap_or('n');
+                                    gate.resolve(&req, ch)
+                                }
+                            };
+
+                            if let crate::approval::ApprovalDecision::Denied(reason) = decision {
+                                println!("✗ Denied: {}", reason);
+                                return Ok(());
+                            }
+
+                            println!("Running...");
+                            let parts: Vec<&str> = cmd.split_whitespace().collect();
+                            let (cmd_exec, args) = parts.split_first().unwrap();
+                            let mut full_args = args.to_vec();
+                            if !skill_name.is_empty() {
+                                full_args.push(skill_name);
+                            }
+                            let output = std::process::Command::new(cmd_exec).args(&full_args).output();
+                            match output {
+                                Ok(out) => {
+                                    if out.status.success() {
+                                        println!("✓ Skill execution completed.");
+                                        println!("{}", String::from_utf8_lossy(&out.stdout));
+                                    } else {
+                                        println!("✗ Skill execution failed.");
+                                        println!("{}", String::from_utf8_lossy(&out.stdout));
+                                        eprintln!("{}", String::from_utf8_lossy(&out.stderr));
+                                    }
+                                }
+                                Err(e) => println!("✗ Execution error: {}", e),
+                            }
+                        }
+                    }
+                    Err(e) => println!("✗ Failed to prepare extension: {}", e),
+                }
+                return Ok(());
+            }
+
             let name = arg.ok_or_else(|| anyhow::anyhow!("Expected skill name"))?;
             let skill = skill_manager
                 .get_skill(name)

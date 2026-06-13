@@ -1,0 +1,12 @@
+{
+  "id": "example-validator",
+  "name": "Rust Test Suite",
+  "capability_type": "ValidationRecipe",
+  "risk_level": "Low",
+  "description": "Runs cargo test in the current directory",
+  "source": "Local",
+  "version": "1.0",
+  "metadata": {
+    "command": "cargo test --workspace"
+  }
+}

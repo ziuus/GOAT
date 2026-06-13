@@ -1,0 +1,14 @@
+{
+  "id": "example-basic-skill",
+  "name": "Format Codebase",
+  "capability_type": "Skill",
+  "risk_level": "Low",
+  "description": "Runs cargo fmt across the workspace",
+  "source": "Local",
+  "version": "1.0",
+  "metadata": {
+    "command": "cargo",
+    "args": ["fmt"],
+    "guided_workflow": true
+  }
+}

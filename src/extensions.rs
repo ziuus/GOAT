@@ -104,6 +104,44 @@ pub struct ExtensionEntrypoints {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionToolMeta {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(default = "default_risk")]
+    pub risk_level: ExtensionRiskLevel,
+    #[serde(default)]
+    pub command: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionMcpServerMeta {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default = "default_risk")]
+    pub risk_level: ExtensionRiskLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionSkillMeta {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionValidationRecipeMeta {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoatExtensionManifest {
     pub extension: ExtensionMeta,
     #[serde(default)]
@@ -112,6 +150,15 @@ pub struct GoatExtensionManifest {
     pub permissions: ExtensionPermissions,
     #[serde(default)]
     pub entrypoints: ExtensionEntrypoints,
+
+    #[serde(default)]
+    pub skills: Vec<ExtensionSkillMeta>,
+    #[serde(default)]
+    pub mcp_servers: Vec<ExtensionMcpServerMeta>,
+    #[serde(default)]
+    pub validation_recipes: Vec<ExtensionValidationRecipeMeta>,
+    #[serde(default)]
+    pub tools: Vec<ExtensionToolMeta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,6 +269,20 @@ impl ExtensionManager {
         check_paths(&manifest.entrypoints.commands, "commands")?;
         check_paths(&manifest.entrypoints.mcp_servers, "mcp_servers")?;
         check_paths(&manifest.entrypoints.external_agents, "external_agents")?;
+
+        let check_meta_path = |p: &str, kind: &str| -> Result<()> {
+            if p.contains("..") || p.starts_with('/') {
+                return Err(anyhow!("Path traversal detected in {} meta: {}", kind, p));
+            }
+            Ok(())
+        };
+
+        for s in &manifest.skills {
+            check_meta_path(&s.path, "skills")?;
+        }
+        for v in &manifest.validation_recipes {
+            check_meta_path(&v.path, "validation_recipes")?;
+        }
 
         Ok(manifest)
     }

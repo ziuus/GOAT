@@ -1517,35 +1517,9 @@ impl App {
                 let subcommand = _args;
                 match subcommand {
                     "list" | "" => {
-                        let tools = self
-                            .tool_registry
-                            .list_all()
-                            .into_iter()
-                            .cloned()
-                            .collect::<Vec<_>>();
-                        self.push_log(format!(
-                            "[TOOLS] GOAT Tool Registry ({} tools)",
-                            tools.len()
-                        ));
-                        for t in &tools {
-                            let perm = self
-                                .tool_registry
-                                .get_permission(&t.name, &self.config.tools);
-                            self.push_log(format!(
-                                "[TOOLS]   {:<15} [{:?}] - {}",
-                                t.name, perm, t.description
-                            ));
-                        }
-
-                        let mcp_tools = self.mcp_manager.all_tools();
-                        if !mcp_tools.is_empty() {
-                            self.push_log(format!("[TOOLS] {} MCP tools:", mcp_tools.len()));
-                            for t in &mcp_tools {
-                                if let Some(name) = t.get("name").and_then(|v| v.as_str()) {
-                                    self.push_log(format!("[TOOLS]   {}", name));
-                                }
-                            }
-                        }
+                        // Switch view and log
+                        self.active_view = ActiveView::Tools;
+                        self.push_log("[TOOLS] Switching to Tools view. See capabilities in the Tools panel.".to_string());
                     }
                     "categories" => {
                         self.push_log(
@@ -1609,36 +1583,105 @@ impl App {
                         self.push_log("[TOOLS] No automatic installation yet. Future installs require approval and sandbox checks.".to_string());
                     }
                     name => {
-                        let tool_opt = self.tool_registry.get(name).cloned();
-                        if let Some(tool) = tool_opt {
-                            let perm = self
-                                .tool_registry
-                                .get_permission(&tool.name, &self.config.tools);
-                            self.push_log(format!("[TOOLS] Tool: {}", tool.name));
-                            self.push_log(format!("[TOOLS] Category: {}", tool.category));
-                            self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
-                            self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
-                        } else {
-                            self.push_log(format!("[TOOLS] Tool '{}' not found.", name));
-                        }
+                        self.push_log(format!("[TOOLS] Unknown tools subcommand '{}'. Use: /tools list|categories|doctor|audit", name));
                     }
                 }
                 true
             }
 
             "/tool" => {
-                let name = _args;
-                let tool_opt = self.tool_registry.get(name).cloned();
-                if let Some(tool) = tool_opt {
-                    let perm = self
-                        .tool_registry
-                        .get_permission(&tool.name, &self.config.tools);
-                    self.push_log(format!("[TOOLS] Tool: {}", tool.name));
-                    self.push_log(format!("[TOOLS] Category: {}", tool.category));
-                    self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
-                    self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
-                } else {
-                    self.push_log(format!("[TOOLS] Tool '{}' not found.", name));
+                let parts: Vec<&str> = _args.splitn(2, ' ').collect();
+                let cmd = parts[0];
+                let target_id = parts.get(1).unwrap_or(&"");
+
+                if cmd.is_empty() {
+                    self.active_view = ActiveView::Tools;
+                    self.push_log("[TOOLS] Switching to Tools view.".to_string());
+                    return true;
+                }
+
+                match cmd {
+                    "show" => {
+                        if target_id.is_empty() {
+                            self.push_log("[TOOLS] Usage: /tool show <id>");
+                        } else {
+                            let tool_opt = self.tool_registry.get(target_id).cloned();
+                            if let Some(tool) = tool_opt {
+                                let perm = self
+                                    .tool_registry
+                                    .get_permission(&tool.name, &self.config.tools);
+                                self.push_log(format!("[TOOLS] Native Tool: {}", tool.name));
+                                self.push_log(format!("[TOOLS] Category: {}", tool.category));
+                                self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
+                                self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
+                            } else {
+                                // Fallback to capability registry
+                                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                                if let Ok(Some(rc)) = adapter.resolve(target_id) {
+                                    self.push_log(format!("[TOOLS] Extension Capability: {}", rc.capability.id));
+                                    self.push_log(format!("[TOOLS] Name: {}", rc.capability.name));
+                                    self.push_log(format!("[TOOLS] Type: {:?}", rc.capability.capability_type));
+                                    self.push_log(format!("[TOOLS] Risk: {}", rc.capability.risk_level));
+                                    self.push_log(format!("[TOOLS] Status: {}", rc.status));
+                                    self.push_log(format!("[TOOLS] Description: {}", rc.capability.description));
+                                } else {
+                                    self.push_log(format!("[TOOLS] Tool/Capability '{}' not found.", target_id));
+                                }
+                            }
+                        }
+                    }
+                    "prepare" => {
+                        if target_id.is_empty() {
+                            self.push_log("[TOOLS] Usage: /tool prepare <capability-id>");
+                        } else {
+                            let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                            match adapter.prepare(target_id) {
+                                Ok(result) => {
+                                    self.push_log(format!("[TOOLS] Prepare: {}", result.capability_id));
+                                    self.push_log(format!("  Status: {}", result.status));
+                                    self.push_log(format!("  Approval Required: {}", result.approval_required));
+                                    for check in result.checks {
+                                        let icon = if check.passed { "✓" } else { "✗" };
+                                        self.push_log(format!("  {} {} — {}", icon, check.label, check.message));
+                                    }
+                                    if result.safe_to_invoke {
+                                        self.push_log(format!("[TOOLS] READY. Use 'goat tools invoke {}' in terminal to execute.", target_id));
+                                    } else {
+                                        self.push_log("[TOOLS] NOT READY. Fix failed checks above.");
+                                    }
+                                }
+                                Err(e) => {
+                                    self.push_log(format!("[TOOLS] Prepare failed: {}", e));
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // If user just typed `/tool name`, act like `show name`
+                        let target_id = if target_id.is_empty() { cmd } else { target_id };
+                        if target_id.is_empty() {
+                            self.push_log("[TOOLS] Usage: /tool show <id> | /tool prepare <id>");
+                        } else {
+                            let tool_opt = self.tool_registry.get(target_id).cloned();
+                            if let Some(tool) = tool_opt {
+                                let perm = self
+                                    .tool_registry
+                                    .get_permission(&tool.name, &self.config.tools);
+                                self.push_log(format!("[TOOLS] Tool: {}", tool.name));
+                                self.push_log(format!("[TOOLS] Risk: {}", tool.risk_level));
+                                self.push_log(format!("[TOOLS] Effective Permission: {:?}", perm));
+                            } else {
+                                let adapter = crate::capability_runtime::CapabilityRuntimeAdapter::new(self.paths.clone());
+                                if let Ok(Some(rc)) = adapter.resolve(target_id) {
+                                    self.push_log(format!("[TOOLS] Capability: {}", rc.capability.id));
+                                    self.push_log(format!("[TOOLS] Type: {:?}", rc.capability.capability_type));
+                                    self.push_log(format!("[TOOLS] Status: {}", rc.status));
+                                } else {
+                                    self.push_log(format!("[TOOLS] Tool '{}' not found.", target_id));
+                                }
+                            }
+                        }
+                    }
                 }
                 true
             }
@@ -6379,5 +6422,19 @@ impl App {
 
         // Send the step to the LLM.
         self.handle_user_input(msg).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_status_label() {
+        assert_eq!(AppStatus::Ready.label(), "READY");
+        assert_eq!(AppStatus::Thinking.label(), "THINKING…");
+        assert_eq!(AppStatus::ToolRunning("test".to_string()).label(), "RUNNING: test");
+        assert_eq!(AppStatus::WaitingApproval("test".to_string()).label(), "APPROVAL REQUIRED: test");
+        assert_eq!(AppStatus::Error("error msg".to_string()).label(), "ERROR: error msg");
     }
 }
